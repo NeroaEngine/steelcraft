@@ -1,0 +1,312 @@
+/*
+  Accounting Hard Lock
+  Brand controls may change color tokens, but they must not change Accounting's structure.
+  This file must load last. It intentionally overrides the old global ERP accounting rules.
+*/
+
+.workspace:has(.accounting-section-nav),
+.workspace:has(.accounting-subroom-header) {
+  width: min(100%, 1280px) !important;
+  max-width: 1280px !important;
+  margin-inline: auto !important;
+  gap: 12px !important;
+}
+
+.accounting-tabs,
+.accounting-tabs button {
+  display: none !important;
+  visibility: hidden !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  overflow: hidden !important;
+}
+
+.accounting-section-nav {
+  border-radius: 22px !important;
+  padding: 12px 16px !important;
+  display: grid !important;
+  gap: 10px !important;
+  overflow: hidden !important;
+}
+
+.accounting-room-title {
+  display: none !important;
+}
+
+.accounting-nav-row {
+  display: grid !important;
+  grid-template-columns: minmax(240px, 360px) 1fr !important;
+  gap: 14px !important;
+  align-items: end !important;
+}
+
+.accounting-nav-row label {
+  margin: 0 !important;
+}
+
+.accounting-nav-row label > span {
+  display: block !important;
+  margin: 0 0 6px !important;
+  color: var(--brand-accent) !important;
+  font-size: 0.68rem !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.18em !important;
+  text-transform: uppercase !important;
+}
+
+.accounting-nav-row select {
+  min-height: 44px !important;
+  border-radius: 999px !important;
+}
+
+.accounting-header-actions.compact,
+.accounting-header-actions {
+  display: flex !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+  gap: 10px !important;
+  flex-wrap: wrap !important;
+}
+
+.accounting-header-actions button,
+.accounting-header-actions.compact button,
+.accounting-actions-list button,
+.accounting-live-form > button,
+.accounting-form-card button {
+  min-height: 40px !important;
+  padding: 9px 15px !important;
+  border-radius: 999px !important;
+}
+
+.accounting-subroom-header {
+  min-height: 0 !important;
+  padding: 18px 24px !important;
+  display: grid !important;
+  grid-template-columns: 1fr auto !important;
+  align-items: center !important;
+  gap: 18px !important;
+}
+
+.accounting-subroom-header h1 {
+  font-size: clamp(32px, 3.2vw, 48px) !important;
+  margin: 4px 0 6px !important;
+}
+
+.accounting-subroom-header p {
+  margin: 0 !important;
+  max-width: 620px !important;
+}
+
+.accounting-subroom-header .live-badge {
+  font-size: 12px !important;
+  max-width: 240px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.accounting-focus-grid,
+.accounting-workspace-grid,
+.accounting-data-grid,
+.accounting-stat-grid,
+.accounting-page-format {
+  width: 100% !important;
+  max-width: 1120px !important;
+  margin-inline: auto !important;
+}
+
+.accounting-page-format {
+  display: grid !important;
+  grid-template-columns: minmax(0, 0.94fr) minmax(320px, 0.56fr) !important;
+  gap: 16px !important;
+  align-items: start !important;
+}
+
+.accounting-page-format > .accounting-primary-card {
+  grid-column: 1 !important;
+}
+
+.accounting-page-format > .accounting-side-stack {
+  grid-column: 2 !important;
+  display: grid !important;
+  gap: 16px !important;
+}
+
+.accounting-focus-grid {
+  display: grid !important;
+  grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
+  gap: 16px !important;
+  align-items: start !important;
+}
+
+.accounting-focus-grid > .feature {
+  grid-column: span 6 !important;
+  width: 100% !important;
+  min-height: 0 !important;
+}
+
+/* Kill the old full-width intro cards that made Money In / Money Out look like a long ERP feed. */
+.accounting-focus-grid > .feature:first-child:has(.accounting-actions-list),
+.accounting-focus-grid > .feature:first-child:not(:has(form)):not(:has(.accounting-table)):not(:has(.accounting-stat-grid)) {
+  display: none !important;
+}
+
+.accounting-workspace-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 16px !important;
+}
+
+.accounting-data-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 16px !important;
+}
+
+.accounting-stat-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 16px !important;
+}
+
+.accounting-form-card,
+.accounting-stat,
+.accounting-workflow-card {
+  min-height: 0 !important;
+}
+
+.accounting-form-card {
+  padding: 22px !important;
+}
+
+.accounting-form-card h2,
+.accounting-workflow-card h2,
+.accounting-focus-grid .feature h2 {
+  font-size: clamp(24px, 2.1vw, 34px) !important;
+  margin: 0 0 10px !important;
+}
+
+.accounting-form-card p {
+  max-width: 620px !important;
+  margin-top: 0 !important;
+}
+
+.accounting-live-form,
+.accounting-form-card form {
+  display: grid !important;
+  gap: 14px !important;
+}
+
+.accounting-card-section {
+  padding: 14px !important;
+  margin: 0 !important;
+  border: 1px solid color-mix(in srgb, var(--line) 72%, transparent) !important;
+  border-radius: 18px !important;
+  background: color-mix(in srgb, var(--surface-alt) 55%, transparent) !important;
+}
+
+.accounting-card-section + .accounting-card-section {
+  margin-top: 0 !important;
+}
+
+.accounting-card-section h3 {
+  margin: 0 0 12px !important;
+  color: var(--brand-accent) !important;
+  font-size: 0.82rem !important;
+  letter-spacing: 0.16em !important;
+  text-transform: uppercase !important;
+}
+
+.accounting-card-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(180px, 1fr)) !important;
+  gap: 12px !important;
+}
+
+.accounting-card-grid label,
+.accounting-live-form label,
+.accounting-form-card form label {
+  margin: 0 !important;
+}
+
+.accounting-card-grid input,
+.accounting-card-grid select,
+.accounting-card-grid textarea,
+.accounting-live-form input,
+.accounting-live-form select,
+.accounting-live-form textarea,
+.accounting-form-card form input,
+.accounting-form-card form select,
+.accounting-form-card form textarea {
+  min-height: 42px !important;
+}
+
+.accounting-card-grid textarea,
+.accounting-live-form textarea,
+.accounting-form-card form textarea {
+  min-height: 76px !important;
+}
+
+.accounting-side-stack .accounting-card-grid {
+  grid-template-columns: 1fr !important;
+}
+
+.accounting-table {
+  display: grid !important;
+  gap: 8px !important;
+}
+
+.accounting-table-row {
+  display: grid !important;
+  grid-template-columns: minmax(160px, 0.75fr) minmax(160px, 1fr) auto !important;
+  align-items: center !important;
+  gap: 10px !important;
+  min-height: 52px !important;
+  padding: 10px 12px !important;
+  border-radius: 14px !important;
+}
+
+.accounting-table-row b {
+  justify-self: end !important;
+}
+
+@media (max-width: 1180px) {
+  .accounting-nav-row,
+  .accounting-page-format {
+    grid-template-columns: 1fr !important;
+  }
+
+  .accounting-page-format > .accounting-primary-card,
+  .accounting-page-format > .accounting-side-stack {
+    grid-column: auto !important;
+  }
+
+  .accounting-focus-grid,
+  .accounting-workspace-grid,
+  .accounting-data-grid,
+  .accounting-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .accounting-subroom-header,
+  .accounting-focus-grid,
+  .accounting-workspace-grid,
+  .accounting-data-grid,
+  .accounting-stat-grid,
+  .accounting-card-grid,
+  .accounting-table-row {
+    grid-template-columns: 1fr !important;
+  }
+
+  .accounting-subroom-header {
+    padding: 18px !important;
+  }
+
+  .accounting-table-row b {
+    justify-self: start !important;
+  }
+}
