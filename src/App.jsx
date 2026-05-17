@@ -6,6 +6,7 @@ import './styles.css';
 import './brandGeometry.js';
 import './brandThemePacks.js';
 import './accountingLayout.css';
+import './accountingHardLock.css';
 
 const brandKey = 'steelcraft_brand_controls_v1';
 const enabledKey = 'steelcraft_enabled_portals_v1';
