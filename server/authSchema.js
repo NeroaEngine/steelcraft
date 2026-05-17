@@ -4,6 +4,10 @@ const ITERATIONS = 120000;
 const KEYLEN = 64;
 const DIGEST = 'sha512';
 
+function getBootstrapPassword() {
+  return process.env.AUTH_BOOTSTRAP_PASSWORD || process.env.NEROA_AUTH_BOOTSTRAP_PASSWORD || process.env.STEELCRAFT_AUTH_BOOTSTRAP_PASSWORD || process.env.ERP_BOOTSTRAP_PASSWORD || null;
+}
+
 function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
   const hash = crypto.pbkdf2Sync(password, salt, ITERATIONS, KEYLEN, DIGEST).toString('hex');
   return { salt, hash };
@@ -40,7 +44,7 @@ export async function ensureAuthSchema(db) {
 
 export async function seedAuthUsers(db) {
   await ensureAuthSchema(db);
-  const bootstrapPassword = process.env.AUTH_BOOTSTRAP_PASSWORD || process.env.NEROA_AUTH_BOOTSTRAP_PASSWORD || null;
+  const bootstrapPassword = getBootstrapPassword();
   const credentials = bootstrapPassword ? hashPassword(bootstrapPassword) : { salt: null, hash: null };
   const users = [
     { email: 'seth@steelcraftbuilders.com', fullName: 'Seth Mcbride', role: 'admin', language: 'en' },
@@ -56,10 +60,11 @@ export async function seedAuthUsers(db) {
          role = excluded.role,
          language = coalesce(erp_users.language, excluded.language),
          status = 'active',
-         password_hash = coalesce(erp_users.password_hash, excluded.password_hash),
-         password_salt = coalesce(erp_users.password_salt, excluded.password_salt),
+         password_hash = case when $9::boolean then excluded.password_hash else erp_users.password_hash end,
+         password_salt = case when $9::boolean then excluded.password_salt else erp_users.password_salt end,
+         must_change_password = case when $9::boolean then true else erp_users.must_change_password end,
          updated_at = now()`,
-      [user.email, user.fullName, user.role, user.language, credentials.hash, credentials.salt, Boolean(bootstrapPassword), user]
+      [user.email, user.fullName, user.role, user.language, credentials.hash, credentials.salt, Boolean(bootstrapPassword), user, Boolean(bootstrapPassword)]
     );
   }
 }
@@ -89,7 +94,7 @@ export async function authenticateUser(db, email, password) {
   const user = result.rows[0];
   if (!user) return null;
 
-  const bootstrapPassword = process.env.AUTH_BOOTSTRAP_PASSWORD || process.env.NEROA_AUTH_BOOTSTRAP_PASSWORD || null;
+  const bootstrapPassword = getBootstrapPassword();
   if (!user.password_hash || !user.password_salt) {
     if (!bootstrapPassword || password !== bootstrapPassword) return null;
   } else if (!verifyPassword(password, user.password_salt, user.password_hash)) {
