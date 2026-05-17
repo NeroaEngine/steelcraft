@@ -13,6 +13,10 @@ function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
   return { salt, hash };
 }
 
+function hashToken(token) {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
 export function verifyPassword(password, salt, expectedHash) {
   if (!password || !salt || !expectedHash) return false;
   const { hash } = hashPassword(password, salt);
@@ -38,6 +42,19 @@ export async function ensureAuthSchema(db) {
       raw jsonb not null default '{}'::jsonb,
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now()
+    );
+
+    create table if not exists erp_password_reset_tokens (
+      id bigserial primary key,
+      user_id bigint references erp_users(id) on delete cascade,
+      email text not null,
+      token_hash text not null unique,
+      status text not null default 'active' check (status in ('active','used','expired')),
+      expires_at timestamptz not null,
+      used_at timestamptz,
+      requested_ip text,
+      raw jsonb not null default '{}'::jsonb,
+      created_at timestamptz not null default now()
     );
   `);
 }
@@ -86,6 +103,44 @@ export async function updateUserLanguage(db, userId, language) {
     [language || 'en', userId]
   );
   return result.rows[0] || null;
+}
+
+export async function requestPasswordReset(db, email, requestedIp = null) {
+  await ensureAuthSchema(db);
+  const userResult = await db.query(`select id, email, full_name, role, status from erp_users where lower(email) = lower($1) and status = 'active'`, [email || '']);
+  const user = userResult.rows[0] || null;
+  if (!user) return { sent: false, user: null, resetUrl: null, token: null };
+
+  await db.query(`update erp_password_reset_tokens set status = 'expired' where user_id = $1 and status = 'active'`, [user.id]);
+  const token = crypto.randomBytes(32).toString('hex');
+  const tokenHash = hashToken(token);
+  const expiresAt = new Date(Date.now() + 1000 * 60 * 30);
+  await db.query(
+    `insert into erp_password_reset_tokens (user_id, email, token_hash, expires_at, requested_ip, raw) values ($1,$2,$3,$4,$5,$6)`,
+    [user.id, user.email, tokenHash, expiresAt, requestedIp, { requestedFrom: 'login_forgot_password' }]
+  );
+  const baseUrl = process.env.PUBLIC_APP_URL || process.env.APP_URL || process.env.DIGITALOCEAN_APP_URL || 'https://stingray-app-npaac.ondigitalocean.app';
+  return { sent: true, user, token, resetUrl: `${baseUrl.replace(/\/$/, '')}/reset-password?token=${token}` };
+}
+
+export async function resetPasswordWithToken(db, token, password) {
+  await ensureAuthSchema(db);
+  if (!token || !password || password.length < 8) return null;
+  const tokenHash = hashToken(token);
+  const result = await db.query(
+    `select prt.*, eu.email, eu.full_name, eu.role
+     from erp_password_reset_tokens prt
+     join erp_users eu on eu.id = prt.user_id
+     where prt.token_hash = $1 and prt.status = 'active' and prt.expires_at > now()
+     limit 1`,
+    [tokenHash]
+  );
+  const reset = result.rows[0];
+  if (!reset) return null;
+  const credentials = hashPassword(password);
+  await db.query(`update erp_users set password_hash = $1, password_salt = $2, must_change_password = false, updated_at = now() where id = $3`, [credentials.hash, credentials.salt, reset.user_id]);
+  await db.query(`update erp_password_reset_tokens set status = 'used', used_at = now() where id = $1`, [reset.id]);
+  return { id: reset.user_id, email: reset.email, name: reset.full_name, role: reset.role };
 }
 
 export async function authenticateUser(db, email, password) {
