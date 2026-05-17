@@ -21,7 +21,23 @@ const port = process.env.PORT || 8080;
 const mondayApiUrl = process.env.MONDAY_API_URL || 'https://api.monday.com/v2';
 
 app.use(express.json({ limit: '10mb' }));
-app.use(express.static(path.join(__dirname, 'dist')));
+app.use((req, res, next) => {
+  if (req.path === '/' || req.path.endsWith('.html')) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+  next();
+});
+app.use(express.static(path.join(__dirname, 'dist'), {
+  etag: false,
+  lastModified: false,
+  setHeaders(res, filePath) {
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    }
+  }
+}));
 
 function getDatabaseUrl() {
   if (!process.env.DATABASE_URL) return null;
@@ -114,6 +130,8 @@ async function auditSteelCraftWorkflow({ save = false } = {}) {
   return mapped;
 }
 
+app.get('/api/build', (req, res) => { res.json({ ok: true, commit: 'runtime-fallback-fix', accountingHardLock: true }); });
+
 app.get('/api/health', async (req, res) => {
   const checks = { app: 'ok', database: 'not_configured', monday: process.env.MONDAY_API_TOKEN ? 'configured' : 'not_configured', spaces: process.env.DO_SPACES_BUCKET ? 'configured' : 'not_configured', auth: 'not_checked' };
   try { if (pool) { await pool.query('select 1 as ok'); checks.database = 'connected'; checks.auth = 'database_backed'; } } catch (error) { checks.database = `error: ${error.message}`; checks.auth = 'error'; }
@@ -168,6 +186,10 @@ app.get('/api/steelcraft/workflow/audit', async (req, res, next) => { try { cons
 app.get('/api/steelcraft/workflow/sources', async (req, res, next) => { try { await ensureSchema(); const result = await requireDatabase().query(`select id, source, source_board_id, internal_name, classification, destination, workflow_map, verification_checklist, pulled_at from steelcraft_workflow_sources order by internal_name`); res.json({ ok: true, sources: result.rows }); } catch (error) { next(error); } });
 app.get('/api/spaces/status', async (req, res, next) => { try { if (!process.env.DO_SPACES_KEY || !process.env.DO_SPACES_SECRET || !process.env.DO_SPACES_ENDPOINT) return res.json({ ok: false, configured: false }); const client = new S3Client({ endpoint: process.env.DO_SPACES_ENDPOINT, region: process.env.DO_SPACES_REGION || 'us-east-1', credentials: { accessKeyId: process.env.DO_SPACES_KEY, secretAccessKey: process.env.DO_SPACES_SECRET } }); await client.send(new ListBucketsCommand({})); res.json({ ok: true, configured: true, bucket: process.env.DO_SPACES_BUCKET || null }); } catch (error) { next(error); } });
 
-app.get('*', (req, res) => { res.sendFile(path.join(__dirname, 'dist', 'index.html')); });
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/')) return next();
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+});
 app.use((error, req, res, next) => { const status = error.statusCode || 500; res.status(status).json({ ok: false, error: error.message }); });
 app.listen(port, () => { console.log(`Steel Craft portal server listening on ${port}`); });
