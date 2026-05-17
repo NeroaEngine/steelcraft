@@ -1,9 +1,7 @@
 /* Clean accounting portal layout overrides.
-   This file intentionally lives after the main theme CSS so accounting rooms stay centered,
-   compact, and card-based without changing the whole ERP shell. */
+   Keep syntax conservative for the production build pipeline. */
 
-.workspace:has(.accounting-section-nav),
-.workspace:has(.accounting-subroom-header) {
+.workspace {
   width: min(100%, 1320px);
   max-width: 1320px;
   margin-inline: auto;
@@ -17,10 +15,15 @@
   display: grid;
   gap: 12px;
   overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--brand-accent) 18%, var(--line));
+  background:
+    radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--brand-accent) 12%, transparent), transparent 32%),
+    color-mix(in srgb, var(--surface) 92%, #000 8%);
 }
 
-.accounting-room-title {
-  display: none;
+.accounting-room-title,
+.accounting-tabs {
+  display: none !important;
 }
 
 .accounting-nav-row {
@@ -32,6 +35,22 @@
 
 .accounting-nav-row label {
   margin: 0;
+}
+
+.accounting-nav-row > label > span {
+  display: block;
+  margin: 0 0 6px;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--brand-accent) 86%, white 14%);
+}
+
+.accounting-nav-row select {
+  min-height: 46px;
+  border-radius: 999px;
+  font-weight: 900;
 }
 
 .accounting-header-actions.compact {
@@ -48,8 +67,10 @@
   border-radius: 999px;
 }
 
-.accounting-tabs {
-  display: none !important;
+.accounting-header-actions.compact button {
+  background: color-mix(in srgb, var(--button) 88%, #fff 12%);
+  border: 1px solid color-mix(in srgb, var(--button) 82%, #fff 18%);
+  box-shadow: 0 14px 34px rgb(0 0 0 / 0.18);
 }
 
 .accounting-subroom-header {
@@ -59,6 +80,9 @@
   grid-template-columns: 1fr auto;
   align-items: center;
   gap: 18px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--surface) 94%, transparent), color-mix(in srgb, var(--surface-alt) 88%, transparent)),
+    radial-gradient(circle at 86% 28%, color-mix(in srgb, var(--brand-accent) 11%, transparent), transparent 30%);
 }
 
 .accounting-subroom-header h1 {
@@ -69,6 +93,11 @@
 .accounting-subroom-header p {
   margin: 0;
   max-width: 620px;
+}
+
+.accounting-subroom-header .eyebrow {
+  font-size: 0.7rem;
+  letter-spacing: 0.22em;
 }
 
 .accounting-subroom-header .live-badge {
@@ -217,57 +246,6 @@
   min-height: 76px;
 }
 
-.accounting-table-row {
-  min-height: 52px;
-}
-
-.accounting-empty {
-  min-height: 64px;
-  display: grid;
-  align-items: center;
-}
-
-/* Locked minimal Accounting layout. These are not brand preferences. They keep the app from falling back into old ERP UI. */
-.accounting-compact-nav {
-  border: 1px solid color-mix(in srgb, var(--brand-accent) 18%, var(--line));
-  background:
-    radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--brand-accent) 12%, transparent), transparent 32%),
-    color-mix(in srgb, var(--surface) 92%, #000 8%);
-}
-
-.accounting-nav-row > label > span {
-  display: block;
-  margin: 0 0 6px;
-  font-size: 0.68rem;
-  font-weight: 900;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: color-mix(in srgb, var(--brand-accent) 86%, white 14%);
-}
-
-.accounting-nav-row select {
-  min-height: 46px;
-  border-radius: 999px;
-  font-weight: 900;
-}
-
-.accounting-header-actions.compact button {
-  background: color-mix(in srgb, var(--button) 88%, #fff 12%);
-  border: 1px solid color-mix(in srgb, var(--button) 82%, #fff 18%);
-  box-shadow: 0 14px 34px rgb(0 0 0 / 0.18);
-}
-
-.accounting-subroom-header {
-  background:
-    linear-gradient(135deg, color-mix(in srgb, var(--surface) 94%, transparent), color-mix(in srgb, var(--surface-alt) 88%, transparent)),
-    radial-gradient(circle at 86% 28%, color-mix(in srgb, var(--brand-accent) 11%, transparent), transparent 30%);
-}
-
-.accounting-subroom-header .eyebrow {
-  font-size: 0.7rem;
-  letter-spacing: 0.22em;
-}
-
 .accounting-page-format {
   display: grid !important;
   grid-template-columns: minmax(0, 0.94fr) minmax(320px, 0.56fr);
@@ -321,6 +299,7 @@
 }
 
 .accounting-table-row {
+  min-height: 52px;
   display: grid;
   grid-template-columns: minmax(160px, 0.75fr) minmax(160px, 1fr) auto;
   align-items: center;
@@ -335,6 +314,12 @@
   justify-self: end;
 }
 
+.accounting-empty {
+  min-height: 64px;
+  display: grid;
+  align-items: center;
+}
+
 .accounting-actions-list {
   display: flex;
   flex-wrap: wrap;
@@ -342,12 +327,12 @@
 }
 
 @media (max-width: 1180px) {
-  .workspace:has(.accounting-section-nav),
-  .workspace:has(.accounting-subroom-header) {
+  .workspace {
     max-width: 100%;
   }
 
-  .accounting-nav-row {
+  .accounting-nav-row,
+  .accounting-page-format {
     grid-template-columns: 1fr;
   }
 
@@ -363,14 +348,7 @@
   }
 
   .accounting-focus-grid > .feature,
-  .accounting-focus-grid > .feature:first-child {
-    grid-column: auto;
-  }
-
-  .accounting-page-format {
-    grid-template-columns: 1fr;
-  }
-
+  .accounting-focus-grid > .feature:first-child,
   .accounting-page-format > .accounting-primary-card,
   .accounting-page-format > .accounting-side-stack {
     grid-column: auto;
