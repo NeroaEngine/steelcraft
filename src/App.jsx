@@ -5,6 +5,7 @@ import { canonicalPortals, defaultTenantModuleMap, getTenantPortals, industryPac
 import './styles.css';
 import './brandGeometry.js';
 import './brandThemePacks.js';
+import './accountingLayout.css';
 
 const brandKey = 'steelcraft_brand_controls_v1';
 const enabledKey = 'steelcraft_enabled_portals_v1';
