@@ -1,0 +1,74 @@
+/* Accounting card polish: center small snapshot cards and keep lower list cards pulled up. */
+
+.accounting-focus-grid {
+  align-items: start !important;
+  grid-auto-flow: row dense !important;
+}
+
+.accounting-focus-grid > .feature {
+  align-self: start !important;
+}
+
+.accounting-focus-grid > .accounting-full-row,
+.accounting-report-room > .accounting-full-row,
+.accounting-reports-grid > .accounting-full-row {
+  grid-column: 1 / -1 !important;
+  margin-top: 0 !important;
+}
+
+.accounting-stat-grid.mini {
+  grid-template-columns: repeat(auto-fit, minmax(176px, 206px)) !important;
+  justify-content: center !important;
+  align-items: stretch !important;
+  gap: 16px !important;
+  width: 100% !important;
+}
+
+.accounting-stat-grid.mini .accounting-stat {
+  min-width: 176px !important;
+  min-height: 150px !important;
+  display: grid !important;
+  align-content: center !important;
+  justify-items: start !important;
+  padding: 22px !important;
+}
+
+.accounting-stat-grid.mini .accounting-stat span {
+  max-width: none !important;
+  white-space: normal !important;
+  line-height: 1.25 !important;
+}
+
+.accounting-stat-grid.mini .accounting-stat small {
+  max-width: none !important;
+  line-height: 1.35 !important;
+}
+
+.accounting-stat-grid.mini .accounting-stat strong {
+  white-space: nowrap !important;
+}
+
+.accounting-form-card:has(.accounting-stat-grid.mini) {
+  display: grid !important;
+  justify-content: center !important;
+}
+
+.accounting-form-card:has(.accounting-stat-grid.mini) > h2,
+.accounting-form-card:has(.accounting-stat-grid.mini) > p {
+  width: 100% !important;
+}
+
+.accounting-table-card,
+.accounting-form-card.accounting-full-row {
+  margin-top: 0 !important;
+}
+
+@media (max-width: 720px) {
+  .accounting-stat-grid.mini {
+    grid-template-columns: 1fr !important;
+  }
+
+  .accounting-stat-grid.mini .accounting-stat {
+    min-width: 0 !important;
+  }
+}
