@@ -7,8 +7,9 @@
   <link rel="stylesheet" href="/accounting-card-polish.css" />
   <link rel="stylesheet" href="/accounting-setup-polish.css" />
   <link rel="stylesheet" href="/comptroller-runtime-test.css" />
+  <link rel="stylesheet" href="/neroa-runtime-safe.css" />
   <style>
-    /* Stable shell overrides only. Runtime DOM injectors are disabled until moved into React modules. */
+    /* Stable shell overrides only. Runtime feature is a single guarded Neroa launcher. */
     .dashboard > .dock-trigger {
       position: fixed !important;
       z-index: 39 !important;
@@ -78,5 +79,6 @@
 <body>
   <div id="root"></div>
   <script type="module" src="/src/App.jsx"></script>
+  <script src="/neroa-runtime-safe.js"></script>
 </body>
 </html>
