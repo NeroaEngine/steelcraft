@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="/accounting-setup-polish.css" />
   <link rel="stylesheet" href="/comptroller-runtime-test.css" />
   <style>
-    /* The actual trigger is rendered as .dock-trigger outside the header. Target it directly. */
+    /* Stable shell overrides only. Runtime DOM injectors are disabled until moved into React modules. */
     .dashboard > .dock-trigger {
       position: fixed !important;
       z-index: 39 !important;
@@ -72,186 +72,11 @@
     .permission-toggle input { width: auto !important; }
     .permission-toggle strong { display:block; color: var(--text); }
     .permission-toggle small { display:block; color: var(--muted); margin-top: 2px; }
-    .quote-workbook-panel {
-      display: none;
-      grid-column: 1 / -1;
-      border: var(--border-width, 1px) solid color-mix(in srgb, var(--brand-accent) 48%, var(--line));
-      border-radius: var(--radius);
-      background: linear-gradient(145deg, color-mix(in srgb, var(--card) 92%, var(--brand-accent) 8%), color-mix(in srgb, var(--page-bg) 90%, var(--brand-accent) 10%));
-      padding: var(--card-padding);
-      box-shadow: 0 20px 60px color-mix(in srgb, var(--shadow) var(--shadow-strength), transparent);
-    }
-    .quote-workbook-panel.live { display: block; }
-    .quote-workbook-head {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 18px;
-      margin-bottom: 18px;
-    }
-    .quote-workbook-panel h2 {
-      color: var(--text);
-      font-size: clamp(28px, 3vw, 42px);
-      line-height: .95;
-      letter-spacing: -.06em;
-      margin: 8px 0 10px;
-    }
-    .quote-workbook-panel p,
-    .quote-status-card span,
-    .quote-step span { color: var(--muted); line-height: 1.55; }
-    .quote-upload-box {
-      border: 1px dashed color-mix(in srgb, var(--brand-accent) 58%, var(--line));
-      border-radius: var(--radius);
-      background: color-mix(in srgb, var(--surface-alt) 70%, transparent);
-      padding: 18px;
-      display: grid;
-      gap: 10px;
-    }
-    .quote-upload-box input { max-width: 520px; }
-    .quote-status-grid {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 10px;
-      margin: 18px 0;
-    }
-    .quote-status-card,
-    .quote-step {
-      border: 1px solid var(--line);
-      border-radius: calc(var(--radius) * .78);
-      background: color-mix(in srgb, var(--surface-alt) 72%, transparent);
-      padding: 13px;
-    }
-    .quote-status-card strong,
-    .quote-step strong { display:block; color: var(--text); }
-    .quote-status-card b {
-      display: inline-flex;
-      margin-top: 8px;
-      border-radius: var(--button-radius);
-      padding: 7px 10px;
-      background: color-mix(in srgb, var(--brand-accent) 18%, transparent);
-      color: var(--text);
-    }
-    .quote-step-list {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 10px;
-      margin-top: 14px;
-    }
-    .quote-actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:14px; }
-    .quote-actions button {
-      border: 1px solid color-mix(in srgb, var(--brand-accent) 42%, var(--line));
-      background: var(--button);
-      color: var(--button-text);
-      border-radius: var(--button-radius);
-      padding: 10px 13px;
-      font-weight: 900;
-    }
-    @media (max-width: 900px) {
-      .quote-workbook-head { display:block; }
-      .quote-status-grid,
-      .quote-step-list { grid-template-columns: 1fr; }
-    }
     @media (max-width: 760px) { .portal-permission-grid { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
   <div id="root"></div>
   <script type="module" src="/src/App.jsx"></script>
-  <script src="/accounting-demo-banking.js"></script>
-  <script src="/accounting-setup-polish.js"></script>
-  <script src="/comptroller-runtime-test.js"></script>
-  <script>
-    (function () {
-      function findWorkspace() {
-        return document.querySelector('.workspace');
-      }
-      function isEstimatingPortal() {
-        const workspace = findWorkspace();
-        const title = workspace && workspace.querySelector('.workspace-header h1');
-        return title && title.textContent.trim() === 'Estimating Portal';
-      }
-      function removeQuotePanelsOutsideEstimating() {
-        if (isEstimatingPortal()) return;
-        document.querySelectorAll('[data-quote-workbook="true"]').forEach(function(panel) {
-          panel.remove();
-        });
-      }
-      function buildPanel() {
-        const panel = document.createElement('section');
-        panel.className = 'quote-workbook-panel live';
-        panel.dataset.quoteWorkbook = 'true';
-        panel.innerHTML = `
-          <div class="quote-workbook-head">
-            <div>
-              <p class="eyebrow">Estimating workbook</p>
-              <h2>Quoting Sheet Engine</h2>
-              <p>This belongs in Estimating only. Upload the Excel quoting workbook here, then we map sheets, formulas, quote lines, labor/material fields, margin, and final quote output into the ERP database.</p>
-            </div>
-            <div class="live-badge">Estimating source file</div>
-          </div>
-          <div class="quote-upload-box">
-            <strong>Upload Steel Craft quoting spreadsheet</strong>
-            <span>Accepted: .xlsx, .xls, .xlsm, .csv. This front-end captures the file and marks the quote engine as staged. Backend parsing is the next connection.</span>
-            <input id="quoteWorkbookInput" type="file" accept=".xlsx,.xls,.xlsm,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
-            <div id="quoteWorkbookName" class="notice">No workbook uploaded in this session.</div>
-          </div>
-          <div class="quote-status-grid">
-            <div class="quote-status-card"><strong>File status</strong><span>Waiting for workbook</span><b id="quoteFileStatus">Not uploaded</b></div>
-            <div class="quote-status-card"><strong>Parser</strong><span>Needs backend endpoint</span><b>Next</b></div>
-            <div class="quote-status-card"><strong>Database target</strong><span>Estimating quote tables</span><b>PostgreSQL</b></div>
-            <div class="quote-status-card"><strong>Workflow handoff</strong><span>Estimating to Sales / Projects / Accounting</span><b>Planned</b></div>
-          </div>
-          <h2>Make it live path</h2>
-          <div class="quote-step-list">
-            <div class="quote-step"><strong>1. Import workbook</strong><span>Store the original Excel file and read workbook sheets.</span></div>
-            <div class="quote-step"><strong>2. Map quote fields</strong><span>Map line items, material, labor, tax, margin, totals, terms, and exclusions.</span></div>
-            <div class="quote-step"><strong>3. Generate quote</strong><span>Create quote records, printable proposals, and project handoff data.</span></div>
-          </div>
-          <div class="quote-actions">
-            <button type="button" id="quoteParseButton">Prepare parser endpoint</button>
-            <button type="button" id="quoteSchemaButton">Create quote schema plan</button>
-            <button type="button" id="quoteHandoffButton">Map handoff workflow</button>
-          </div>
-        `;
-        return panel;
-      }
-      function attachPanel() {
-        removeQuotePanelsOutsideEstimating();
-        const workspace = findWorkspace();
-        if (!workspace || !isEstimatingPortal()) return;
-        if (workspace.querySelector('[data-quote-workbook="true"]')) return;
-        const panel = buildPanel();
-        const header = workspace.querySelector('.workspace-header');
-        if (header && header.nextSibling) workspace.insertBefore(panel, header.nextSibling);
-        else workspace.appendChild(panel);
-        const input = panel.querySelector('#quoteWorkbookInput');
-        const name = panel.querySelector('#quoteWorkbookName');
-        const status = panel.querySelector('#quoteFileStatus');
-        input.addEventListener('change', function () {
-          const file = input.files && input.files[0];
-          if (!file) return;
-          const sizeKb = Math.max(1, Math.round(file.size / 1024));
-          name.textContent = file.name + ' uploaded locally (' + sizeKb + ' KB). Ready for backend parser wiring.';
-          status.textContent = 'Staged';
-          localStorage.setItem('steelcraft_quote_workbook_name', file.name);
-        });
-        ['quoteParseButton','quoteSchemaButton','quoteHandoffButton'].forEach(function(id) {
-          const btn = panel.querySelector('#' + id);
-          btn.addEventListener('click', function () {
-            name.textContent = btn.textContent + ' marked as next implementation step.';
-          });
-        });
-        const savedName = localStorage.getItem('steelcraft_quote_workbook_name');
-        if (savedName) {
-          name.textContent = savedName + ' was previously staged in this browser. Re-upload to parse/store it.';
-          status.textContent = 'Previously staged';
-        }
-      }
-      const observer = new MutationObserver(attachPanel);
-      observer.observe(document.documentElement, { childList: true, subtree: true });
-      window.addEventListener('load', attachPanel);
-      setInterval(attachPanel, 1200);
-    }());
-  </script>
 </body>
 </html>
