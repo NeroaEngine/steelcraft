@@ -1,0 +1,82 @@
+/* Accounting Setup room compact layout and automated setup priority. */
+
+.accounting-room-heading h1 {
+  font-size: clamp(30px, 2.8vw, 42px) !important;
+}
+
+.accounting-setup-grid {
+  align-items: start !important;
+  grid-auto-flow: row dense !important;
+}
+
+.accounting-setup-priority-card,
+.accounting-setup-advanced-card {
+  grid-column: 1 / -1 !important;
+}
+
+.accounting-setup-priority-card {
+  border-color: color-mix(in srgb, var(--brand-accent) 45%, var(--line)) !important;
+  background:
+    radial-gradient(circle at 10% 0%, color-mix(in srgb, var(--brand-accent) 15%, transparent), transparent 34%),
+    color-mix(in srgb, var(--surface) 92%, #000 8%) !important;
+}
+
+.accounting-setup-priority-card .accounting-worker-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.accounting-setup-priority-card .accounting-worker-item {
+  min-height: 78px;
+}
+
+.accounting-setup-advanced-card {
+  order: -8 !important;
+  min-height: 0 !important;
+}
+
+.accounting-setup-advanced-card pre {
+  max-height: 160px;
+  overflow: auto;
+}
+
+.accounting-setup-number-card,
+.accounting-setup-tax-card,
+.accounting-setup-compact-form {
+  min-height: 0 !important;
+}
+
+.accounting-setup-number-card .accounting-card-grid,
+.accounting-setup-tax-card .accounting-card-grid,
+.accounting-setup-compact-form .accounting-card-grid {
+  gap: 10px !important;
+}
+
+.accounting-setup-number-card .accounting-form-card,
+.accounting-setup-tax-card .accounting-form-card,
+.accounting-setup-compact-form .accounting-form-card {
+  padding: 18px !important;
+}
+
+.accounting-setup-grid > .feature h2 {
+  font-size: clamp(22px, 1.8vw, 30px) !important;
+  letter-spacing: -0.05em !important;
+}
+
+.accounting-setup-grid > .feature p {
+  font-size: 0.95rem !important;
+}
+
+.accounting-setup-grid input,
+.accounting-setup-grid select {
+  min-height: 38px !important;
+}
+
+.accounting-setup-grid .accounting-card-section {
+  padding: 12px !important;
+}
+
+@media (max-width: 900px) {
+  .accounting-setup-priority-card .accounting-worker-list {
+    grid-template-columns: 1fr;
+  }
+}
