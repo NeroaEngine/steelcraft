@@ -330,6 +330,19 @@
   grid-column: 2;
   display: grid;
   gap: 16px;
+  align-content: start;
+}
+
+.accounting-page-format > .accounting-side-stack > .feature:nth-child(2) {
+  order: -3;
+}
+
+.accounting-page-format > .accounting-side-stack > .feature:nth-child(3) {
+  order: -2;
+}
+
+.accounting-page-format > .accounting-side-stack > .feature:nth-child(1) {
+  order: -1;
 }
 
 .accounting-primary-card,
