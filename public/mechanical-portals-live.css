@@ -1,0 +1,149 @@
+.live-portal-enhanced .workspace-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(360px, .46fr);
+  align-items: start;
+}
+.live-module-shell {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, .42fr);
+  gap: 16px;
+  margin-top: 0;
+}
+.live-module-card {
+  border: 1px solid color-mix(in srgb, var(--brand-accent, #9f3d42) 22%, var(--line, #343036));
+  border-radius: var(--radius, 22px);
+  background:
+    radial-gradient(circle at 8% 0%, color-mix(in srgb, var(--brand-accent, #9f3d42) 10%, transparent), transparent 34%),
+    color-mix(in srgb, var(--surface, #141418) 92%, #000 8%);
+  padding: 22px;
+  box-shadow: 0 20px 70px rgb(0 0 0 / .22);
+}
+.live-module-card h2,
+.live-module-card h3 {
+  margin: 0 0 10px;
+  letter-spacing: -.05em;
+}
+.live-module-card h2 { font-size: clamp(28px, 2.4vw, 42px); line-height: .95; }
+.live-module-card h3 { font-size: clamp(22px, 1.8vw, 30px); }
+.live-module-card p { color: var(--muted, #b7aaa3); line-height: 1.5; margin-top: 0; }
+.live-module-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 14px 0 0;
+}
+.live-module-actions button,
+.live-module-form button {
+  border: 1px solid color-mix(in srgb, var(--brand-accent, #9f3d42) 48%, var(--line, #343036));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--button, #9f3d42) 88%, #000 12%);
+  color: var(--button-text, #fff);
+  padding: 10px 15px;
+  min-height: 40px;
+  font-weight: 900;
+  cursor: pointer;
+}
+.live-module-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+.live-module-metric,
+.live-module-row,
+.live-module-step,
+.live-module-proof {
+  border: 1px solid color-mix(in srgb, var(--line, #343036) 70%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface-alt, #1e1e24) 58%, transparent);
+  padding: 12px;
+}
+.live-module-metric strong { display:block; color: var(--muted, #b7aaa3); text-transform: uppercase; letter-spacing: .13em; font-size: .72rem; }
+.live-module-metric b { display:block; margin-top: 8px; font-size: clamp(24px, 2vw, 34px); color: var(--text, #f6f0ea); }
+.live-module-metric span,
+.live-module-row span,
+.live-module-step span,
+.live-module-proof span { color: var(--muted, #b7aaa3); }
+.live-module-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+.live-module-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+.live-module-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+.live-module-row strong { display:block; }
+.live-module-row b {
+  color: var(--brand-accent, #9f3d42);
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  font-size: .72rem;
+}
+.live-module-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+.live-module-form label { margin: 0; }
+.live-module-form input,
+.live-module-form select,
+.live-module-form textarea {
+  min-height: 42px;
+  border-radius: 14px;
+}
+.live-module-form textarea,
+.live-module-form .wide,
+.live-module-form button { grid-column: 1 / -1; }
+.live-module-proof {
+  margin-top: 14px;
+  display: grid;
+  gap: 6px;
+}
+.live-module-status-strip {
+  display: grid;
+  gap: 10px;
+}
+.live-module-step {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+.live-module-step b {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--brand-accent, #9f3d42) 28%, transparent);
+}
+.live-module-empty {
+  min-height: 68px;
+  display: grid;
+  place-items: center start;
+  color: var(--muted, #b7aaa3);
+  border: 1px dashed color-mix(in srgb, var(--line, #343036) 76%, transparent);
+  border-radius: 16px;
+  padding: 12px;
+}
+@media (max-width: 1180px) {
+  .live-module-shell,
+  .live-portal-enhanced .workspace-grid { grid-template-columns: 1fr; }
+  .live-module-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 720px) {
+  .live-module-grid,
+  .live-module-form,
+  .live-module-metrics { grid-template-columns: 1fr; }
+  .live-module-row { grid-template-columns: 1fr; }
+}
