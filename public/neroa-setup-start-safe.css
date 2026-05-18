@@ -1,0 +1,133 @@
+.neroa-setup-start-button {
+  position: fixed;
+  left: 22px;
+  bottom: 22px;
+  z-index: 82;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid color-mix(in srgb, var(--brand-accent, #9f3d42) 52%, var(--line, #343036));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface, #141418) 94%, #000 6%);
+  color: var(--text, #f6f0ea);
+  padding: 13px 17px;
+  font-weight: 900;
+  box-shadow: 0 20px 60px rgb(0 0 0 / 0.42);
+  cursor: pointer;
+}
+.neroa-setup-start-button span {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--brand-accent, #9f3d42);
+}
+.neroa-setup-start-panel {
+  position: fixed;
+  left: 22px;
+  bottom: 84px;
+  z-index: 83;
+  width: min(520px, calc(100vw - 28px));
+  max-height: min(720px, calc(100vh - 110px));
+  overflow: auto;
+  display: none;
+  border: 1px solid color-mix(in srgb, var(--brand-accent, #9f3d42) 42%, var(--line, #343036));
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--surface, #141418) 94%, #000 6%);
+  color: var(--text, #f6f0ea);
+  box-shadow: 0 28px 88px rgb(0 0 0 / 0.46);
+}
+.neroa-setup-start-panel.open { display: block; }
+.neroa-setup-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 18px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line, #343036) 72%, transparent);
+}
+.neroa-setup-head h2 { margin: 2px 0 6px; font-size: 28px; line-height: .95; letter-spacing: -.05em; }
+.neroa-setup-head p,
+.neroa-setup-step span,
+.neroa-setup-note { color: var(--muted, #b7aaa3); }
+.neroa-setup-close {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid var(--line, #343036);
+  background: var(--surface-alt, #1e1e24);
+  color: var(--text, #f6f0ea);
+  cursor: pointer;
+}
+.neroa-setup-body { display: grid; gap: 10px; padding: 14px; }
+.neroa-setup-step {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--line, #343036) 72%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface-alt, #1e1e24) 62%, transparent);
+  padding: 12px;
+}
+.neroa-setup-step b {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--brand-accent, #9f3d42) 28%, transparent);
+  color: var(--text, #f6f0ea);
+}
+.neroa-setup-step strong { display: block; margin-bottom: 3px; }
+.neroa-setup-step button,
+.crm-action-row button {
+  border: 1px solid color-mix(in srgb, var(--brand-accent, #9f3d42) 48%, var(--line, #343036));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--button, #9f3d42) 88%, #000 12%);
+  color: var(--button-text, #fff);
+  padding: 9px 13px;
+  font-weight: 900;
+  cursor: pointer;
+}
+.neroa-setup-note {
+  border: 1px solid color-mix(in srgb, var(--brand-accent, #9f3d42) 24%, var(--line, #343036));
+  border-radius: 16px;
+  padding: 12px;
+  line-height: 1.45;
+}
+.contacts-crm-live-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+.contacts-crm-card {
+  border: 1px solid color-mix(in srgb, var(--line, #343036) 72%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--surface-alt, #1e1e24) 56%, transparent);
+  padding: 14px;
+}
+.contacts-crm-card h3 { margin: 0 0 8px; font-size: 20px; letter-spacing: -.04em; }
+.contacts-crm-card p { margin: 0; color: var(--muted, #b7aaa3); line-height: 1.45; }
+.contacts-crm-list { display: grid; gap: 8px; margin-top: 12px; }
+.contacts-crm-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--line, #343036) 62%, transparent);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--surface, #141418) 70%, transparent);
+}
+.contacts-crm-row strong { display: block; }
+.contacts-crm-row span { color: var(--muted, #b7aaa3); font-size: .92rem; }
+.contacts-crm-row b { color: var(--brand-accent, #9f3d42); text-transform: uppercase; letter-spacing: .12em; font-size: .72rem; }
+.crm-action-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.portal-registry-explain .data-row span { line-height: 1.35; }
+@media (max-width: 760px) {
+  .neroa-setup-start-button { left: 14px; bottom: 14px; }
+  .neroa-setup-start-panel { left: 14px; bottom: 74px; }
+  .neroa-setup-step { grid-template-columns: 32px minmax(0, 1fr); }
+  .neroa-setup-step button { grid-column: 1 / -1; }
+  .contacts-crm-live-grid { grid-template-columns: 1fr; }
+}
