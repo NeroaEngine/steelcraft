@@ -14,6 +14,13 @@ function currency(value) {
   return Number(value || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD' });
 }
 
+function proofAnchor(seed) {
+  let hash = 0;
+  const text = String(seed || 'neroa-proof');
+  for (let i = 0; i < text.length; i += 1) hash = ((hash << 5) - hash + text.charCodeAt(i)) | 0;
+  return `neroachain:demo:${Math.abs(hash).toString(16).padStart(8, '0')}`;
+}
+
 export async function ensureAccountingBankingDemoSchema(db) {
   await db.query(`
     create table if not exists accounting_bank_connections (
@@ -145,24 +152,26 @@ export async function seedDemoBankingData(db) {
 
   const byProviderId = Object.fromEntries(accountRows.map((account) => [account.provider_account_id, account]));
   const transactions = [
-    ['demo_operating_checking', 'Acme Development LLC Deposit', 18500.00, 'credit', 'Customer payment', 'customer_payment', todayOffset(-1), { customer: 'Acme Development LLC', account: 'Accounts Receivable', confidence: 94, action: 'Matched deposit to open invoice.' }],
-    ['demo_operating_checking', 'ABC Steel Supply', -6420.55, 'debit', 'Material purchase', 'materials', todayOffset(-2), { vendor: 'ABC Steel Supply', account: 'Job Materials', confidence: 91, action: 'Matched vendor expense to materials. Project approval needed before posting.' }],
-    ['demo_operating_checking', 'Sunbelt Rentals', -1280.00, 'debit', 'Equipment rental', 'equipment', todayOffset(-3), { vendor: 'Sunbelt Rentals', account: 'Equipment Rental', confidence: 87, action: 'Matched rental expense to equipment rental.' }],
-    ['demo_operating_checking', 'Florida Department of Revenue', -950.00, 'debit', 'Sales tax payment', 'tax', todayOffset(-5), { vendor: 'Florida Department of Revenue', account: 'Sales Tax Payable', confidence: 89, action: 'Matched payment against sales tax liability.' }],
-    ['demo_payroll_checking', 'Payroll Funding Transfer', -9250.00, 'debit', 'Payroll', 'payroll', todayOffset(-4), { account: 'Payroll Clearing', confidence: 78, action: 'Matched to payroll clearing. Review payroll run before posting.' }],
-    ['demo_company_card', 'Home Depot', -428.19, 'debit', 'Card charge', 'materials', todayOffset(-1), { vendor: 'Home Depot', account: 'Small Tools and Supplies', confidence: 86, action: 'Matched card charge to small tools and supplies.' }],
-    ['demo_company_card', 'Shell Oil', -164.32, 'debit', 'Fuel', 'fuel', todayOffset(-2), { vendor: 'Shell Oil', account: 'Vehicle Fuel', confidence: 83, action: 'Matched fuel expense. Low-risk review.' }],
-    ['demo_company_card', 'Unknown ACH Debit', -775.00, 'debit', 'Unknown', 'uncategorized', todayOffset(-1), { account: 'Uncategorized Expense', confidence: 38, action: 'Could not safely match. Customer review required.' }]
+    ['demo_operating_checking', 'Acme Development LLC Deposit', 18500.00, 'credit', 'Customer payment', 'customer_payment', todayOffset(-1), { customer: 'Acme Development LLC', matchedTo: 'Invoice SCB-INV-1001 / Accounts Receivable', ledgerAccount: 'Accounts Receivable', proofEvent: 'bank_match_customer_payment', confidence: 94, action: 'Matched deposit to open invoice SCB-INV-1001.' }],
+    ['demo_operating_checking', 'ABC Steel Supply', -6420.55, 'debit', 'Material purchase', 'materials', todayOffset(-2), { vendor: 'ABC Steel Supply', matchedTo: 'Job Materials / Project Cost Holding', ledgerAccount: 'Job Materials', project: 'Project pending approval', proofEvent: 'bank_match_vendor_materials', confidence: 91, action: 'Matched vendor expense to Job Materials. Project approval needed before posting.' }],
+    ['demo_operating_checking', 'Sunbelt Rentals', -1280.00, 'debit', 'Equipment rental', 'equipment', todayOffset(-3), { vendor: 'Sunbelt Rentals', matchedTo: 'Equipment Rental Expense', ledgerAccount: 'Equipment Rental', proofEvent: 'bank_match_equipment_rental', confidence: 87, action: 'Matched rental expense to Equipment Rental Expense.' }],
+    ['demo_operating_checking', 'Florida Department of Revenue', -950.00, 'debit', 'Sales tax payment', 'tax', todayOffset(-5), { vendor: 'Florida Department of Revenue', matchedTo: 'Sales Tax Payable', ledgerAccount: 'Sales Tax Payable', proofEvent: 'bank_match_tax_payment', confidence: 89, action: 'Matched payment against Sales Tax Payable.' }],
+    ['demo_payroll_checking', 'Payroll Funding Transfer', -9250.00, 'debit', 'Payroll', 'payroll', todayOffset(-4), { matchedTo: 'Payroll Clearing', ledgerAccount: 'Payroll Clearing', proofEvent: 'bank_match_payroll_clearing', confidence: 78, action: 'Matched to Payroll Clearing. Review payroll run before posting.' }],
+    ['demo_company_card', 'Home Depot', -428.19, 'debit', 'Card charge', 'materials', todayOffset(-1), { vendor: 'Home Depot', matchedTo: 'Small Tools and Supplies Expense', ledgerAccount: 'Small Tools and Supplies', proofEvent: 'bank_match_card_supplies', confidence: 86, action: 'Matched Home Depot card charge to Small Tools and Supplies Expense.' }],
+    ['demo_company_card', 'Shell Oil', -164.32, 'debit', 'Fuel', 'fuel', todayOffset(-2), { vendor: 'Shell Oil', matchedTo: 'Vehicle Fuel Expense', ledgerAccount: 'Vehicle Fuel', proofEvent: 'bank_match_vehicle_fuel', confidence: 83, action: 'Matched Shell Oil charge to Vehicle Fuel Expense.' }],
+    ['demo_company_card', 'Unknown ACH Debit', -775.00, 'debit', 'Unknown', 'uncategorized', todayOffset(-1), { matchedTo: 'Unmatched / Hold for owner review', ledgerAccount: 'Uncategorized Expense', proofEvent: 'bank_match_exception', confidence: 38, action: 'Could not safely match. Customer review required before posting.' }]
   ];
 
   for (const tx of transactions) {
     const account = byProviderId[tx[0]];
     const status = Number(tx[7].confidence || 0) >= 75 ? 'auto_matched_pending_approval' : 'needs_customer_review';
+    const anchor = proofAnchor(`${tx[1]}|${tx[2]}|${tx[7].matchedTo}|${tx[6]}`);
+    const match = { ...tx[7], proofAnchor: anchor, blockchainStatus: 'anchored_to_demo_chain_pending_real_chain' };
     await db.query(
       `insert into accounting_bank_transactions (bank_account_id, provider_transaction_id, posted_date, authorized_date, description, merchant_name, amount, transaction_type, category, match_status, suggested_match, raw)
        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
        on conflict (provider_transaction_id) do update set posted_date = excluded.posted_date, amount = excluded.amount, match_status = excluded.match_status, suggested_match = excluded.suggested_match, updated_at = now()`,
-      [account.id, txId(`${tx[0]}_${tx[1]}`), tx[6], tx[6], tx[1], tx[1], tx[2], tx[3], tx[5], status, tx[7], { type: tx[4], demo: true }]
+      [account.id, txId(`${tx[0]}_${tx[1]}`), tx[6], tx[6], tx[1], tx[1], tx[2], tx[3], tx[5], status, match, { type: tx[4], demo: true, proofAnchor: anchor }]
     );
   }
 
@@ -198,6 +207,7 @@ function taskForTransaction(tx) {
   const matched = confidence >= 75;
   const priority = confidence >= 85 ? 'ready' : confidence >= 75 ? 'review' : 'customer_review';
   const title = matched ? `Matched: ${tx.merchant_name}` : `Needs customer review: ${tx.merchant_name}`;
+  const matchedTo = match.matchedTo || match.ledgerAccount || 'No safe match';
   return {
     taskType: 'daily_bank_match',
     entityType: 'accounting_bank_transaction',
@@ -205,10 +215,10 @@ function taskForTransaction(tx) {
     priority,
     status: matched ? 'matched_pending_customer_approval' : 'needs_customer_review',
     title,
-    description: `${tx.account_name} ${tx.amount >= 0 ? 'deposit' : 'charge'} for ${currency(tx.amount)}.`,
-    action: match.action || 'Review transaction coding.',
+    description: `${tx.account_name} ${tx.amount >= 0 ? 'deposit' : 'charge'} for ${currency(tx.amount)} matched to ${matchedTo}.`,
+    action: `${match.action || 'Review transaction coding.'} Matched to: ${matchedTo}. Proof: ${match.proofAnchor || 'pending'}.`,
     confidence,
-    raw: { transaction: tx, match }
+    raw: { transaction: tx, match, matchedTo, proofAnchor: match.proofAnchor }
   };
 }
 
@@ -237,13 +247,13 @@ export async function runDemoAccountingWorker(db) {
   const matched = tasks.filter((task) => Number(task.confidence) >= 75).length;
   const needsReview = tasks.length - matched;
   const avgConfidence = tasks.length ? tasks.reduce((sum, task) => sum + Number(task.confidence || 0), 0) / tasks.length : 0;
-  const brief = `Daily match complete. ${matched} transactions were matched by Neroa. ${needsReview} transactions need customer review. Average confidence is ${avgConfidence.toFixed(0)}%. Customer approval is required before posting.`;
+  const brief = `Daily match complete. ${matched} transactions were matched by Neroa and include account-level match details. ${needsReview} transactions need customer review. Average confidence is ${avgConfidence.toFixed(0)}%. Every match includes a proof anchor for blockchain/DAG accountability before posting.`;
   const finalRun = await db.query(`update accounting_worker_runs set status = 'completed', finished_at = now(), summary = $1 where id = $2 returning *`, [brief, run.id]);
   const report = await db.query(
     `insert into accounting_daily_match_reports (worker_run_id, tenant_id, report_date, status, matched_count, needs_review_count, average_confidence, brief, email_status, approval_status, raw)
      values ($1,$2,current_date,'ready_for_approval',$3,$4,$5,$6,'demo_not_sent','waiting_customer_approval',$7)
      returning *`,
-    [run.id, DEMO_TENANT, matched, needsReview, avgConfidence, brief, { tasks, transactions: data.transactions }]
+    [run.id, DEMO_TENANT, matched, needsReview, avgConfidence, brief, { tasks, transactions: data.transactions, proofMode: 'demo_blockchain_anchor' }]
   );
   return { run: finalRun.rows[0], report: report.rows[0], tasks, banking: await getDemoBankingData(db) };
 }
