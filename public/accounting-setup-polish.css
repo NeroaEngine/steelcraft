@@ -4,21 +4,22 @@
   font-size: clamp(30px, 2.8vw, 42px) !important;
 }
 
-.accounting-setup-grid {
-  align-items: start !important;
+.accounting-setup-grid,
+.accounting-setup-layout-safe {
+  align-items: stretch !important;
   grid-auto-flow: row dense !important;
+  gap: 14px !important;
 }
 
 .accounting-setup-priority-card,
-.accounting-setup-advanced-card {
+.accounting-setup-advanced-card,
+.accounting-setup-layout-safe .setup-advanced-card {
   grid-column: 1 / -1 !important;
 }
 
 .accounting-setup-priority-card {
   border-color: color-mix(in srgb, var(--brand-accent) 45%, var(--line)) !important;
-  background:
-    radial-gradient(circle at 10% 0%, color-mix(in srgb, var(--brand-accent) 15%, transparent), transparent 34%),
-    color-mix(in srgb, var(--surface) 92%, #000 8%) !important;
+  background: color-mix(in srgb, var(--surface) 92%, #000 8%) !important;
 }
 
 .accounting-setup-priority-card .accounting-worker-list {
@@ -29,26 +30,58 @@
   min-height: 78px;
 }
 
-.accounting-setup-advanced-card {
-  order: -8 !important;
+.accounting-setup-advanced-card,
+.accounting-setup-layout-safe .setup-advanced-card {
+  order: 20 !important;
   min-height: 0 !important;
 }
 
-.accounting-setup-advanced-card pre {
+.accounting-setup-advanced-card pre,
+.accounting-setup-layout-safe .setup-advanced-card pre {
   max-height: 160px;
   overflow: auto;
 }
 
 .accounting-setup-number-card,
 .accounting-setup-tax-card,
-.accounting-setup-compact-form {
+.accounting-setup-compact-form,
+.accounting-setup-layout-safe .setup-numbering-card,
+.accounting-setup-layout-safe .setup-tax-card,
+.accounting-setup-layout-safe .setup-contact-card,
+.accounting-setup-layout-safe .setup-list-card {
   min-height: 0 !important;
 }
 
+.accounting-setup-layout-safe .setup-numbering-card,
+.accounting-setup-layout-safe .setup-tax-card,
+.accounting-setup-layout-safe .setup-contact-card {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: flex-start !important;
+}
+
+.accounting-setup-layout-safe .setup-numbering-card,
+.accounting-setup-layout-safe .setup-tax-card {
+  min-height: 230px !important;
+}
+
+.accounting-setup-layout-safe .setup-contact-card {
+  min-height: 264px !important;
+}
+
+.accounting-setup-layout-safe .setup-numbering-card .accounting-card-grid,
+.accounting-setup-layout-safe .setup-tax-card .accounting-card-grid,
+.accounting-setup-layout-safe .setup-contact-card .accounting-card-grid,
 .accounting-setup-number-card .accounting-card-grid,
 .accounting-setup-tax-card .accounting-card-grid,
 .accounting-setup-compact-form .accounting-card-grid {
   gap: 10px !important;
+}
+
+.accounting-setup-layout-safe .setup-numbering-card .accounting-card-grid,
+.accounting-setup-layout-safe .setup-tax-card .accounting-card-grid,
+.accounting-setup-layout-safe .setup-contact-card .accounting-card-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
 }
 
 .accounting-setup-number-card .accounting-form-card,
@@ -57,26 +90,61 @@
   padding: 18px !important;
 }
 
+.accounting-setup-layout-safe > .feature,
+.accounting-setup-layout-safe .feature {
+  padding: 18px !important;
+}
+
+.accounting-setup-layout-safe > .feature h2,
 .accounting-setup-grid > .feature h2 {
   font-size: clamp(22px, 1.8vw, 30px) !important;
   letter-spacing: -0.05em !important;
+  margin-bottom: 8px !important;
 }
 
+.accounting-setup-layout-safe > .feature p,
 .accounting-setup-grid > .feature p {
   font-size: 0.95rem !important;
+  margin-bottom: 12px !important;
 }
 
+.accounting-setup-layout-safe input,
+.accounting-setup-layout-safe select,
 .accounting-setup-grid input,
 .accounting-setup-grid select {
   min-height: 38px !important;
 }
 
+.accounting-setup-layout-safe .accounting-card-section,
 .accounting-setup-grid .accounting-card-section {
   padding: 12px !important;
+}
+
+.accounting-setup-layout-safe .accounting-card-section h3 {
+  margin-bottom: 10px !important;
+}
+
+.accounting-setup-layout-safe .accounting-live-form {
+  gap: 12px !important;
+}
+
+.accounting-setup-layout-safe .accounting-live-form > button {
+  width: 100% !important;
+}
+
+.accounting-setup-layout-safe .inline-check {
+  min-height: 38px !important;
+  align-items: center !important;
 }
 
 @media (max-width: 900px) {
   .accounting-setup-priority-card .accounting-worker-list {
     grid-template-columns: 1fr;
+  }
+
+  .accounting-setup-layout-safe .setup-numbering-card .accounting-card-grid,
+  .accounting-setup-layout-safe .setup-tax-card .accounting-card-grid,
+  .accounting-setup-layout-safe .setup-contact-card .accounting-card-grid {
+    grid-template-columns: 1fr !important;
   }
 }
