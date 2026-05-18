@@ -10,6 +10,10 @@ function txId(name) {
   return `demo_${String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')}`;
 }
 
+function currency(value) {
+  return Number(value || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD' });
+}
+
 export async function ensureAccountingBankingDemoSchema(db) {
   await db.query(`
     create table if not exists accounting_bank_connections (
@@ -91,6 +95,23 @@ export async function ensureAccountingBankingDemoSchema(db) {
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now()
     );
+
+    create table if not exists accounting_daily_match_reports (
+      id bigserial primary key,
+      worker_run_id bigint references accounting_worker_runs(id) on delete set null,
+      tenant_id text not null default 'default',
+      report_date date not null default current_date,
+      status text not null default 'ready_for_approval',
+      matched_count integer not null default 0,
+      needs_review_count integer not null default 0,
+      average_confidence numeric(5,2) not null default 0,
+      brief text,
+      email_status text not null default 'not_sent_demo',
+      approval_status text not null default 'waiting_customer_approval',
+      raw jsonb not null default '{}'::jsonb,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
   `);
 }
 
@@ -124,23 +145,24 @@ export async function seedDemoBankingData(db) {
 
   const byProviderId = Object.fromEntries(accountRows.map((account) => [account.provider_account_id, account]));
   const transactions = [
-    ['demo_operating_checking', 'Acme Development LLC Deposit', 18500.00, 'credit', 'Customer payment', 'customer_payment', todayOffset(-1), { customer: 'Acme Development LLC', account: 'Accounts Receivable', confidence: 94, action: 'Match deposit to open invoice.' }],
-    ['demo_operating_checking', 'ABC Steel Supply', -6420.55, 'debit', 'Material purchase', 'materials', todayOffset(-2), { vendor: 'ABC Steel Supply', account: 'Job Materials', confidence: 91, action: 'Create vendor expense and ask for project.' }],
-    ['demo_operating_checking', 'Sunbelt Rentals', -1280.00, 'debit', 'Equipment rental', 'equipment', todayOffset(-3), { vendor: 'Sunbelt Rentals', account: 'Equipment Rental', confidence: 87, action: 'Code to project cost after approval.' }],
-    ['demo_operating_checking', 'Florida Department of Revenue', -950.00, 'debit', 'Sales tax payment', 'tax', todayOffset(-5), { vendor: 'Florida Department of Revenue', account: 'Sales Tax Payable', confidence: 89, action: 'Apply against sales tax liability.' }],
-    ['demo_payroll_checking', 'Payroll Funding Transfer', -9250.00, 'debit', 'Payroll', 'payroll', todayOffset(-4), { account: 'Payroll Clearing', confidence: 78, action: 'Review payroll run before posting journal entry.' }],
-    ['demo_company_card', 'Home Depot', -428.19, 'debit', 'Card charge', 'materials', todayOffset(-1), { vendor: 'Home Depot', account: 'Small Tools and Supplies', confidence: 86, action: 'Approve card expense or assign project.' }],
-    ['demo_company_card', 'Shell Oil', -164.32, 'debit', 'Fuel', 'fuel', todayOffset(-2), { vendor: 'Shell Oil', account: 'Vehicle Fuel', confidence: 83, action: 'Approve fuel expense.' }],
-    ['demo_company_card', 'Unknown ACH Debit', -775.00, 'debit', 'Unknown', 'uncategorized', todayOffset(-1), { account: 'Uncategorized Expense', confidence: 38, action: 'Needs manual review before posting.' }]
+    ['demo_operating_checking', 'Acme Development LLC Deposit', 18500.00, 'credit', 'Customer payment', 'customer_payment', todayOffset(-1), { customer: 'Acme Development LLC', account: 'Accounts Receivable', confidence: 94, action: 'Matched deposit to open invoice.' }],
+    ['demo_operating_checking', 'ABC Steel Supply', -6420.55, 'debit', 'Material purchase', 'materials', todayOffset(-2), { vendor: 'ABC Steel Supply', account: 'Job Materials', confidence: 91, action: 'Matched vendor expense to materials. Project approval needed before posting.' }],
+    ['demo_operating_checking', 'Sunbelt Rentals', -1280.00, 'debit', 'Equipment rental', 'equipment', todayOffset(-3), { vendor: 'Sunbelt Rentals', account: 'Equipment Rental', confidence: 87, action: 'Matched rental expense to equipment rental.' }],
+    ['demo_operating_checking', 'Florida Department of Revenue', -950.00, 'debit', 'Sales tax payment', 'tax', todayOffset(-5), { vendor: 'Florida Department of Revenue', account: 'Sales Tax Payable', confidence: 89, action: 'Matched payment against sales tax liability.' }],
+    ['demo_payroll_checking', 'Payroll Funding Transfer', -9250.00, 'debit', 'Payroll', 'payroll', todayOffset(-4), { account: 'Payroll Clearing', confidence: 78, action: 'Matched to payroll clearing. Review payroll run before posting.' }],
+    ['demo_company_card', 'Home Depot', -428.19, 'debit', 'Card charge', 'materials', todayOffset(-1), { vendor: 'Home Depot', account: 'Small Tools and Supplies', confidence: 86, action: 'Matched card charge to small tools and supplies.' }],
+    ['demo_company_card', 'Shell Oil', -164.32, 'debit', 'Fuel', 'fuel', todayOffset(-2), { vendor: 'Shell Oil', account: 'Vehicle Fuel', confidence: 83, action: 'Matched fuel expense. Low-risk review.' }],
+    ['demo_company_card', 'Unknown ACH Debit', -775.00, 'debit', 'Unknown', 'uncategorized', todayOffset(-1), { account: 'Uncategorized Expense', confidence: 38, action: 'Could not safely match. Customer review required.' }]
   ];
 
   for (const tx of transactions) {
     const account = byProviderId[tx[0]];
+    const status = Number(tx[7].confidence || 0) >= 75 ? 'auto_matched_pending_approval' : 'needs_customer_review';
     await db.query(
       `insert into accounting_bank_transactions (bank_account_id, provider_transaction_id, posted_date, authorized_date, description, merchant_name, amount, transaction_type, category, match_status, suggested_match, raw)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,'unreviewed',$10,$11)
-       on conflict (provider_transaction_id) do update set posted_date = excluded.posted_date, amount = excluded.amount, suggested_match = excluded.suggested_match, updated_at = now()`,
-      [account.id, txId(`${tx[0]}_${tx[1]}`), tx[6], tx[6], tx[1], tx[1], tx[2], tx[3], tx[5], tx[7], { type: tx[4], demo: true }]
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+       on conflict (provider_transaction_id) do update set posted_date = excluded.posted_date, amount = excluded.amount, match_status = excluded.match_status, suggested_match = excluded.suggested_match, updated_at = now()`,
+      [account.id, txId(`${tx[0]}_${tx[1]}`), tx[6], tx[6], tx[1], tx[1], tx[2], tx[3], tx[5], status, tx[7], { type: tx[4], demo: true }]
     );
   }
 
@@ -166,24 +188,27 @@ export async function getDemoBankingData(db) {
     order by bt.posted_date desc, bt.id desc
     limit 50
   `, [DEMO_TENANT]);
-  return { connections: connections.rows, accounts: accounts.rows, transactions: transactions.rows };
+  const reports = await db.query(`select * from accounting_daily_match_reports where tenant_id = $1 order by created_at desc limit 5`, [DEMO_TENANT]);
+  return { connections: connections.rows, accounts: accounts.rows, transactions: transactions.rows, reports: reports.rows };
 }
 
 function taskForTransaction(tx) {
-  const suggestion = tx.suggested_match || {};
-  const confidence = Number(suggestion.confidence || 0);
-  const priority = confidence >= 85 ? 'ready' : confidence >= 70 ? 'normal' : 'high';
-  const title = confidence >= 85 ? `Ready to approve: ${tx.merchant_name}` : `Review needed: ${tx.merchant_name}`;
+  const match = tx.suggested_match || {};
+  const confidence = Number(match.confidence || 0);
+  const matched = confidence >= 75;
+  const priority = confidence >= 85 ? 'ready' : confidence >= 75 ? 'review' : 'customer_review';
+  const title = matched ? `Matched: ${tx.merchant_name}` : `Needs customer review: ${tx.merchant_name}`;
   return {
-    taskType: 'bank_transaction_review',
+    taskType: 'daily_bank_match',
     entityType: 'accounting_bank_transaction',
     entityId: String(tx.id),
     priority,
+    status: matched ? 'matched_pending_customer_approval' : 'needs_customer_review',
     title,
-    description: `${tx.account_name} ${tx.amount >= 0 ? 'deposit' : 'charge'} for ${Number(tx.amount).toLocaleString(undefined, { style: 'currency', currency: 'USD' })}.`,
-    suggestedAction: suggestion.action || 'Review transaction coding.',
+    description: `${tx.account_name} ${tx.amount >= 0 ? 'deposit' : 'charge'} for ${currency(tx.amount)}.`,
+    action: match.action || 'Review transaction coding.',
     confidence,
-    raw: { transaction: tx, suggestion }
+    raw: { transaction: tx, match }
   };
 }
 
@@ -193,27 +218,34 @@ export async function runDemoAccountingWorker(db) {
   const data = await getDemoBankingData(db);
   const runResult = await db.query(
     `insert into accounting_worker_runs (worker_key, tenant_id, status, started_at, summary, raw)
-     values ('accounting.bookkeeper.demo.v1', $1, 'running', $2, $3, $4)
+     values ('accounting.daily.matching.demo.v1', $1, 'running', $2, $3, $4)
      returning *`,
-    [DEMO_TENANT, startedAt, 'Reviewing demo bank feed, cash movement, and bookkeeping matches.', { mode: 'demo', accountCount: data.accounts.length, transactionCount: data.transactions.length }]
+    [DEMO_TENANT, startedAt, 'Running daily bank match. Preparing customer approval report.', { mode: 'demo', accountCount: data.accounts.length, transactionCount: data.transactions.length }]
   );
   const run = runResult.rows[0];
   const tasks = [];
   for (const tx of data.transactions) {
     const task = taskForTransaction(tx);
     const result = await db.query(
-      `insert into accounting_worker_tasks (worker_run_id, task_type, entity_type, entity_id, priority, title, description, suggested_action, confidence, raw)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+      `insert into accounting_worker_tasks (worker_run_id, task_type, entity_type, entity_id, status, priority, title, description, suggested_action, confidence, raw)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
        returning *`,
-      [run.id, task.taskType, task.entityType, task.entityId, task.priority, task.title, task.description, task.suggestedAction, task.confidence, task.raw]
+      [run.id, task.taskType, task.entityType, task.entityId, task.status, task.priority, task.title, task.description, task.action, task.confidence, task.raw]
     );
     tasks.push(result.rows[0]);
   }
-  const ready = tasks.filter((task) => Number(task.confidence) >= 85).length;
-  const needsReview = tasks.length - ready;
-  const summary = `${ready} ready to approve, ${needsReview} need review from ${data.transactions.length} demo bank transactions.`;
-  const finalRun = await db.query(`update accounting_worker_runs set status = 'completed', finished_at = now(), summary = $1 where id = $2 returning *`, [summary, run.id]);
-  return { run: finalRun.rows[0], tasks, banking: data };
+  const matched = tasks.filter((task) => Number(task.confidence) >= 75).length;
+  const needsReview = tasks.length - matched;
+  const avgConfidence = tasks.length ? tasks.reduce((sum, task) => sum + Number(task.confidence || 0), 0) / tasks.length : 0;
+  const brief = `Daily match complete. ${matched} transactions were matched by Neroa. ${needsReview} transactions need customer review. Average confidence is ${avgConfidence.toFixed(0)}%. Customer approval is required before posting.`;
+  const finalRun = await db.query(`update accounting_worker_runs set status = 'completed', finished_at = now(), summary = $1 where id = $2 returning *`, [brief, run.id]);
+  const report = await db.query(
+    `insert into accounting_daily_match_reports (worker_run_id, tenant_id, report_date, status, matched_count, needs_review_count, average_confidence, brief, email_status, approval_status, raw)
+     values ($1,$2,current_date,'ready_for_approval',$3,$4,$5,$6,'demo_not_sent','waiting_customer_approval',$7)
+     returning *`,
+    [run.id, DEMO_TENANT, matched, needsReview, avgConfidence, brief, { tasks, transactions: data.transactions }]
+  );
+  return { run: finalRun.rows[0], report: report.rows[0], tasks, banking: await getDemoBankingData(db) };
 }
 
 export async function listAccountingWorkerTasks(db) {
