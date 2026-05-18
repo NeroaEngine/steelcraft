@@ -8,6 +8,7 @@ import { ensureEstimatingSchema } from './server/estimatingSchema.js';
 import { ensureHrSchema } from './server/hrSchema.js';
 import { ensureAccountingSchema } from './server/accountingSchema.js';
 import { registerAccountingRoutes } from './server/accountingApi.js';
+import { registerAccountingBankingDemoRoutes } from './server/accountingBankingDemoRoutes.js';
 import { authenticateUser, ensureAuthSchema, listAuthUsers, requestPasswordReset, resetPasswordWithToken, seedAuthUsers, updateUserLanguage } from './server/authSchema.js';
 import { ensureQuoteWorkbookSchema, importQuoteWorkbook } from './server/quoteWorkbook.js';
 import { ensureQuoteTemplateSchema, createTemplateFromWorkbook, listTemplates, getTemplate, updateTemplateVersion, upsertTemplateOverride } from './server/quoteTemplate.js';
@@ -68,7 +69,7 @@ async function syncMondayBoards() {
 }
 async function auditSteelCraftWorkflow({ save = false } = {}) { await ensureSchema(); const data = await pullMondayBoards(); const mapped = mapMondayBoardsToSteelCraftWorkflow(data.boards); if (save) { for (const flow of mapped.workflows) await pool.query(`insert into steelcraft_workflow_sources (source, source_board_id, internal_name, classification, destination, field_map, workflow_map, verification_checklist, raw, pulled_at) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,now()) on conflict (source, source_board_id) do update set internal_name = excluded.internal_name, classification = excluded.classification, destination = excluded.destination, field_map = excluded.field_map, workflow_map = excluded.workflow_map, verification_checklist = excluded.verification_checklist, raw = excluded.raw, pulled_at = now()`, ['monday_api', flow.sourceBoardId, flow.internalName, flow.classification, flow.destination, flow.fieldMap, flow.workflow, flow.verificationChecklist, flow]); await pool.query(`insert into portal_activity_logs (actor, action, entity_type, metadata) values ($1,$2,$3,$4)`, ['system', 'steelcraft_workflow_audit_saved', 'workflow_source', { mappedWorkflowCount: mapped.mappedWorkflowCount }]); } return mapped; }
 
-app.get('/api/build', (req, res) => { res.json({ ok: true, commit: 'forgot-password-ui', accountingHardLock: true }); });
+app.get('/api/build', (req, res) => { res.json({ ok: true, commit: 'demo-banking-worker', accountingHardLock: true }); });
 app.get('/api/health', async (req, res) => { const checks = { app: 'ok', database: 'not_configured', monday: process.env.MONDAY_API_TOKEN ? 'configured' : 'not_configured', spaces: process.env.DO_SPACES_BUCKET ? 'configured' : 'not_configured', auth: 'not_checked' }; try { if (pool) { await pool.query('select 1 as ok'); checks.database = 'connected'; checks.auth = 'database_backed'; } } catch (error) { checks.database = `error: ${error.message}`; checks.auth = 'error'; } res.json({ ok: checks.database === 'connected', checks }); });
 app.post('/api/setup/schema', async (req, res, next) => { try { await ensureSchema(); await pool.query(`insert into portal_activity_logs (actor, action, entity_type, metadata) values ($1, $2, $3, $4)`, ['system', 'schema_initialized', 'database', { estimating: true, quoteWorkbooks: true, quoteTemplates: true, accounting: true, hr: true, auth: true, steelcraftWorkflow: true }]); res.json({ ok: true, message: 'Steel Craft schema initialized, including auth, password reset, language preference, accounting, editable quote templates, and Steel Craft workflow mapping.' }); } catch (error) { next(error); } });
 
@@ -89,6 +90,7 @@ app.patch('/api/estimating/quote-template-versions/:id', async (req, res, next) 
 app.put('/api/estimating/quote-template-versions/:id/overrides', async (req, res, next) => { try { await ensureSchema(); const override = await upsertTemplateOverride(requireDatabase(), req.params.id, req.body, req.body.actor || 'estimating'); res.json({ ok: true, override }); } catch (error) { next(error); } });
 
 registerAccountingRoutes(app, requireDatabase, ensureSchema);
+registerAccountingBankingDemoRoutes(app, requireDatabase, ensureSchema);
 
 app.get('/api/hr/schema/status', async (req, res, next) => { try { await ensureSchema(); const tables = await requireDatabase().query(`select table_name from information_schema.tables where table_schema = 'public' and table_name in ('employees', 'pto_policies', 'pto_balances', 'pto_requests', 'company_holidays', 'handbook_documents', 'handbook_acknowledgements', 'onboarding_checklists', 'onboarding_tasks', 'training_courses', 'training_lessons', 'employee_training_assignments') order by table_name`); res.json({ ok: true, tables: tables.rows.map((row) => row.table_name) }); } catch (error) { next(error); } });
 app.get('/api/monday/boards', async (req, res, next) => { try { const data = await pullMondayBoards(); res.json({ ok: true, boards: data.boards }); } catch (error) { next(error); } });
