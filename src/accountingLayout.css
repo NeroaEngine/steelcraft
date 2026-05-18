@@ -9,7 +9,8 @@
 }
 
 .accounting-section-nav {
-  width: 100%;
+  width: min(100%, 1120px);
+  margin-inline: auto;
   border-radius: 22px;
   padding: 14px 16px;
   display: grid;
@@ -22,8 +23,27 @@
 }
 
 .accounting-room-title,
-.accounting-tabs {
+.accounting-tabs,
+.accounting-subroom-header {
   display: none !important;
+}
+
+.accounting-room-heading {
+  display: grid;
+  gap: 4px;
+}
+
+.accounting-room-heading h1 {
+  margin: 0;
+  font-size: clamp(30px, 3vw, 44px);
+  line-height: 0.95;
+  letter-spacing: -0.06em;
+}
+
+.accounting-room-heading p:not(.eyebrow) {
+  margin: 0;
+  color: var(--muted);
+  max-width: 760px;
 }
 
 .accounting-nav-row {
@@ -73,40 +93,6 @@
   box-shadow: 0 14px 34px rgb(0 0 0 / 0.18);
 }
 
-.accounting-subroom-header {
-  min-height: 0;
-  padding: 18px 24px;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: 18px;
-  background:
-    linear-gradient(135deg, color-mix(in srgb, var(--surface) 94%, transparent), color-mix(in srgb, var(--surface-alt) 88%, transparent)),
-    radial-gradient(circle at 86% 28%, color-mix(in srgb, var(--brand-accent) 11%, transparent), transparent 30%);
-}
-
-.accounting-subroom-header h1 {
-  font-size: clamp(32px, 3.2vw, 48px);
-  margin: 4px 0 6px;
-}
-
-.accounting-subroom-header p {
-  margin: 0;
-  max-width: 620px;
-}
-
-.accounting-subroom-header .eyebrow {
-  font-size: 0.7rem;
-  letter-spacing: 0.22em;
-}
-
-.accounting-subroom-header .live-badge {
-  font-size: 12px;
-  max-width: 240px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .accounting-focus-grid,
 .accounting-workspace-grid,
 .accounting-data-grid,
@@ -114,7 +100,8 @@
   width: 100%;
 }
 
-.accounting-focus-grid {
+.accounting-focus-grid,
+.accounting-reports-grid {
   display: grid !important;
   grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: 16px;
@@ -123,41 +110,47 @@
   margin-inline: auto;
 }
 
-.accounting-focus-grid > .feature {
+.accounting-focus-grid > .feature,
+.accounting-reports-grid > .feature,
+.accounting-reports-grid > .accounting-report-tile {
   grid-column: span 6;
   width: 100%;
 }
 
-.accounting-focus-grid > .feature:first-child {
-  grid-column: 1 / -1;
-  min-height: 0;
-  padding: 18px 22px;
+.accounting-balanced-grid > .feature:first-child {
+  grid-column: span 6;
 }
 
-.accounting-focus-grid > .feature:first-child h2 {
-  font-size: clamp(24px, 2.2vw, 34px);
-}
-
-.accounting-focus-grid > .feature:first-child p {
-  max-width: 720px;
+.accounting-full-row,
+.accounting-reports-grid > .accounting-full-row {
+  grid-column: 1 / -1 !important;
 }
 
 .accounting-workspace-grid {
   display: grid !important;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
+  max-width: 1120px;
+  margin-inline: auto;
 }
 
 .accounting-data-grid {
   display: grid !important;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
+  max-width: 1120px;
+  margin-inline: auto;
 }
 
 .accounting-stat-grid {
   display: grid !important;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
+}
+
+.accounting-stat-grid.mini {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: fit-content;
 }
 
 .accounting-stat,
@@ -168,6 +161,7 @@
 
 .accounting-stat {
   padding: 18px;
+  min-width: 112px;
 }
 
 .accounting-stat strong {
@@ -182,7 +176,8 @@
 .accounting-workflow-card h2,
 .accounting-form-card h2,
 .accounting-table-card h2,
-.accounting-focus-grid .feature h2 {
+.accounting-focus-grid .feature h2,
+.accounting-report-tile h2 {
   font-size: clamp(24px, 2.1vw, 34px);
   margin: 0 0 10px;
 }
@@ -191,9 +186,29 @@
   padding: 22px;
 }
 
-.accounting-form-card p {
+.accounting-form-card p,
+.accounting-report-tile p {
   max-width: 620px;
   margin-top: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.accounting-report-tile {
+  text-align: left;
+  border-radius: var(--radius);
+  color: var(--text);
+  min-height: 170px;
+}
+
+.accounting-report-tile span {
+  display: inline-flex;
+  margin-top: 10px;
+  color: var(--brand-accent);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.72rem;
 }
 
 .accounting-live-form {
@@ -343,7 +358,8 @@
   .accounting-focus-grid,
   .accounting-workspace-grid,
   .accounting-data-grid,
-  .accounting-stat-grid {
+  .accounting-stat-grid,
+  .accounting-reports-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -361,13 +377,9 @@
   .accounting-data-grid,
   .accounting-stat-grid,
   .accounting-card-grid,
-  .accounting-primary-card .accounting-card-grid {
+  .accounting-primary-card .accounting-card-grid,
+  .accounting-reports-grid {
     grid-template-columns: 1fr;
-  }
-
-  .accounting-subroom-header {
-    grid-template-columns: 1fr;
-    padding: 18px;
   }
 
   .accounting-table-row {
