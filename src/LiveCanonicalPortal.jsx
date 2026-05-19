@@ -1,6 +1,20 @@
 import React from 'react';
 
 const canonicalLiveData = {
+  admin: {
+    eyebrow: 'Canonical live module',
+    title: 'Admin',
+    intro: 'Tenant controls, users, roles, portal access, language, setup status, security posture, and customer-facing administration.',
+    metrics: [['Users', '6', 'Authenticated roles'], ['Portals', '12', 'Enabled for tenant'], ['Languages', '6', 'Available'], ['Setup', 'Open', 'Comptroller-guided']],
+    actions: ['Invite user', 'Assign portals', 'Start setup', 'Review security'],
+    sections: [
+      ['User control', [['Seth McBride', 'Admin / Owner · all tenant controls', 'Owner'], ['Neroa Developer', 'Developer room and system setup', 'Dev'], ['Accounting User', 'Accounting + Contacts + Employee access', 'Ready']]],
+      ['Portal access', [['Canonical core', 'Admin, Accounting, Contacts, HR, Vendor, Customer, Employee', 'Live'], ['Industry pack', 'Sales, Estimating, Projects, Planning, Purchasing', 'Live'], ['Permission map', 'Role-based portal assignment', 'Ready']]],
+      ['Tenant setup', [['Start Setup', 'Guided customer/accounting/payroll/banking setup', 'Open'], ['Language', 'User language stored in database', 'Live'], ['Brand handoff', 'Steel Craft brand controls locked by developer', 'Ready']]],
+      ['Security + proof', [['Authentication', 'Database-backed login users', 'Live'], ['Neroa Edge', 'Bank-level security foundation lane', 'Planned'], ['Audit trail', 'Admin changes should create proof/audit events', 'Proof']]]
+    ],
+    formTitle: 'Admin action'
+  },
   contacts: {
     eyebrow: 'Canonical live module',
     title: 'Contacts / CRM',
@@ -89,7 +103,7 @@ export default function LiveCanonicalPortal({ id, Header }) {
   const data = canonicalLiveData[id];
   if (!data) return null;
   return <>
-    <Header id={id} />
+    {Header ? <Header id={id} /> : null}
     <section className="live-module-shell canonical-force-live">
       <article className="live-module-card">
         <p className="eyebrow">{data.eyebrow}</p>
