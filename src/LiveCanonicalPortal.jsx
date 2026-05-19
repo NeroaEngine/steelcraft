@@ -74,7 +74,7 @@ function ActionPanel({ portalId, activeAction, selectedRow, events, onRunStep, o
   return <aside className="live-module-card live-action-panel">
     <div className="live-action-head"><div><p className="eyebrow">Live action drawer</p><h3>{activeAction || 'Select an action'}</h3></div>{activeAction && <button type="button" onClick={onClose}>Close</button>}</div>
     {selectedRow && <div className="live-module-proof"><strong>Selected record</strong><span>{selectedRow.section}: {selectedRow.row[0]} · {selectedRow.row[1]} · {selectedRow.row[2]}</span></div>}
-    <div className="live-module-status-strip">{steps.map((step, index) => <div className="live-module-step live-click-step" key={step}><b>{index + 1}</b><span>{step}</span><button type="button" onClick={() => onRunStep(step)}>Run</button></div>)}</div>
+    <div className="live-module-status-strip">{steps.map((step, index) => <button className="live-module-step live-click-step" type="button" key={step} onClick={() => onRunStep(step)}><b>{index + 1}</b><span>{step}</span></button>)}</div>
     <div className="live-module-proof"><strong>Action log</strong>{events.length ? events.slice(0, 5).map((event) => <span key={event.id}>{event.text}</span>) : <span>Click a button, row, or step to create a live prototype event.</span>}</div>
   </aside>;
 }
