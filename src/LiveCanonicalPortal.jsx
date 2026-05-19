@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 
 const canonicalLiveData = {
   admin: {
@@ -87,12 +87,70 @@ const canonicalLiveData = {
   }
 };
 
+const actionBlueprints = {
+  admin: {
+    'Invite user': ['Create invitation', 'Choose role', 'Send setup link', 'Write audit event'],
+    'Assign portals': ['Select user', 'Toggle portals', 'Save permission map', 'Write admin proof'],
+    'Start setup': ['Open setup checklist', 'Confirm tenant info', 'Route to Comptroller', 'Track completion'],
+    'Review security': ['Check users', 'Review roles', 'Review proof events', 'Flag risks']
+  },
+  contacts: {
+    'New company': ['Create company', 'Add primary contact', 'Classify customer/vendor', 'Link to accounting'],
+    'Import list': ['Upload CSV', 'Map columns', 'Preview cleanup', 'Import records'],
+    'Clean duplicates': ['Find duplicates', 'Merge companies', 'Fix missing emails', 'Proof cleanup'],
+    'Push to Accounting': ['Create customers', 'Create vendors', 'Apply terms', 'Open setup report']
+  },
+  hr: {
+    'Add employee': ['Create employee', 'Set role/rate', 'Assign manager', 'Send onboarding'],
+    'Assign training': ['Pick employee', 'Pick course', 'Set due date', 'Notify employee'],
+    'Review PTO': ['Open requests', 'Check schedule', 'Approve/deny', 'Write proof'],
+    'Open payroll prep': ['Review rates', 'Approve timecards', 'Calculate loaded labor', 'Send to Comptroller']
+  },
+  vendor: {
+    'Send vendor packet': ['Choose vendor', 'Attach PO', 'Set due date', 'Send packet'],
+    'Request upload': ['Pick document', 'Send upload slot', 'Track receipt', 'Route to AP'],
+    'Confirm due date': ['Open vendor thread', 'Ask confirmation', 'Update PO', 'Proof response'],
+    'Open AP bill': ['Match PO', 'Attach invoice', 'Code expense', 'Queue payment']
+  },
+  customer: {
+    'Send approval': ['Select job', 'Attach photo/quote', 'Send approval', 'Capture proof'],
+    'Request payment': ['Select invoice', 'Send payment link', 'Track response', 'Update AR'],
+    'Upload document': ['Open upload slot', 'Classify document', 'Attach to job', 'Write proof'],
+    'Open customer thread': ['Start thread', 'Link customer/job', 'Route message', 'Track response']
+  },
+  employee: {
+    'Request PTO': ['Choose dates', 'Check balance', 'Route to manager', 'Track decision'],
+    'Open training': ['View assignments', 'Start course', 'Mark complete', 'Write proof'],
+    'Acknowledge handbook': ['Open handbook', 'Sign acknowledgement', 'Save timestamp', 'Write proof'],
+    'Ask HR': ['Write question', 'Route to HR/Neroa', 'Track answer', 'Attach proof']
+  }
+};
+
+const quickActions = ['Open', 'Approve', 'Route', 'Proof'];
+
+function makeProof(label) {
+  let hash = 0;
+  String(label || 'proof').split('').forEach((char) => { hash = ((hash << 5) - hash + char.charCodeAt(0)) | 0; });
+  return `proof:${Math.abs(hash).toString(16).padStart(8, '0')}`;
+}
+
 function Metric({ row }) {
   return <div className="live-module-metric"><strong>{row[0]}</strong><b>{row[1]}</b><span>{row[2]}</span></div>;
 }
 
-function LiveSection({ section }) {
-  return <article className="live-module-card"><h3>{section[0]}</h3><div className="live-module-list">{section[1].map((row) => <div className="live-module-row" key={`${section[0]}-${row[0]}`}><div><strong>{row[0]}</strong><span>{row[1]}</span></div><b>{row[2]}</b></div>)}</div></article>;
+function ActionPanel({ portalId, activeAction, selectedRow, events, onRunStep, onClose }) {
+  const steps = activeAction ? (actionBlueprints[portalId]?.[activeAction] || ['Capture request', 'Route with Neroa', 'Queue approval', 'Write proof']) : [];
+  return <aside className="live-module-card live-action-panel">
+    <div className="live-action-head"><div><p className="eyebrow">Live action drawer</p><h3>{activeAction || 'Select an action'}</h3></div>{activeAction && <button type="button" onClick={onClose}>Close</button>}</div>
+    {selectedRow && <div className="live-module-proof"><strong>Selected record</strong><span>{selectedRow.section}: {selectedRow.row[0]} · {selectedRow.row[1]} · {selectedRow.row[2]}</span></div>}
+    <div className="live-module-status-strip">{steps.map((step, index) => <div className="live-module-step live-click-step" key={step}><b>{index + 1}</b><span>{step}</span><button type="button" onClick={() => onRunStep(step)}>Run</button></div>)}</div>
+    <div className="live-module-proof"><strong>Action log</strong>{events.length ? events.slice(0, 5).map((event) => <span key={event.id}>{event.text}</span>) : <span>Click a button, row, or step to create a live prototype event.</span>}</div>
+  </aside>;
+}
+
+function LiveSection({ section, draftRows, onRowAction }) {
+  const rows = [...section[1], ...draftRows];
+  return <article className="live-module-card"><h3>{section[0]}</h3><div className="live-module-list">{rows.map((row) => <div className="live-module-row live-module-row-action" key={`${section[0]}-${row[0]}`}><button type="button" onClick={() => onRowAction(section[0], row, 'Open')}><strong>{row[0]}</strong><span>{row[1]}</span></button><b>{row[2]}</b><div className="live-row-actions">{quickActions.map((action) => <button type="button" key={action} onClick={() => onRowAction(section[0], row, action)}>{action}</button>)}</div></div>)}</div></article>;
 }
 
 export function isLiveCanonicalPortal(id) {
@@ -101,7 +159,47 @@ export function isLiveCanonicalPortal(id) {
 
 export default function LiveCanonicalPortal({ id, Header }) {
   const data = canonicalLiveData[id];
+  const [activeAction, setActiveAction] = useState(data?.actions?.[0] || '');
+  const [selectedRow, setSelectedRow] = useState(null);
+  const [events, setEvents] = useState([]);
+  const [draftRows, setDraftRows] = useState({});
+  const [form, setForm] = useState({ name: '', type: 'Customer', email: '', priority: 'Ready', notes: '' });
+
+  const defaultSectionName = data?.sections?.[0]?.[0] || 'Records';
+  const panelEvents = useMemo(() => events, [events]);
+
   if (!data) return null;
+
+  function log(text) {
+    setEvents((current) => [{ id: `${Date.now()}-${current.length}`, text }, ...current].slice(0, 12));
+  }
+
+  function openAction(action) {
+    setActiveAction(action);
+    log(`${data.title}: opened ${action}. ${makeProof(`${id}-${action}`)}`);
+  }
+
+  function rowAction(sectionName, row, action) {
+    setSelectedRow({ section: sectionName, row });
+    setActiveAction(action === 'Open' ? `Open ${sectionName}` : `${action} ${row[0]}`);
+    log(`${action}: ${row[0]} from ${sectionName}. ${makeProof(`${id}-${sectionName}-${row[0]}-${action}`)}`);
+  }
+
+  function runStep(step) {
+    log(`Ran step: ${step}. ${makeProof(`${id}-${activeAction}-${step}`)}`);
+  }
+
+  function submit(event) {
+    event.preventDefault();
+    const name = form.name.trim() || `${data.title} draft`;
+    const row = [name, `${form.type} · ${form.email || 'email pending'} · ${form.notes || 'ready for Neroa routing'}`, form.priority];
+    setDraftRows((current) => ({ ...current, [defaultSectionName]: [...(current[defaultSectionName] || []), row] }));
+    setSelectedRow({ section: defaultSectionName, row });
+    setActiveAction(`Saved ${name}`);
+    log(`Saved draft record: ${name}. ${makeProof(`${id}-${name}-${Date.now()}`)}`);
+    setForm({ name: '', type: 'Customer', email: '', priority: 'Ready', notes: '' });
+  }
+
   return <>
     {Header ? <Header id={id} /> : null}
     <section className="live-module-shell canonical-force-live">
@@ -109,29 +207,21 @@ export default function LiveCanonicalPortal({ id, Header }) {
         <p className="eyebrow">{data.eyebrow}</p>
         <h2>{data.title}</h2>
         <p>{data.intro}</p>
-        <div className="live-module-actions">{data.actions.map((action) => <button type="button" key={action}>{action}</button>)}</div>
+        <div className="live-module-actions">{data.actions.map((action) => <button type="button" key={action} onClick={() => openAction(action)}>{action}</button>)}</div>
         <div className="live-module-metrics">{data.metrics.map((row) => <Metric row={row} key={row[0]} />)}</div>
       </article>
-      <aside className="live-module-card">
-        <h3>Neroa control path</h3>
-        <div className="live-module-status-strip">
-          <div className="live-module-step"><b>1</b><span>Capture or import the record.</span></div>
-          <div className="live-module-step"><b>2</b><span>Clean and classify with Neroa.</span></div>
-          <div className="live-module-step"><b>3</b><span>Link to accounting, jobs, messages, and approvals.</span></div>
-          <div className="live-module-step"><b>4</b><span>Write Proof/Audit event when it matters.</span></div>
-        </div>
-      </aside>
+      <ActionPanel portalId={id} activeAction={activeAction} selectedRow={selectedRow} events={panelEvents} onRunStep={runStep} onClose={() => setActiveAction('')} />
       <div className="live-module-grid">
-        {data.sections.map((section) => <LiveSection section={section} key={section[0]} />)}
+        {data.sections.map((section) => <LiveSection section={section} draftRows={draftRows[section[0]] || []} onRowAction={rowAction} key={section[0]} />)}
         <article className="live-module-card">
           <h3>{data.formTitle}</h3>
-          <form className="live-module-form">
-            <label>Name<input placeholder="Name" /></label>
-            <label>Type<select><option>Customer</option><option>Vendor</option><option>Employee</option><option>Approval</option></select></label>
-            <label>Email<input placeholder="email@company.com" /></label>
-            <label>Priority<select><option>Ready</option><option>Needs review</option><option>Proof required</option></select></label>
-            <label className="wide">Notes<textarea placeholder="Notes for Neroa routing"></textarea></label>
-            <button type="button">Save draft</button>
+          <form className="live-module-form" onSubmit={submit}>
+            <label>Name<input value={form.name} placeholder="Name" onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
+            <label>Type<select value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value })}><option>Customer</option><option>Vendor</option><option>Employee</option><option>Approval</option></select></label>
+            <label>Email<input value={form.email} placeholder="email@company.com" onChange={(event) => setForm({ ...form, email: event.target.value })} /></label>
+            <label>Priority<select value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })}><option>Ready</option><option>Needs review</option><option>Proof required</option></select></label>
+            <label className="wide">Notes<textarea value={form.notes} placeholder="Notes for Neroa routing" onChange={(event) => setForm({ ...form, notes: event.target.value })} /></label>
+            <button type="submit">Save draft</button>
           </form>
           <div className="live-module-proof"><strong>Proof-ready path</strong><span>Action captured -> Neroa Policy -> record write -> Proof/Audit event.</span></div>
         </article>
