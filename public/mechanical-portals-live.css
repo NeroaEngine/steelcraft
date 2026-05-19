@@ -1,3 +1,6 @@
+.canonical-placeholder-hidden {
+  display: none !important;
+}
 .live-portal-enhanced .workspace-grid {
   grid-template-columns: minmax(0, 1fr) minmax(360px, .46fr);
   align-items: start;
@@ -12,9 +15,7 @@
 .live-module-card {
   border: 1px solid color-mix(in srgb, var(--brand-accent, #9f3d42) 22%, var(--line, #343036));
   border-radius: var(--radius, 22px);
-  background:
-    radial-gradient(circle at 8% 0%, color-mix(in srgb, var(--brand-accent, #9f3d42) 10%, transparent), transparent 34%),
-    color-mix(in srgb, var(--surface, #141418) 92%, #000 8%);
+  background: color-mix(in srgb, var(--surface, #141418) 92%, #000 8%);
   padding: 22px;
   box-shadow: 0 20px 70px rgb(0 0 0 / .22);
 }
@@ -126,15 +127,6 @@
   height: 28px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--brand-accent, #9f3d42) 28%, transparent);
-}
-.live-module-empty {
-  min-height: 68px;
-  display: grid;
-  place-items: center start;
-  color: var(--muted, #b7aaa3);
-  border: 1px dashed color-mix(in srgb, var(--line, #343036) 76%, transparent);
-  border-radius: 16px;
-  padding: 12px;
 }
 @media (max-width: 1180px) {
   .live-module-shell,
