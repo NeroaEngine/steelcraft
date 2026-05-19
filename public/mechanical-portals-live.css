@@ -34,7 +34,10 @@
   margin: 14px 0 0;
 }
 .live-module-actions button,
-.live-module-form button {
+.live-module-form button,
+.live-action-head button,
+.live-click-step button,
+.live-row-actions button {
   border: 1px solid color-mix(in srgb, var(--brand-accent, #9f3d42) 48%, var(--line, #343036));
   border-radius: 999px;
   background: color-mix(in srgb, var(--button, #9f3d42) 88%, #000 12%);
@@ -73,7 +76,7 @@
 }
 .live-module-list {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   margin-top: 10px;
 }
 .live-module-row {
@@ -88,6 +91,51 @@
   text-transform: uppercase;
   letter-spacing: .12em;
   font-size: .72rem;
+}
+.live-module-row-action {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.live-module-row-action > button:first-child {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  padding: 0;
+  cursor: pointer;
+}
+.live-module-row-action > button:first-child:hover strong {
+  color: var(--brand-accent, #9f3d42);
+}
+.live-row-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.live-row-actions button,
+.live-click-step button,
+.live-action-head button {
+  min-height: 32px;
+  padding: 7px 10px;
+  font-size: .82rem;
+}
+.live-action-panel {
+  position: sticky;
+  top: 92px;
+  align-self: start;
+}
+.live-action-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+}
+.live-action-head h3 {
+  margin-bottom: 0;
+}
+.live-click-step {
+  grid-template-columns: 30px minmax(0, 1fr) auto;
 }
 .live-module-form {
   display: grid;
@@ -132,10 +180,12 @@
   .live-module-shell,
   .live-portal-enhanced .workspace-grid { grid-template-columns: 1fr; }
   .live-module-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .live-action-panel { position: static; }
 }
 @media (max-width: 720px) {
   .live-module-grid,
   .live-module-form,
   .live-module-metrics { grid-template-columns: 1fr; }
-  .live-module-row { grid-template-columns: 1fr; }
+  .live-module-row,
+  .live-click-step { grid-template-columns: 1fr; }
 }
