@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import AccountingPortal from './AccountingPortal.jsx';
+import LiveCanonicalPortal, { isLiveCanonicalPortal } from './LiveCanonicalPortal.jsx';
 import { canonicalPortals, defaultTenantModuleMap, getTenantPortals, industryPacks } from './portalRegistry.js';
 import './styles.css';
 import './brandGeometry.js';
@@ -241,7 +242,7 @@ function App() {
   const active = requestedPortal && user.portals.includes(requestedPortal) && enabledPortals.includes(requestedPortal) ? requestedPortal : (user.portals.find((id) => enabledPortals.includes(id)) || 'admin');
   if (!requestedPortal) goTo(portalUrl(active));
 
-  return <Shell brand={brand} user={user} active={active} signOut={signOut} enabledPortals={enabledPortals}>{active === 'admin' ? <Admin profiles={profiles} setProfiles={setProfiles} enabledPortals={enabledPortals} /> : active === 'accounting' ? <AccountingPortal /> : <Portal id={active} />}</Shell>;
+  return <Shell brand={brand} user={user} active={active} signOut={signOut} enabledPortals={enabledPortals}>{active === 'admin' ? <Admin profiles={profiles} setProfiles={setProfiles} enabledPortals={enabledPortals} /> : active === 'accounting' ? <AccountingPortal /> : isLiveCanonicalPortal(active) ? <LiveCanonicalPortal id={active} Header={Header} /> : <Portal id={active} />}</Shell>;
 }
 
 createRoot(document.getElementById('root')).render(<App />);
