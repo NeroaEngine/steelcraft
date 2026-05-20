@@ -21,6 +21,10 @@ import {
   createVaultLineageRecord,
   validateVaultLineageRecord
 } from '../src/neroaGuard/neroaVaultLineage.js';
+import {
+  SYSTEMS_ACTION_HELPER_EVENT_TYPES,
+  emitSystemsActionWithReceiptAndLineage
+} from '../src/neroaGuard/systemsActionHelper.js';
 
 function baseEvent(overrides = {}) {
   return {
@@ -43,6 +47,28 @@ function baseEvent(overrides = {}) {
     auth_status: 'local_authenticated',
     security_class: 'bank_level',
     retention_class: 'audit_7y',
+    ...overrides
+  };
+}
+
+function baseHelper(overrides = {}) {
+  return {
+    event_type: 'systems.customer.created',
+    action_id: 'action-customer-created-1',
+    actor_type: 'user',
+    actor_id: 'admin-1',
+    business_identity_number: 'BIN-001',
+    business_address: 'trustnet:business:bin-001',
+    business_id: 'biz-a',
+    customer_id: 'cust-a',
+    workspace_id: 'workspace-a',
+    module_id: 'contacts',
+    payload: { summary: 'customer created', customer_name: 'Atlas Apparel' },
+    payload_redaction_class: 'metadata_only',
+    evidence_refs: ['evidence:local:contact-form'],
+    source_refs: ['source:local:ui'],
+    retention_class: 'audit_7y',
+    security_class: 'bank_level',
     ...overrides
   };
 }
@@ -259,4 +285,92 @@ const linked = lineageAdapter.linkReceipt({
 assert.equal(linked.receipt_id, allowed.receipt_id);
 assert.equal(lineageStore.findByReceiptId(allowed.receipt_id).length, 1);
 
-console.log('Neroa Guard TrustNet and Neroa Vault local validation passed.');
+assert.ok(SYSTEMS_ACTION_HELPER_EVENT_TYPES.includes('systems.customer.created'));
+assert.ok(SYSTEMS_ACTION_HELPER_EVENT_TYPES.includes('systems.communication.sent'));
+
+const helperCustomer = emitSystemsActionWithReceiptAndLineage(baseHelper());
+assert.equal(helperCustomer.ok, true);
+assert.equal(helperCustomer.receipt.event_type, 'systems.customer.created');
+assert.equal(helperCustomer.lineage.receipt_id, helperCustomer.receipt.receipt_id);
+assert.equal(helperCustomer.trustStore.findByReceiptId(helperCustomer.receipt_id).receipt_id, helperCustomer.receipt_id);
+assert.equal(helperCustomer.vaultStore.findByReceiptId(helperCustomer.receipt_id).length, 1);
+
+const helperMissingBin = emitSystemsActionWithReceiptAndLineage(baseHelper({ business_identity_number: '' }));
+assert.equal(helperMissingBin.ok, false);
+assert.match(helperMissingBin.blocked_reason, /business_identity_number is missing/);
+assert.equal(helperMissingBin.receipt_id, null);
+assert.equal(helperMissingBin.lineage_id, null);
+
+const helperMissingBusinessAddress = emitSystemsActionWithReceiptAndLineage(baseHelper({ business_address: '' }));
+assert.equal(helperMissingBusinessAddress.ok, false);
+assert.match(helperMissingBusinessAddress.blocked_reason, /business_address is missing/);
+
+const helperReceiptFailure = emitSystemsActionWithReceiptAndLineage(baseHelper({
+  guardAdapter: { emitProofEvent() { throw new Error('simulated receipt failure'); } }
+}));
+assert.equal(helperReceiptFailure.ok, false);
+assert.match(helperReceiptFailure.blocked_reason, /receipt emission failed/);
+assert.equal(helperReceiptFailure.lineage_id, null);
+
+const helperLineageFailure = emitSystemsActionWithReceiptAndLineage(baseHelper({
+  vaultAdapter: { linkReceipt() { throw new Error('simulated lineage failure'); } }
+}));
+assert.equal(helperLineageFailure.ok, false);
+assert.ok(helperLineageFailure.receipt_id);
+assert.match(helperLineageFailure.blocked_reason, /lineage record creation failed/);
+
+const assistantCompleted = emitSystemsActionWithReceiptAndLineage(baseHelper({
+  event_type: 'systems.assistant.action_completed',
+  action_id: 'assistant-action-completed-1',
+  module_id: 'assistant',
+  approval_refs: ['approval:assistant:1'],
+  source_refs: ['source:local:assistant-context'],
+  decision_refs: ['decision:one-brain:1'],
+  payload: { summary: 'assistant completed approved business action' }
+}));
+assert.equal(assistantCompleted.ok, true);
+assert.equal(assistantCompleted.receipt.event_type, 'systems.assistant.action_completed');
+assert.equal(assistantCompleted.lineage.receipt_id, assistantCompleted.receipt.receipt_id);
+
+const communicationBlocked = emitSystemsActionWithReceiptAndLineage(baseHelper({
+  event_type: 'systems.communication.sent',
+  action_id: 'communication-sent-no-approval',
+  module_id: 'communications',
+  approval_refs: [],
+  source_refs: [],
+  payload: { summary: 'send customer communication without approval' }
+}));
+assert.equal(communicationBlocked.ok, false);
+assert.match(communicationBlocked.blocked_reason, /approval-required action has no approval_ref|source-backed action has no source_ref/);
+assert.equal(communicationBlocked.lineage_id, null);
+
+const fulfillmentStarted = emitSystemsActionWithReceiptAndLineage(baseHelper({
+  event_type: 'systems.fulfillment.started',
+  action_id: 'fulfillment-started-1',
+  module_id: 'fulfillment',
+  order_id: 'order-1',
+  payload: { summary: 'fulfillment started' }
+}));
+assert.equal(fulfillmentStarted.ok, true);
+assert.equal(fulfillmentStarted.receipt.event_type, 'systems.fulfillment.started');
+assert.equal(fulfillmentStarted.lineage.receipt_id, fulfillmentStarted.receipt.receipt_id);
+
+const shipmentCreated = emitSystemsActionWithReceiptAndLineage(baseHelper({
+  event_type: 'systems.shipment.created',
+  action_id: 'shipment-created-1',
+  module_id: 'shipping',
+  shipment_id: 'ship-1',
+  approval_refs: ['approval:shipping:ship-1'],
+  payload: { summary: 'shipment created' }
+}));
+assert.equal(shipmentCreated.ok, true);
+assert.equal(shipmentCreated.receipt.event_type, 'systems.shipment.created');
+assert.equal(shipmentCreated.lineage.shipment_refs[0], 'ship-1');
+
+const helperPublicBehaviorBlocked = emitSystemsActionWithReceiptAndLineage(baseHelper({
+  payload: { summary: 'create wallet token gas mainnet custody bridge behavior' }
+}));
+assert.equal(helperPublicBehaviorBlocked.ok, false);
+assert.match(helperPublicBehaviorBlocked.blocked_reason, /prohibited public crypto behavior/);
+
+console.log('Neroa Guard TrustNet, Neroa Vault, and Systems action helper local validation passed.');
