@@ -10,6 +10,7 @@ import {
 } from './neroaVaultLineage.js';
 
 export const SYSTEMS_ACTION_HELPER_EVENT_TYPES = Object.freeze([
+  'systems.contact.created',
   'systems.customer.created',
   'systems.vendor.created',
   'systems.invoice.created',
@@ -31,6 +32,7 @@ export const SYSTEMS_ACTION_HELPER_EVENT_TYPES = Object.freeze([
 
 const BUSINESS_SCOPED_ACTIONS = new Set(SYSTEMS_ACTION_HELPER_EVENT_TYPES);
 const LINEAGE_EVENT_BY_ACTION_PREFIX = [
+  ['systems.contact.', 'systems.contact.linked_to_vault'],
   ['systems.customer.', 'systems.customer.linked_to_vault'],
   ['systems.vendor.', 'systems.vendor.linked_to_vault'],
   ['systems.invoice.', 'systems.invoice.linked_to_vault'],
