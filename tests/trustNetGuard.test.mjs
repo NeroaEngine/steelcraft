@@ -8,6 +8,12 @@ import {
   trustAddress,
   validateTrustNetRequest
 } from '../src/neroaGuard/trustNetGuard.js';
+import {
+  TRUSTNET_PACKAGE_TYPES,
+  buildTrustNetPackageReceipts,
+  createPackageInstallPlan,
+  createPackageInstallPlans
+} from '../src/neroaGuard/trustNetPackageWiring.js';
 
 function baseEvent(overrides = {}) {
   return {
@@ -115,5 +121,48 @@ const approvalRequiredReceipt = adapter.emitApprovalRequired(baseEvent({
 }));
 assert.equal(approvalRequiredReceipt.event_type, 'systems.policy.blocked');
 assert.match(approvalRequiredReceipt.blocked_reason, /approval-required/);
+
+assert.ok(TRUSTNET_PACKAGE_TYPES.shipping);
+assert.ok(TRUSTNET_PACKAGE_TYPES.fulfillment);
+assert.ok(TRUSTNET_PACKAGE_TYPES.logistics);
+assert.ok(TRUSTNET_PACKAGE_TYPES.projects);
+
+const shippingReceipts = buildTrustNetPackageReceipts({
+  packageType: 'shipping',
+  action: 'create shipment',
+  actor_type: 'user',
+  actor_id: 'shipper-1',
+  business_id: 'biz-a',
+  customer_id: 'cust-a',
+  workspace_id: 'workspace-a',
+  shipment_id: 'ship-1',
+  approval_refs: ['approval:shipping:ship-1'],
+  payload: { summary: 'shipment created from fulfillment' },
+  store: new LocalTrustNetReceiptStore()
+});
+assert.equal(shippingReceipts.length, 1);
+assert.equal(shippingReceipts[0].event_type, 'systems.shipment.created');
+assert.equal(shippingReceipts[0].policy_result, 'allowed');
+assert.equal(shippingReceipts[0].module_id, 'shipping');
+assert.deepEqual(shippingReceipts[0].payload_hash.length, 64);
+
+const fulfillmentBlocked = buildTrustNetPackageReceipts({
+  packageType: 'fulfillment',
+  action: 'production update',
+  actor_type: 'worker',
+  actor_id: 'press-operator-1',
+  business_id: 'biz-a',
+  customer_id: 'cust-a',
+  workspace_id: 'workspace-a',
+  order_id: 'order-1',
+  payload: { summary: 'production quantity update' },
+  store: new LocalTrustNetReceiptStore()
+});
+assert.equal(fulfillmentBlocked[0].event_type, 'systems.policy.blocked');
+assert.match(fulfillmentBlocked[0].blocked_reason, /approval-required/);
+
+const projectPlans = createPackageInstallPlans(['projects', 'logistics', 'purchasing']);
+assert.equal(projectPlans.length, 3);
+assert.deepEqual(createPackageInstallPlan('projects').downstream_modules, ['accounting', 'customer', 'fulfillment', 'shipping']);
 
 console.log('Neroa Guard TrustNet local validation passed.');
