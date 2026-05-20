@@ -14,14 +14,23 @@ import {
   createPackageInstallPlan,
   createPackageInstallPlans
 } from '../src/neroaGuard/trustNetPackageWiring.js';
+import {
+  SYSTEMS_VAULT_LINEAGE_EVENTS,
+  LocalVaultLineageStore,
+  createLocalVaultLineageAdapter,
+  createVaultLineageRecord,
+  validateVaultLineageRecord
+} from '../src/neroaGuard/neroaVaultLineage.js';
 
 function baseEvent(overrides = {}) {
   return {
     event_type: 'systems.customer.created',
-    from_address: trustAddress({ workspace_id: 'workspace-a', business_id: 'biz-a', actor_type: 'user', actor_id: 'admin-1', module_id: 'contacts' }),
-    to_address: trustAddress({ workspace_id: 'workspace-a', business_id: 'biz-a', module_id: 'contacts' }),
+    from_address: trustAddress({ workspace_id: 'workspace-a', business_id: 'biz-a', business_identity_number: 'BIN-001', actor_type: 'user', actor_id: 'admin-1', module_id: 'contacts' }),
+    to_address: trustAddress({ workspace_id: 'workspace-a', business_id: 'biz-a', business_identity_number: 'BIN-001', module_id: 'contacts' }),
     actor_type: 'user',
     actor_id: 'admin-1',
+    business_identity_number: 'BIN-001',
+    business_address: 'trustnet:business:bin-001',
     business_id: 'biz-a',
     customer_id: 'cust-a',
     workspace_id: 'workspace-a',
@@ -39,6 +48,8 @@ function baseEvent(overrides = {}) {
 }
 
 assert.ok(TRUSTNET_EVENT_FAMILIES.includes('systems.policy.blocked'));
+assert.ok(TRUSTNET_EVENT_FAMILIES.includes('systems.fulfillment.completed'));
+assert.ok(TRUSTNET_EVENT_FAMILIES.includes('systems.communication.sent'));
 assert.deepEqual(TRUSTNET_REDACTION_CLASSES, [
   'hash_only',
   'metadata_only',
@@ -55,6 +66,9 @@ assert.equal(allowed.network_behavior, 'address_to_address_proof_audit_only');
 assert.ok(allowed.payload_hash);
 assert.ok(allowed.receipt_id);
 assert.ok(allowed.event_hash);
+assert.ok(allowed.receipt_hash);
+assert.equal(allowed.business_identity_number, 'BIN-001');
+assert.equal(allowed.business_address, 'trustnet:business:bin-001');
 
 const unknownEvent = createTrustNetReceipt(baseEvent({ event_type: 'systems.wallet.created' }));
 assert.equal(unknownEvent.event_type, 'systems.policy.blocked');
@@ -68,6 +82,19 @@ assert.match(missingActor.blockedReasons.join(';'), /actor identity is missing/)
 const missingAddress = createTrustNetReceipt(baseEvent({ from_address: null }));
 assert.equal(missingAddress.event_type, 'systems.policy.blocked');
 assert.match(missingAddress.blocked_reason, /from_address is missing/);
+
+const missingBusinessIdentity = createTrustNetReceipt(baseEvent({ business_identity_number: '' }));
+assert.equal(missingBusinessIdentity.event_type, 'systems.policy.blocked');
+assert.match(missingBusinessIdentity.blocked_reason, /business_identity_number or business_address is missing/);
+
+const sourceBackedBlocked = createTrustNetReceipt(baseEvent({
+  event_type: 'systems.business_decision.recommended',
+  source_refs: [],
+  evidence_refs: [],
+  payload: { summary: 'AI business decision without source' }
+}));
+assert.equal(sourceBackedBlocked.event_type, 'systems.policy.blocked');
+assert.match(sourceBackedBlocked.blocked_reason, /source-backed action has no source_ref/);
 
 const approvalBlocked = createTrustNetReceipt(baseEvent({
   event_type: 'systems.payment.recorded',
@@ -101,7 +128,7 @@ assert.match(sensitiveCustomerSafeBlocked.blocked_reason, /customer-safe receipt
 
 const crossCustomerBlocked = createTrustNetReceipt(baseEvent({ cross_customer_access: true }));
 assert.equal(crossCustomerBlocked.event_type, 'systems.policy.blocked');
-assert.match(crossCustomerBlocked.blocked_reason, /cross-user or cross-customer/);
+assert.match(crossCustomerBlocked.blocked_reason, /cross-user, cross-customer, or cross-workspace/);
 
 const uncontrolledProductionBlocked = createTrustNetReceipt(baseEvent({ uncontrolled_production_execution: true }));
 assert.equal(uncontrolledProductionBlocked.event_type, 'systems.policy.blocked');
@@ -132,6 +159,8 @@ const shippingReceipts = buildTrustNetPackageReceipts({
   action: 'create shipment',
   actor_type: 'user',
   actor_id: 'shipper-1',
+  business_identity_number: 'BIN-001',
+  business_address: 'trustnet:business:bin-001',
   business_id: 'biz-a',
   customer_id: 'cust-a',
   workspace_id: 'workspace-a',
@@ -151,6 +180,8 @@ const fulfillmentBlocked = buildTrustNetPackageReceipts({
   action: 'production update',
   actor_type: 'worker',
   actor_id: 'press-operator-1',
+  business_identity_number: 'BIN-001',
+  business_address: 'trustnet:business:bin-001',
   business_id: 'biz-a',
   customer_id: 'cust-a',
   workspace_id: 'workspace-a',
@@ -165,4 +196,67 @@ const projectPlans = createPackageInstallPlans(['projects', 'logistics', 'purcha
 assert.equal(projectPlans.length, 3);
 assert.deepEqual(createPackageInstallPlan('projects').downstream_modules, ['accounting', 'customer', 'fulfillment', 'shipping']);
 
-console.log('Neroa Guard TrustNet local validation passed.');
+assert.ok(SYSTEMS_VAULT_LINEAGE_EVENTS.includes('systems.shipment.linked_to_vault'));
+const lineage = createVaultLineageRecord({
+  repo: 'NeroaEngine/steelcraft',
+  system_name: 'Neroa Systems',
+  module_name: 'contacts',
+  action_id: 'action-contact-created-1',
+  event_id: allowed.event_id,
+  receipt_id: allowed.receipt_id,
+  memory_refs: ['memory:local:contact-summary'],
+  source_refs: allowed.source_refs,
+  decision_refs: ['decision:local:route-contact-to-accounting'],
+  approval_refs: allowed.approval_refs,
+  evidence_refs: allowed.evidence_refs,
+  customer_refs: ['cust-a'],
+  business_refs: ['BIN-001'],
+  redaction_class: 'metadata_only',
+  retention_class: 'audit_7y',
+  created_by_actor: 'admin-1',
+  summary: 'Contact creation linked to TrustNet receipt.'
+});
+assert.equal(lineage.policy_result, 'allowed');
+assert.equal(lineage.receipt_id, allowed.receipt_id);
+assert.ok(lineage.lineage_hash);
+
+const lineageMissingSource = validateVaultLineageRecord({
+  repo: 'NeroaEngine/steelcraft',
+  system_name: 'Neroa Systems',
+  action_id: 'source-required-action',
+  created_by_actor: 'admin-1',
+  redaction_class: 'metadata_only',
+  retention_class: 'audit_7y',
+  source_required: true,
+  source_refs: []
+});
+assert.equal(lineageMissingSource.allowed, false);
+assert.match(lineageMissingSource.blockedReasons.join(';'), /source-backed lineage has no source_refs/);
+
+const lineageSensitiveBlocked = createVaultLineageRecord({
+  repo: 'NeroaEngine/steelcraft',
+  system_name: 'Neroa Systems',
+  action_id: 'unsafe-customer-safe-lineage',
+  created_by_actor: 'admin-1',
+  redaction_class: 'customer_safe_projection',
+  retention_class: 'audit_7y',
+  summary: 'bank account and payroll detail should not be exposed'
+});
+assert.equal(lineageSensitiveBlocked.policy_result, 'blocked');
+assert.match(lineageSensitiveBlocked.blocked_reason, /customer-safe lineage attempted to expose sensitive data/);
+
+const lineageStore = new LocalVaultLineageStore();
+const lineageAdapter = createLocalVaultLineageAdapter({ store: lineageStore });
+const linked = lineageAdapter.linkReceipt({
+  receipt: allowed,
+  repo: 'NeroaEngine/steelcraft',
+  system_name: 'Neroa Systems',
+  module_name: 'contacts',
+  action_id: 'link-receipt-action',
+  created_by_actor: 'admin-1',
+  summary: 'Receipt linked to local Vault lineage.'
+});
+assert.equal(linked.receipt_id, allowed.receipt_id);
+assert.equal(lineageStore.findByReceiptId(allowed.receipt_id).length, 1);
+
+console.log('Neroa Guard TrustNet and Neroa Vault local validation passed.');
