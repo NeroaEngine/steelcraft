@@ -44,7 +44,6 @@
 .live-module-actions button,
 .live-module-form button,
 .live-action-head button,
-.live-click-step button,
 .live-row-actions button {
   border: 1px solid color-mix(in srgb, var(--brand-accent, #9f3d42) 48%, var(--line, #343036));
   border-radius: 999px;
@@ -123,7 +122,6 @@
   margin-top: 8px;
 }
 .live-row-actions button,
-.live-click-step button,
 .live-action-head button {
   min-height: 32px;
   padding: 7px 10px;
@@ -147,7 +145,24 @@
   margin-bottom: 0;
 }
 .live-click-step {
-  grid-template-columns: 30px minmax(0, 1fr) auto;
+  grid-template-columns: 30px minmax(0, 1fr);
+  width: 100%;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+button.live-click-step {
+  border: 1px solid color-mix(in srgb, var(--line, #343036) 70%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface-alt, #1e1e24) 58%, transparent);
+  color: inherit;
+  min-height: auto;
+  padding: 12px;
+  font-weight: inherit;
+}
+.live-click-step > button,
+.live-module-status-strip .live-module-step > button {
+  display: none !important;
 }
 .live-module-form {
   display: grid;
