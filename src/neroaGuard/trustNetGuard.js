@@ -11,22 +11,63 @@ export const TRUSTNET_EVENT_FAMILIES = Object.freeze([
   'systems.worker.completed',
   'systems.worker.failed',
   'systems.customer.created',
+  'systems.customer.updated',
   'systems.vendor.created',
+  'systems.vendor.updated',
+  'systems.contact.created',
+  'systems.crm_action.completed',
   'systems.order.created',
   'systems.order.updated',
+  'systems.order.blocked',
+  'systems.production.started',
   'systems.production.updated',
+  'systems.production.completed',
   'systems.purchase_order.created',
+  'systems.purchase_order.updated',
+  'systems.fulfillment.started',
+  'systems.fulfillment.completed',
+  'systems.fulfillment.blocked',
   'systems.shipment.created',
+  'systems.shipment.updated',
+  'systems.logistics.started',
+  'systems.logistics.completed',
   'systems.invoice.created',
+  'systems.invoice.updated',
   'systems.payment.recorded',
   'systems.accounting.reconciliation_started',
   'systems.accounting.reconciliation_completed',
+  'systems.accounting.reconciliation_blocked',
+  'systems.costing.calculated',
+  'systems.margin.warning_created',
+  'systems.business_decision.recommended',
+  'systems.business_decision.approved',
+  'systems.business_decision.blocked',
+  'systems.communication.drafted',
+  'systems.communication.sent',
+  'systems.communication.blocked',
   'systems.audit_report.created',
   'systems.sop.created',
   'systems.sop.updated',
   'systems.assistant.action_started',
   'systems.assistant.action_completed',
   'systems.assistant.action_blocked',
+  'systems.database.created',
+  'systems.schema.migration.started',
+  'systems.schema.migration.completed',
+  'systems.schema.migration.failed',
+  'systems.table.created',
+  'systems.policy.changed',
+  'systems.sensitive_query.requested',
+  'systems.sensitive_query.allowed',
+  'systems.sensitive_query.blocked',
+  'systems.data_export.requested',
+  'systems.data_export.completed',
+  'systems.data_export.blocked',
+  'systems.backup.created',
+  'systems.restore.requested',
+  'systems.restore.completed',
+  'systems.tenant_data_accessed',
+  'systems.customer_data_accessed',
   'systems.policy.blocked'
 ]);
 
@@ -80,7 +121,9 @@ const SENSITIVE_EXPOSURE_TERMS = [
   'ssn',
   'social security',
   'protected customer data',
-  'sensitive financial'
+  'sensitive financial',
+  'raw financial',
+  'message body'
 ];
 
 const CUSTOMER_SAFE_ALLOWED = new Set(['hash_only', 'metadata_only', 'redacted_summary', 'customer_safe_projection']);
@@ -89,29 +132,71 @@ const APPROVAL_REQUIRED_EVENT_TYPES = new Set([
   'systems.order.updated',
   'systems.production.updated',
   'systems.purchase_order.created',
+  'systems.purchase_order.updated',
+  'systems.fulfillment.completed',
   'systems.shipment.created',
+  'systems.shipment.updated',
+  'systems.logistics.completed',
   'systems.invoice.created',
+  'systems.invoice.updated',
   'systems.payment.recorded',
   'systems.accounting.reconciliation_completed',
+  'systems.business_decision.approved',
+  'systems.communication.sent',
   'systems.audit_report.created',
   'systems.sop.updated',
-  'systems.assistant.action_completed'
+  'systems.assistant.action_completed',
+  'systems.schema.migration.completed',
+  'systems.data_export.completed',
+  'systems.restore.completed'
+]);
+const SOURCE_REQUIRED_EVENT_TYPES = new Set([
+  'systems.assistant.action_completed',
+  'systems.business_decision.recommended',
+  'systems.business_decision.approved',
+  'systems.costing.calculated',
+  'systems.margin.warning_created',
+  'systems.accounting.reconciliation_completed',
+  'systems.communication.drafted',
+  'systems.communication.sent',
+  'systems.audit_report.created'
 ]);
 const CUSTOMER_IMPACTING_EVENT_TYPES = new Set([
   'systems.customer.created',
+  'systems.customer.updated',
   'systems.vendor.created',
+  'systems.vendor.updated',
+  'systems.contact.created',
+  'systems.crm_action.completed',
   'systems.order.created',
   'systems.order.updated',
   'systems.production.updated',
   'systems.purchase_order.created',
+  'systems.purchase_order.updated',
+  'systems.fulfillment.completed',
   'systems.shipment.created',
+  'systems.shipment.updated',
   'systems.invoice.created',
+  'systems.invoice.updated',
   'systems.payment.recorded',
-  'systems.accounting.reconciliation_completed'
+  'systems.accounting.reconciliation_completed',
+  'systems.communication.sent'
+]);
+const BUSINESS_IDENTITY_REQUIRED_EVENT_TYPES = new Set([
+  ...CUSTOMER_IMPACTING_EVENT_TYPES,
+  'systems.worker.started',
+  'systems.worker.completed',
+  'systems.worker.failed',
+  'systems.assistant.action_started',
+  'systems.assistant.action_completed',
+  'systems.assistant.action_blocked',
+  'systems.audit_report.created',
+  'systems.sop.created',
+  'systems.sop.updated'
 ]);
 
-export function trustAddress({ system = 'neroa-systems', workspace_id, business_id, actor_type, actor_id, module_id } = {}) {
-  const parts = [system, workspace_id, business_id, module_id, actor_type, actor_id]
+export function trustAddress({ system = 'neroa-systems', workspace_id, business_id, business_identity_number, actor_type, actor_id, module_id } = {}) {
+  const parts = [system, workspace_id, business_identity_number || business_id, module_id, actor_type, actor_id]
     .filter(Boolean)
     .map((part) => String(part).trim().toLowerCase().replace(/[^a-z0-9_.:-]+/g, '-'));
   return `trustnet:${parts.join(':') || 'unknown'}`;
@@ -134,6 +219,7 @@ export function createPayloadHash(payload) {
 export function createEventHash(receipt) {
   const hashable = { ...receipt };
   delete hashable.event_hash;
+  delete hashable.receipt_hash;
   return sha256Hex(stableStringify(hashable));
 }
 
@@ -170,10 +256,16 @@ export function validateTrustNetRequest(input = {}) {
   else pass('actor_identity_required');
 
   if (CUSTOMER_IMPACTING_EVENT_TYPES.has(eventType)) {
-    if (isMissing(input.business_id) || isMissing(input.customer_id) || isMissing(input.workspace_id)) {
-      blockedReasons.push(fail('business_context_required', 'required business/customer/workspace context is missing'));
+    if (isMissing(input.business_id) || isMissing(input.workspace_id)) {
+      blockedReasons.push(fail('business_context_required', 'required business/workspace context is missing'));
     } else pass('business_context_required');
   } else pass('business_context_required');
+
+  if (BUSINESS_IDENTITY_REQUIRED_EVENT_TYPES.has(eventType)) {
+    if (isMissing(input.business_identity_number) || isMissing(input.business_address)) {
+      blockedReasons.push(fail('business_identity_required', 'business_identity_number or business_address is missing'));
+    } else pass('business_identity_required');
+  } else pass('business_identity_required');
 
   if (!TRUSTNET_REDACTION_CLASSES.includes(input.payload_redaction_class)) blockedReasons.push(fail('valid_redaction_class', 'payload_redaction_class is invalid'));
   else pass('valid_redaction_class');
@@ -197,6 +289,10 @@ export function validateTrustNetRequest(input = {}) {
     blockedReasons.push(fail('approval_required', 'approval-required action has no approval_ref'));
   } else pass('approval_required');
 
+  if (SOURCE_REQUIRED_EVENT_TYPES.has(eventType) && isMissing(input.source_refs)) {
+    blockedReasons.push(fail('source_refs_required', 'source-backed action has no source_ref'));
+  } else pass('source_refs_required');
+
   const prohibitedTerm = containsTerm(input, BLOCKED_BEHAVIOR_TERMS);
   if (prohibitedTerm) blockedReasons.push(fail('no_public_crypto_behavior', `action attempts prohibited public crypto behavior: ${prohibitedTerm}`));
   else pass('no_public_crypto_behavior');
@@ -208,7 +304,7 @@ export function validateTrustNetRequest(input = {}) {
     blockedReasons.push(fail('customer_safe_no_sensitive_data', 'customer_safe receipt requires a customer-safe redaction class'));
   } else pass('customer_safe_no_sensitive_data');
 
-  if (input.cross_user_access === true || input.cross_customer_access === true) blockedReasons.push(fail('no_cross_boundary_access', 'action attempts cross-user or cross-customer data access'));
+  if (input.cross_user_access === true || input.cross_customer_access === true || input.cross_workspace_access === true) blockedReasons.push(fail('no_cross_boundary_access', 'action attempts cross-user, cross-customer, or cross-workspace data access'));
   else pass('no_cross_boundary_access');
 
   if (input.uncontrolled_model_chatter === true) blockedReasons.push(fail('no_uncontrolled_model_chatter', 'action attempts uncontrolled model-to-model chatter'));
@@ -220,6 +316,13 @@ export function validateTrustNetRequest(input = {}) {
   if (input.customer_impacting_change === true && isMissing(input.approval_refs) && input.policy_override !== 'approval_not_required') {
     blockedReasons.push(fail('customer_impacting_changes_need_approval', 'customer-impacting change has no approval or policy path'));
   } else pass('customer_impacting_changes_need_approval');
+
+  if (input.source_backed_action === true && isMissing(input.source_refs)) {
+    blockedReasons.push(fail('source_backed_actions_need_sources', 'source-backed action has no source_refs'));
+  } else pass('source_backed_actions_need_sources');
+
+  if (input.bypass_neroa_policy === true) blockedReasons.push(fail('no_policy_bypass', 'action attempts to bypass Neroa One Brain, Neroa Core policy, Neroa Guard, or Neroa Vault rules'));
+  else pass('no_policy_bypass');
 
   return {
     allowed: blockedReasons.length === 0,
@@ -245,6 +348,8 @@ export function createTrustNetReceipt(input = {}, options = {}) {
     to_address: input.to_address || null,
     actor_type: input.actor_type || null,
     actor_id: input.actor_id || null,
+    business_identity_number: input.business_identity_number || null,
+    business_address: input.business_address || null,
     business_id: input.business_id || null,
     customer_id: input.customer_id || null,
     workspace_id: input.workspace_id || null,
@@ -261,6 +366,7 @@ export function createTrustNetReceipt(input = {}, options = {}) {
     evidence_refs: input.evidence_refs || [],
     source_refs: input.source_refs || [],
     approval_refs: input.approval_refs || [],
+    vault_lineage_refs: input.vault_lineage_refs || [],
     policy_result: validation.policy_result,
     policy_checks: validation.policyChecks,
     previous_event_hash: previousEventHash,
@@ -273,9 +379,12 @@ export function createTrustNetReceipt(input = {}, options = {}) {
     retention_class: input.retention_class || null
   };
 
+  const receiptHash = createEventHash(receipt);
+
   return {
     ...receipt,
-    event_hash: createEventHash(receipt),
+    event_hash: receiptHash,
+    receipt_hash: receiptHash,
     trust_layer: TRUSTNET_LAYER,
     guard_layer: NEROA_GUARD_PRODUCT_LAYER,
     network_behavior: 'address_to_address_proof_audit_only'
@@ -307,7 +416,7 @@ export class LocalTrustNetReceiptStore {
 
   verifyChain() {
     return this.receipts.every((receipt, index) => {
-      const { event_hash: eventHash, ...withoutHash } = receipt;
+      const { event_hash: eventHash, receipt_hash: _receiptHash, ...withoutHash } = receipt;
       const recalculated = createEventHash(withoutHash);
       if (eventHash !== recalculated) return false;
       if (index === 0) return !receipt.previous_event_hash;
