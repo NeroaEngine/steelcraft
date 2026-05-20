@@ -10,7 +10,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "node server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "validate:trustnet": "node tests/trustNetGuard.test.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
