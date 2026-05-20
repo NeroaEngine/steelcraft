@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 const businessDefaults = {
   business_identity_number: 'BIN-STEELCRAFT-001',
@@ -26,6 +26,40 @@ function ResultCard({ result }) {
   </article>;
 }
 
+function ProofLogPanel({ proofLog, onRefresh }) {
+  const receipts = proofLog?.receipts || [];
+  const lineage = proofLog?.lineage || [];
+  return <article className="feature panel large">
+    <div className="feature-title-row">
+      <div>
+        <p className="eyebrow">Read-only proof log</p>
+        <h2>Contacts TrustNet / Vault activity</h2>
+      </div>
+      <button type="button" onClick={onRefresh}>Refresh</button>
+    </div>
+    <div className="data-rows">
+      {receipts.length ? receipts.map((receipt) => <div className="data-row" key={receipt.receipt_id}>
+        <div>
+          <strong>{receipt.event_type}</strong>
+          <span>{receipt.receipt_id}</span>
+          <small>{receipt.lineage_id || receipt.payload_hash}</small>
+        </div>
+        <b>{receipt.policy_result}</b>
+      </div>) : <div className="notice">No local Contacts receipts yet. Create a Contact, Customer, or Vendor to generate one.</div>}
+    </div>
+    <div className="data-rows">
+      {lineage.slice(0, 5).map((record) => <div className="data-row" key={record.lineage_id}>
+        <div>
+          <strong>Vault lineage</strong>
+          <span>{record.lineage_id}</span>
+          <small>{record.receipt_id}</small>
+        </div>
+        <b>{record.policy_result}</b>
+      </div>)}
+    </div>
+  </article>;
+}
+
 export default function ContactsCrmPortal({ user }) {
   const [form, setForm] = useState({
     record_type: 'contact',
@@ -39,10 +73,23 @@ export default function ContactsCrmPortal({ user }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
   const [localRows, setLocalRows] = useState([]);
+  const [proofLog, setProofLog] = useState(null);
 
   function update(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
   }
+
+  async function refreshProofLog() {
+    try {
+      const response = await fetch('/api/contacts-crm/proof-log?limit=12');
+      const json = await response.json();
+      if (response.ok && json.ok) setProofLog(json);
+    } catch {
+      setProofLog((current) => current || { receipts: [], lineage: [] });
+    }
+  }
+
+  useEffect(() => { refreshProofLog(); }, []);
 
   async function submit(event) {
     event.preventDefault();
@@ -68,11 +115,13 @@ export default function ContactsCrmPortal({ user }) {
       const json = await response.json();
       if (!response.ok || !json.ok) {
         setResult({ ok: false, ...json });
+        await refreshProofLog();
         return;
       }
       setResult(json);
       setLocalRows((rows) => [[json.company?.name || form.name, `${json.receipt_id} / ${json.lineage_id}`, json.record_type], ...rows]);
       setForm((current) => ({ ...current, name: '', email: '', phone: '', notes: '' }));
+      await refreshProofLog();
     } catch (error) {
       setResult({ ok: false, error: error.message || 'Contacts / CRM create failed.' });
     } finally {
@@ -112,6 +161,7 @@ export default function ContactsCrmPortal({ user }) {
       </article>
 
       <ResultCard result={result} />
+      <ProofLogPanel proofLog={proofLog} onRefresh={refreshProofLog} />
 
       <article className="feature panel">
         <p className="eyebrow">Recent local creates</p>
