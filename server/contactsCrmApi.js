@@ -34,6 +34,47 @@ function requireBodyField(body, field) {
   }
 }
 
+function summarizeReceipt(receipt) {
+  return {
+    receipt_id: receipt.receipt_id,
+    event_id: receipt.event_id,
+    event_type: receipt.event_type,
+    requested_event_type: receipt.requested_event_type,
+    policy_result: receipt.policy_result,
+    blocked_reason: receipt.blocked_reason,
+    actor_id: receipt.actor_id,
+    business_identity_number: receipt.business_identity_number,
+    business_id: receipt.business_id,
+    workspace_id: receipt.workspace_id,
+    customer_id: receipt.customer_id,
+    vendor_id: receipt.vendor_id,
+    module_id: receipt.module_id,
+    payload_redaction_class: receipt.payload_redaction_class,
+    security_class: receipt.security_class,
+    retention_class: receipt.retention_class,
+    payload_hash: receipt.payload_hash,
+    event_hash: receipt.event_hash,
+    timestamp: receipt.timestamp
+  };
+}
+
+function summarizeLineage(record) {
+  return {
+    lineage_id: record.lineage_id,
+    receipt_id: record.receipt_id,
+    event_id: record.event_id,
+    module_name: record.module_name,
+    action_id: record.action_id,
+    policy_result: record.policy_result,
+    blocked_reason: record.blocked_reason,
+    redaction_class: record.redaction_class,
+    retention_class: record.retention_class,
+    created_at: record.created_at,
+    created_by_actor: record.created_by_actor,
+    lineage_hash: record.lineage_hash
+  };
+}
+
 export function registerContactsCrmRoutes(app, requireDatabase, ensureSchema) {
   app.post('/api/contacts-crm/create', async (req, res, next) => {
     const db = requireDatabase();
@@ -155,6 +196,21 @@ export function registerContactsCrmRoutes(app, requireDatabase, ensureSchema) {
       try { await db.query('rollback'); } catch {}
       next(error);
     }
+  });
+
+  app.get('/api/contacts-crm/proof-log', async (req, res) => {
+    const limit = Math.max(1, Math.min(Number(req.query.limit || 20), 100));
+    const receipts = contactsTrustStore.all().slice(-limit).reverse().map(summarizeReceipt);
+    const lineage = contactsVaultStore.all().slice(-limit).reverse().map(summarizeLineage);
+    res.json({
+      ok: true,
+      receipts,
+      lineage,
+      counts: {
+        receipts: contactsTrustStore.all().length,
+        lineage: contactsVaultStore.all().length
+      }
+    });
   });
 }
 
