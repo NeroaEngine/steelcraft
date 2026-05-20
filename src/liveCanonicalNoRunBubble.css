@@ -1,0 +1,28 @@
+.live-action-panel .live-module-status-strip .live-module-step button,
+.live-action-panel .live-module-status-strip .live-click-step button,
+.live-action-panel .live-module-status-strip button:not(.live-click-step) {
+  display: none !important;
+}
+
+.live-action-panel .live-module-status-strip .live-click-step,
+.live-action-panel .live-module-status-strip button.live-click-step {
+  display: grid !important;
+  grid-template-columns: 30px minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 10px !important;
+  width: 100% !important;
+  text-align: left !important;
+  border: 1px solid color-mix(in srgb, var(--line, #343036) 70%, transparent) !important;
+  border-radius: 16px !important;
+  background: color-mix(in srgb, var(--surface-alt, #1e1e24) 58%, transparent) !important;
+  color: inherit !important;
+  padding: 12px !important;
+  min-height: 0 !important;
+  font-weight: inherit !important;
+}
+
+.live-action-panel .live-module-status-strip .live-click-step::after,
+.live-action-panel .live-module-status-strip .live-module-step::after {
+  content: none !important;
+  display: none !important;
+}
