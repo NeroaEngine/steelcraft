@@ -8,159 +8,38 @@ export const canonicalPortals = [
   { id: 'employee', canonicalKey: 'core.employee', title: 'Employee Self-Service', kind: 'Employee access', description: 'Personal profile, PTO requests, handbook acknowledgements, training assignments, and employee documents.', route: '/portal/employee', package: 'core', scope: 'canonical' }
 ];
 
-const makePortal = (pack, id, title, kind, description) => ({
-  id,
-  canonicalKey: `${pack}.${id}`,
-  title,
-  kind,
-  description,
-  route: `/portal/${id}`,
-  package: pack,
-  scope: 'industry'
-});
+const makePortal = (pack, id, title, kind, description) => ({ id, canonicalKey: `${pack}.${id}`, title, kind, description, route: `/portal/${id}`, package: pack, scope: 'industry' });
 
 export const industryPacks = {
-  metal_buildings: {
-    id: 'metal_buildings',
-    title: 'Metal Buildings',
-    description: 'Steel buildings, metal construction, fabrication, erection, project delivery, estimating, purchasing, and field readiness.',
-    projectTable: 'metal_building_projects',
-    canonicalProjectTable: 'projects',
-    portals: [
-      makePortal('metal_buildings', 'sales', 'Sales Portal', 'Metal building sales', 'Leads, opportunities, customers, quote requests, handoff notes, and metal-building sales follow-up.'),
-      makePortal('metal_buildings', 'estimating', 'Estimating Portal', 'Metal building estimating', 'Estimate intake, scope builder, cost build, margin review, quote generation, workbook parsing, and bid handoff.'),
-      makePortal('metal_buildings', 'projects', 'Projects Portal', 'Metal building project execution', 'Contracted jobs, engineering, material, fabrication, delivery, erection schedule, punch, and closeout.'),
-      makePortal('metal_buildings', 'planning', 'Planning Portal', 'Metal building operations planning', 'Job readiness, resource planning, schedule blockers, handoffs, production readiness, and field readiness.'),
-      makePortal('metal_buildings', 'purchasing', 'Purchasing Portal', 'Metal building procurement', 'Purchase orders, vendor assignment, material purchasing, approvals, due dates, receiving, and project cost coding.')
-    ]
-  },
-  screen_printing: {
-    id: 'screen_printing',
-    title: 'Screen Printing',
-    description: 'Artwork, approvals, press scheduling, production efficiency, job costing, garments, fulfillment, and customer proofing.',
-    projectTable: 'screen_printing_jobs',
-    canonicalProjectTable: 'projects',
-    portals: [
-      makePortal('screen_printing', 'sp_sales', 'Sales Portal', 'Screen printing sales', 'Leads, customer intake, quote requests, garment needs, due dates, and follow-up.'),
-      makePortal('screen_printing', 'sp_artwork', 'Artwork + Proofing', 'Artwork approvals', 'Artwork intake, proof generation, customer approvals, change requests, and proof receipts.'),
-      makePortal('screen_printing', 'sp_production', 'Production Portal', 'Press production', 'Press schedule, print counts, spoilage, labor, machine rates, production efficiency, and daily output.'),
-      makePortal('screen_printing', 'sp_fulfillment', 'Fulfillment Portal', 'Packing and delivery', 'Order picking, packing, shipping, pickup, delivery, and customer completion notices.'),
-      makePortal('screen_printing', 'sp_purchasing', 'Purchasing Portal', 'Garments and supplies', 'Blank goods, ink, screens, vendor orders, receiving, shortages, and job cost coding.')
-    ]
-  },
-  construction_building: {
-    id: 'construction_building',
-    title: 'Building / Construction',
-    description: 'General construction projects, estimating, subcontractors, schedules, inspections, punch lists, purchasing, and closeout.',
-    projectTable: 'construction_projects',
-    canonicalProjectTable: 'projects',
-    portals: [
-      makePortal('construction_building', 'cb_precon', 'Preconstruction', 'Precon and bid management', 'Lead intake, site review, bid packages, estimates, scope, and owner handoff.'),
-      makePortal('construction_building', 'cb_projects', 'Projects Portal', 'Construction execution', 'Project schedule, subcontractors, field updates, RFIs, submittals, inspections, punch, and closeout.'),
-      makePortal('construction_building', 'cb_field', 'Field Portal', 'Field operations', 'Daily logs, photos, safety, manpower, issues, inspections, and foreman updates.'),
-      makePortal('construction_building', 'cb_purchasing', 'Purchasing Portal', 'Construction purchasing', 'Materials, subcontractor POs, vendor terms, deliveries, receiving, and cost coding.'),
-      makePortal('construction_building', 'cb_closeout', 'Closeout Portal', 'Closeout control', 'Punch lists, warranty documents, final billing, owner turnover, and closeout packages.')
-    ]
-  },
-  mechanical: {
-    id: 'mechanical',
-    title: 'Mechanical / HVAC / Service',
-    description: 'Mechanical service, HVAC installs, dispatch, technicians, maintenance contracts, parts, equipment, and service billing.',
-    projectTable: 'mechanical_jobs',
-    canonicalProjectTable: 'projects',
-    portals: [
-      makePortal('mechanical', 'mech_dispatch', 'Dispatch Portal', 'Service dispatch', 'Service calls, technician scheduling, priority, route status, and emergency work.'),
-      makePortal('mechanical', 'mech_service', 'Service Portal', 'Technician workflow', 'Work orders, site notes, diagnosis, photos, parts, signatures, and customer updates.'),
-      makePortal('mechanical', 'mech_projects', 'Install Projects', 'Mechanical installs', 'Install jobs, equipment, permits, subcontractors, inspections, commissioning, and closeout.'),
-      makePortal('mechanical', 'mech_parts', 'Parts Portal', 'Parts and equipment', 'Inventory, parts orders, vendor pricing, equipment tags, warranties, and receiving.'),
-      makePortal('mechanical', 'mech_contracts', 'Maintenance Contracts', 'Service agreements', 'PM schedules, contract visits, renewals, equipment lists, and recurring billing handoff.')
-    ]
-  },
-  roadside_assistance: {
-    id: 'roadside_assistance',
-    title: 'Roadside Assistance',
-    description: 'Dispatch, service calls, tow providers, motorist communication, vehicle incidents, claims, and provider payments.',
-    projectTable: 'roadside_cases',
-    canonicalProjectTable: 'projects',
-    portals: [
-      makePortal('roadside_assistance', 'ra_dispatch', 'Dispatch Portal', 'Roadside dispatch', 'Motorist requests, location, provider assignment, ETA, route status, and escalation.'),
-      makePortal('roadside_assistance', 'ra_cases', 'Cases Portal', 'Roadside cases', 'Case history, customer status, photos, invoices, provider updates, and completion.'),
-      makePortal('roadside_assistance', 'ra_providers', 'Provider Portal', 'Tow/provider network', 'Provider packets, availability, service zones, upload slots, invoices, and performance.'),
-      makePortal('roadside_assistance', 'ra_claims', 'Claims Portal', 'Claims and reimbursement', 'Incident claims, evidence, approvals, reimbursements, policy review, and customer communication.'),
-      makePortal('roadside_assistance', 'ra_fleet', 'Fleet Monitor', 'Vehicle and coverage monitor', 'Fleet vehicles, assistance coverage, OBD/telematics handoff, service history, and alerts.')
-    ]
-  },
-  manufacturing: {
-    id: 'manufacturing',
-    title: 'Manufacturing',
-    description: 'Production orders, work centers, inventory, quality, maintenance, materials, scheduling, and shipment readiness.',
-    projectTable: 'manufacturing_orders',
-    canonicalProjectTable: 'projects',
-    portals: [
-      makePortal('manufacturing', 'mfg_orders', 'Production Orders', 'Manufacturing orders', 'Order intake, BOM, routing, work centers, due dates, and production status.'),
-      makePortal('manufacturing', 'mfg_floor', 'Shop Floor', 'Production floor', 'Work center execution, labor, counts, scrap, downtime, and shift reporting.'),
-      makePortal('manufacturing', 'mfg_inventory', 'Inventory Portal', 'Inventory and materials', 'Materials, stock, lots, receiving, shortages, reorder points, and cost coding.'),
-      makePortal('manufacturing', 'mfg_quality', 'Quality Portal', 'Quality control', 'Inspections, nonconformance, corrective actions, approvals, and release status.'),
-      makePortal('manufacturing', 'mfg_maintenance', 'Maintenance Portal', 'Equipment maintenance', 'PMs, machine downtime, repairs, parts, technician work, and proof logs.')
-    ]
-  },
-  field_services: {
-    id: 'field_services',
-    title: 'Field Services',
-    description: 'Field crews, service tickets, dispatch, site photos, customer approvals, time, materials, and invoicing handoff.',
-    projectTable: 'field_service_jobs',
-    canonicalProjectTable: 'projects',
-    portals: [
-      makePortal('field_services', 'fs_dispatch', 'Dispatch Portal', 'Field dispatch', 'Service tickets, crew assignments, routes, priorities, and field status.'),
-      makePortal('field_services', 'fs_workorders', 'Work Orders', 'Field work orders', 'Work details, photos, customer approvals, materials, time, notes, and completion.'),
-      makePortal('field_services', 'fs_crews', 'Crew Portal', 'Crew management', 'Crew schedules, skills, availability, field check-ins, and safety requirements.'),
-      makePortal('field_services', 'fs_assets', 'Assets Portal', 'Equipment and assets', 'Customer assets, service history, maintenance plans, serials, and warranty details.'),
-      makePortal('field_services', 'fs_billing', 'Service Billing', 'Field billing handoff', 'Billable time, materials, trip charges, approvals, invoice prep, and customer communication.')
-    ]
-  }
+  metal_buildings: { id: 'metal_buildings', title: 'Metal Buildings', description: 'Steel buildings, metal construction, fabrication, erection, project delivery, estimating, purchasing, and field readiness.', projectTable: 'metal_building_projects', canonicalProjectTable: 'projects', portals: [makePortal('metal_buildings', 'sales', 'Sales Portal', 'Metal building sales', 'Leads, opportunities, customers, quote requests, handoff notes, and metal-building sales follow-up.'), makePortal('metal_buildings', 'estimating', 'Estimating Portal', 'Metal building estimating', 'Estimate intake, scope builder, cost build, margin review, quote generation, workbook parsing, and bid handoff.'), makePortal('metal_buildings', 'projects', 'Projects Portal', 'Metal building project execution', 'Contracted jobs, engineering, material, fabrication, delivery, erection schedule, punch, and closeout.'), makePortal('metal_buildings', 'planning', 'Planning Portal', 'Metal building operations planning', 'Job readiness, resource planning, schedule blockers, handoffs, production readiness, and field readiness.'), makePortal('metal_buildings', 'purchasing', 'Purchasing Portal', 'Metal building procurement', 'Purchase orders, vendor assignment, material purchasing, approvals, due dates, receiving, and project cost coding.')] },
+  screen_printing: { id: 'screen_printing', title: 'Screen Printing', description: 'Artwork, approvals, press scheduling, production efficiency, job costing, garments, fulfillment, and customer proofing.', projectTable: 'screen_printing_jobs', canonicalProjectTable: 'projects', portals: [makePortal('screen_printing', 'sp_sales', 'Sales Portal', 'Screen printing sales', 'Leads, customer intake, quote requests, garment needs, due dates, and follow-up.'), makePortal('screen_printing', 'sp_artwork', 'Artwork + Proofing', 'Artwork approvals', 'Artwork intake, proof generation, customer approvals, change requests, and proof receipts.'), makePortal('screen_printing', 'sp_production', 'Production Portal', 'Press production', 'Press schedule, print counts, spoilage, labor, machine rates, production efficiency, and daily output.'), makePortal('screen_printing', 'sp_fulfillment', 'Fulfillment Portal', 'Packing and delivery', 'Order picking, packing, shipping, pickup, delivery, and customer completion notices.'), makePortal('screen_printing', 'sp_purchasing', 'Purchasing Portal', 'Garments and supplies', 'Blank goods, ink, screens, vendor orders, receiving, shortages, and job cost coding.')] },
+  construction_building: { id: 'construction_building', title: 'Building / Construction', description: 'General construction projects, estimating, subcontractors, schedules, inspections, punch lists, purchasing, and closeout.', projectTable: 'construction_projects', canonicalProjectTable: 'projects', portals: [makePortal('construction_building', 'cb_precon', 'Preconstruction', 'Precon and bid management', 'Lead intake, site review, bid packages, estimates, scope, and owner handoff.'), makePortal('construction_building', 'cb_projects', 'Projects Portal', 'Construction execution', 'Project schedule, subcontractors, field updates, RFIs, submittals, inspections, punch, and closeout.'), makePortal('construction_building', 'cb_field', 'Field Portal', 'Field operations', 'Daily logs, photos, safety, manpower, issues, inspections, and foreman updates.'), makePortal('construction_building', 'cb_purchasing', 'Purchasing Portal', 'Construction purchasing', 'Materials, subcontractor POs, vendor terms, deliveries, receiving, and cost coding.'), makePortal('construction_building', 'cb_closeout', 'Closeout Portal', 'Closeout control', 'Punch lists, warranty documents, final billing, owner turnover, and closeout packages.')] },
+  mechanical: { id: 'mechanical', title: 'Mechanical / HVAC / Service', description: 'Mechanical service, HVAC installs, dispatch, technicians, maintenance contracts, parts, equipment, and service billing.', projectTable: 'mechanical_jobs', canonicalProjectTable: 'projects', portals: [makePortal('mechanical', 'mech_dispatch', 'Dispatch Portal', 'Service dispatch', 'Service calls, technician scheduling, priority, route status, and emergency work.'), makePortal('mechanical', 'mech_service', 'Service Portal', 'Technician workflow', 'Work orders, site notes, diagnosis, photos, parts, signatures, and customer updates.'), makePortal('mechanical', 'mech_projects', 'Install Projects', 'Mechanical installs', 'Install jobs, equipment, permits, subcontractors, inspections, commissioning, and closeout.'), makePortal('mechanical', 'mech_parts', 'Parts Portal', 'Parts and equipment', 'Inventory, parts orders, vendor pricing, equipment tags, warranties, and receiving.'), makePortal('mechanical', 'mech_contracts', 'Maintenance Contracts', 'Service agreements', 'PM schedules, contract visits, renewals, equipment lists, and recurring billing handoff.')] },
+  roadside_assistance: { id: 'roadside_assistance', title: 'Roadside Assistance', description: 'Dispatch, service calls, tow providers, motorist communication, vehicle incidents, claims, and provider payments.', projectTable: 'roadside_cases', canonicalProjectTable: 'projects', portals: [makePortal('roadside_assistance', 'ra_dispatch', 'Dispatch Portal', 'Roadside dispatch', 'Motorist requests, location, provider assignment, ETA, route status, and escalation.'), makePortal('roadside_assistance', 'ra_cases', 'Cases Portal', 'Roadside cases', 'Case history, customer status, photos, invoices, provider updates, and completion.'), makePortal('roadside_assistance', 'ra_providers', 'Provider Portal', 'Tow/provider network', 'Provider packets, availability, service zones, upload slots, invoices, and performance.'), makePortal('roadside_assistance', 'ra_claims', 'Claims Portal', 'Claims and reimbursement', 'Incident claims, evidence, approvals, reimbursements, policy review, and customer communication.'), makePortal('roadside_assistance', 'ra_fleet', 'Fleet Monitor', 'Vehicle and coverage monitor', 'Fleet vehicles, assistance coverage, OBD/telematics handoff, service history, and alerts.')] },
+  manufacturing: { id: 'manufacturing', title: 'Manufacturing', description: 'Production orders, work centers, inventory, quality, maintenance, materials, scheduling, and shipment readiness.', projectTable: 'manufacturing_orders', canonicalProjectTable: 'projects', portals: [makePortal('manufacturing', 'mfg_orders', 'Production Orders', 'Manufacturing orders', 'Order intake, BOM, routing, work centers, due dates, and production status.'), makePortal('manufacturing', 'mfg_floor', 'Shop Floor', 'Production floor', 'Work center execution, labor, counts, scrap, downtime, and shift reporting.'), makePortal('manufacturing', 'mfg_inventory', 'Inventory Portal', 'Inventory and materials', 'Materials, stock, lots, receiving, shortages, reorder points, and cost coding.'), makePortal('manufacturing', 'mfg_quality', 'Quality Portal', 'Quality control', 'Inspections, nonconformance, corrective actions, approvals, and release status.'), makePortal('manufacturing', 'mfg_maintenance', 'Maintenance Portal', 'Equipment maintenance', 'PMs, machine downtime, repairs, parts, technician work, and proof logs.')] },
+  field_services: { id: 'field_services', title: 'Field Services', description: 'Field crews, service tickets, dispatch, site photos, customer approvals, time, materials, and invoicing handoff.', projectTable: 'field_service_jobs', canonicalProjectTable: 'projects', portals: [makePortal('field_services', 'fs_dispatch', 'Dispatch Portal', 'Field dispatch', 'Service tickets, crew assignments, routes, priorities, and field status.'), makePortal('field_services', 'fs_workorders', 'Work Orders', 'Field work orders', 'Work details, photos, customer approvals, materials, time, notes, and completion.'), makePortal('field_services', 'fs_crews', 'Crew Portal', 'Crew management', 'Crew schedules, skills, availability, field check-ins, and safety requirements.'), makePortal('field_services', 'fs_assets', 'Assets Portal', 'Equipment and assets', 'Customer assets, service history, maintenance plans, serials, and warranty details.'), makePortal('field_services', 'fs_billing', 'Service Billing', 'Field billing handoff', 'Billable time, materials, trip charges, approvals, invoice prep, and customer communication.')] }
 };
 
-export const industryPackOptions = Object.values(industryPacks).map((pack) => ({ id: pack.id, title: pack.title, description: pack.description }));
-
-export function getIndustryPack(packId = 'metal_buildings') {
-  return industryPacks[packId] || industryPacks.metal_buildings;
-}
-
-export function getIndustryPortalIds(packId = 'metal_buildings') {
-  return getIndustryPack(packId).portals.map((portal) => portal.id);
-}
-
-export function getAllIndustryPortalIds() {
-  return Object.values(industryPacks).flatMap((pack) => pack.portals.map((portal) => portal.id));
-}
-
-export const defaultTenantModuleMap = {
-  tenantId: 'steelcraft-default',
-  tenantName: 'Steel Craft',
-  corePackage: 'core',
-  industryPack: 'metal_buildings',
-  enabledCanonicalPortals: canonicalPortals.map((portal) => portal.id),
-  enabledIndustryPortals: getIndustryPortalIds('metal_buildings')
+export const industryPackWiringStatus = {
+  metal_buildings: { installStatus: 'installed', wiringStatus: 'ui_ready', trustNetStatus: 'pending_deep_wiring', vaultStatus: 'pending_deep_wiring', note: 'Base portals are active; package-specific TrustNet/Vault events still need deep wiring.' },
+  screen_printing: { installStatus: 'available', wiringStatus: 'ui_ready', trustNetStatus: 'not_wired', vaultStatus: 'not_wired', note: 'Ready to push down as a UI package; artwork, press, production, and fulfillment receipts still need wiring.' },
+  construction_building: { installStatus: 'available', wiringStatus: 'ui_ready', trustNetStatus: 'not_wired', vaultStatus: 'not_wired', note: 'Ready to push down as a UI package; field, inspection, purchasing, and closeout receipts still need wiring.' },
+  mechanical: { installStatus: 'available', wiringStatus: 'ui_ready', trustNetStatus: 'not_wired', vaultStatus: 'not_wired', note: 'Ready to push down as a UI package; dispatch, service, parts, contract, and install receipts still need wiring.' },
+  roadside_assistance: { installStatus: 'available', wiringStatus: 'ui_ready', trustNetStatus: 'not_wired', vaultStatus: 'not_wired', note: 'Ready to push down as a UI package; dispatch, provider, claims, and telematics receipts still need wiring.' },
+  manufacturing: { installStatus: 'available', wiringStatus: 'ui_ready', trustNetStatus: 'not_wired', vaultStatus: 'not_wired', note: 'Ready to push down as a UI package; production, inventory, quality, and maintenance receipts still need wiring.' },
+  field_services: { installStatus: 'available', wiringStatus: 'ui_ready', trustNetStatus: 'not_wired', vaultStatus: 'not_wired', note: 'Ready to push down as a UI package; dispatch, work order, crew, asset, and billing receipts still need wiring.' }
 };
 
-export function createTenantModuleMap({ tenantId = 'steelcraft-default', tenantName = 'Steel Craft', industryPack = 'metal_buildings' } = {}) {
-  return {
-    tenantId,
-    tenantName,
-    corePackage: 'core',
-    industryPack,
-    enabledCanonicalPortals: canonicalPortals.map((portal) => portal.id),
-    enabledIndustryPortals: getIndustryPortalIds(industryPack)
-  };
+export function getIndustryPackWiringStatus(packId = 'metal_buildings') {
+  return industryPackWiringStatus[packId] || { installStatus: 'available', wiringStatus: 'ui_ready', trustNetStatus: 'not_wired', vaultStatus: 'not_wired', note: 'Package has no wiring status entry yet.' };
 }
 
-export function getTenantPortals(moduleMap = defaultTenantModuleMap) {
-  const industry = getIndustryPack(moduleMap.industryPack);
-  const canonical = canonicalPortals.filter((portal) => moduleMap.enabledCanonicalPortals.includes(portal.id));
-  const industryPortals = industry.portals.filter((portal) => moduleMap.enabledIndustryPortals.includes(portal.id));
-  return [...canonical, ...industryPortals];
-}
+export const industryPackOptions = Object.values(industryPacks).map((pack) => ({ ...pack, ...getIndustryPackWiringStatus(pack.id) }));
+export function getIndustryPack(packId = 'metal_buildings') { return industryPacks[packId] || industryPacks.metal_buildings; }
+export function getIndustryPortalIds(packId = 'metal_buildings') { return getIndustryPack(packId).portals.map((portal) => portal.id); }
+export function getAllIndustryPortalIds() { return Object.values(industryPacks).flatMap((pack) => pack.portals.map((portal) => portal.id)); }
 
-export function getPortalById(portalId, moduleMap = defaultTenantModuleMap) {
-  return getTenantPortals(moduleMap).find((portal) => portal.id === portalId) || null;
-}
+export const defaultTenantModuleMap = { tenantId: 'steelcraft-default', tenantName: 'Steel Craft', corePackage: 'core', industryPack: 'metal_buildings', enabledCanonicalPortals: canonicalPortals.map((portal) => portal.id), enabledIndustryPortals: getIndustryPortalIds('metal_buildings') };
+export function createTenantModuleMap({ tenantId = 'steelcraft-default', tenantName = 'Steel Craft', industryPack = 'metal_buildings' } = {}) { return { tenantId, tenantName, corePackage: 'core', industryPack, enabledCanonicalPortals: canonicalPortals.map((portal) => portal.id), enabledIndustryPortals: getIndustryPortalIds(industryPack) }; }
+export function getTenantPortals(moduleMap = defaultTenantModuleMap) { const industry = getIndustryPack(moduleMap.industryPack); const canonical = canonicalPortals.filter((portal) => moduleMap.enabledCanonicalPortals.includes(portal.id)); const industryPortals = industry.portals.filter((portal) => moduleMap.enabledIndustryPortals.includes(portal.id)); return [...canonical, ...industryPortals]; }
+export function getPortalById(portalId, moduleMap = defaultTenantModuleMap) { return getTenantPortals(moduleMap).find((portal) => portal.id === portalId) || null; }
