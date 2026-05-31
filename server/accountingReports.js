@@ -45,8 +45,9 @@ export async function ensureAccountingReportsSchema(db) {
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now(),
       unique (tenant_id, fiscal_year, budget_name)
-    );
-
+    )
+  `);
+  await db.query(`
     create table if not exists accounting_budget_lines (
       id bigserial primary key,
       budget_plan_id bigint not null references accounting_budget_plans(id) on delete cascade,
@@ -59,7 +60,7 @@ export async function ensureAccountingReportsSchema(db) {
       notes text,
       raw jsonb not null default '{}'::jsonb,
       created_at timestamptz not null default now()
-    );
+    )
   `);
 }
 
