@@ -1,4 +1,4 @@
-import { getDemoBankingData, listAccountingWorkerTasks, runDemoAccountingWorker, seedDemoBankingData } from './accountingBankingDemo.js';
+import { commitDemoAccountingWorkerMatches, getDemoBankingData, listAccountingWorkerTasks, runDemoAccountingWorker, seedDemoBankingData } from './accountingBankingDemo.js';
 
 export function registerAccountingBankingDemoRoutes(app, requireDatabase, ensureSchema) {
   app.post('/api/accounting/banking/demo/seed', async (req, res, next) => {
@@ -8,7 +8,7 @@ export function registerAccountingBankingDemoRoutes(app, requireDatabase, ensure
       const banking = await seedDemoBankingData(db);
       await db.query(
         `insert into portal_activity_logs (actor, action, entity_type, metadata) values ($1,$2,$3,$4)`,
-        [req.body?.actor || 'accounting', 'demo_banking_seeded', 'accounting_banking', { accountCount: banking.accounts.length, transactionCount: banking.transactions.length }]
+        [req.body?.actor || 'accounting', 'demo_banking_seeded_unmatched', 'accounting_banking', { accountCount: banking.accounts.length, transactionCount: banking.transactions.length, status: 'unmatched' }]
       );
       res.json({ ok: true, banking });
     } catch (error) { next(error); }
@@ -30,8 +30,17 @@ export function registerAccountingBankingDemoRoutes(app, requireDatabase, ensure
       const result = await runDemoAccountingWorker(db);
       await db.query(
         `insert into portal_activity_logs (actor, action, entity_type, metadata) values ($1,$2,$3,$4)`,
-        [req.body?.actor || 'accounting', 'demo_accounting_worker_run', 'accounting_worker', { runId: result.run.id, taskCount: result.tasks.length, summary: result.run.summary }]
+        [req.body?.actor || 'accounting', 'demo_comptroller_run_pending_commit', 'accounting_worker', { runId: result.run.id, taskCount: result.tasks.length, dailySummary: result.dailySummary }]
       );
+      res.json({ ok: true, ...result });
+    } catch (error) { next(error); }
+  });
+
+  app.post('/api/accounting/worker/demo/commit', async (req, res, next) => {
+    try {
+      await ensureSchema();
+      const db = requireDatabase();
+      const result = await commitDemoAccountingWorkerMatches(db, { actor: req.body?.actor || 'customer' });
       res.json({ ok: true, ...result });
     } catch (error) { next(error); }
   });
