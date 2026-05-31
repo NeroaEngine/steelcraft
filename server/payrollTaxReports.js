@@ -34,8 +34,9 @@ export async function ensurePayrollTaxReportsSchema(db) {
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now(),
       unique (tenant_id, profile_name)
-    );
-
+    )
+  `);
+  await db.query(`
     create table if not exists payroll_runs (
       id bigserial primary key,
       tenant_id text not null default 'steelcraft',
@@ -51,8 +52,9 @@ export async function ensurePayrollTaxReportsSchema(db) {
       raw jsonb not null default '{}'::jsonb,
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now()
-    );
-
+    )
+  `);
+  await db.query(`
     create table if not exists payroll_run_lines (
       id bigserial primary key,
       payroll_run_id bigint not null references payroll_runs(id) on delete cascade,
@@ -73,8 +75,9 @@ export async function ensurePayrollTaxReportsSchema(db) {
       net_pay numeric(14,2) not null default 0,
       raw jsonb not null default '{}'::jsonb,
       created_at timestamptz not null default now()
-    );
-
+    )
+  `);
+  await db.query(`
     create table if not exists payroll_tax_liabilities (
       id bigserial primary key,
       payroll_run_id bigint references payroll_runs(id) on delete cascade,
@@ -87,7 +90,7 @@ export async function ensurePayrollTaxReportsSchema(db) {
       raw jsonb not null default '{}'::jsonb,
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now()
-    );
+    )
   `);
 }
 
