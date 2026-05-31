@@ -8,6 +8,30 @@ function getBootstrapPassword() {
   return process.env.AUTH_BOOTSTRAP_PASSWORD || process.env.NEROA_AUTH_BOOTSTRAP_PASSWORD || process.env.STEELCRAFT_AUTH_BOOTSTRAP_PASSWORD || process.env.ERP_BOOTSTRAP_PASSWORD || null;
 }
 
+function getBootstrapUsers() {
+  const users = [];
+
+  if (process.env.BOOTSTRAP_ADMIN_EMAIL) {
+    users.push({
+      email: process.env.BOOTSTRAP_ADMIN_EMAIL,
+      fullName: process.env.BOOTSTRAP_ADMIN_NAME || 'Tenant Admin',
+      role: process.env.BOOTSTRAP_ADMIN_ROLE || 'admin',
+      language: process.env.BOOTSTRAP_ADMIN_LANGUAGE || 'en'
+    });
+  }
+
+  if (process.env.BOOTSTRAP_DEVELOPER_EMAIL) {
+    users.push({
+      email: process.env.BOOTSTRAP_DEVELOPER_EMAIL,
+      fullName: process.env.BOOTSTRAP_DEVELOPER_NAME || 'Neroa Developer',
+      role: 'developer',
+      language: process.env.BOOTSTRAP_DEVELOPER_LANGUAGE || 'en'
+    });
+  }
+
+  return users;
+}
+
 function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
   const hash = crypto.pbkdf2Sync(password, salt, ITERATIONS, KEYLEN, DIGEST).toString('hex');
   return { salt, hash };
@@ -63,10 +87,7 @@ export async function seedAuthUsers(db) {
   await ensureAuthSchema(db);
   const bootstrapPassword = getBootstrapPassword();
   const credentials = bootstrapPassword ? hashPassword(bootstrapPassword) : { salt: null, hash: null };
-  const users = [
-    { email: 'seth@steelcraftbuilders.com', fullName: 'Seth Mcbride', role: 'admin', language: 'en' },
-    { email: 'admin@neroa.io', fullName: 'Neroa Developer', role: 'developer', language: 'en' }
-  ];
+  const users = getBootstrapUsers();
 
   for (const user of users) {
     await db.query(
