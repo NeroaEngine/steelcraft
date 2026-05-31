@@ -4,6 +4,7 @@ import { attachDagEvent, ensureAccountingDagSchema } from './accountingDagSchema
 import { ensureAccountingInfrastructure, getAccountingInfrastructureStatus, recordAccountingModuleCheck, enqueueAccountingEvent } from './accountingInfrastructure.js';
 import { attachCheckDagEvent, createAccountingCheck, ensureAccountingChecksSchema, listAccountingChecks, markCheckPrinted } from './accountingChecks.js';
 import { getAccountingSettings, seedAccountingSettings, updateAccountingSettings } from './accountingSettings.js';
+import { buildAccountingCommandCenter, buildBalanceSheetReport, buildBudgetReport, buildDetailedCashFlowReport, buildLaborReport, buildProfitAndLossReport, ensureAccountingReportsSchema, seedDefaultBudget } from './accountingReports.js';
 
 async function ensureAccountingReady(db) {
   await seedAccountingDefaults(db);
@@ -11,6 +12,7 @@ async function ensureAccountingReady(db) {
   await ensureAccountingDagSchema(db);
   await ensureAccountingInfrastructure(db);
   await ensureAccountingChecksSchema(db);
+  await ensureAccountingReportsSchema(db);
 }
 
 async function updateAccountingProofFields(db, tableName, id, proof) {
@@ -26,42 +28,35 @@ async function appendAccountingEvent(db, event) {
   return { ledgerEvent, dagEventId };
 }
 
+function reportParams(req) {
+  return { startDate: req.query?.startDate || req.query?.start_date, endDate: req.query?.endDate || req.query?.end_date, asOfDate: req.query?.asOfDate || req.query?.as_of_date, tenantId: req.query?.tenantId || req.query?.tenant_id || 'steelcraft', fiscalYear: req.query?.fiscalYear ? Number(req.query.fiscalYear) : undefined };
+}
+
 export function registerAccountingRoutes(app, requireDatabase, ensureSchema) {
   app.post('/api/accounting/setup', async (req, res, next) => {
     try {
       await ensureSchema();
       const db = requireDatabase();
       await ensureAccountingReady(db);
+      await seedDefaultBudget(db, { tenantId: req.body?.tenantId || req.body?.tenant_id || 'steelcraft' });
       const tables = await listAccountingTables(db);
       const infrastructure = await getAccountingInfrastructureStatus(db);
       const settings = await getAccountingSettings(db);
-      await db.query(`insert into portal_activity_logs (actor, action, entity_type, metadata) values ($1, $2, $3, $4)`, [req.body?.actor || 'system', 'accounting_schema_initialized', 'accounting', { tables, dagLinked: true, infrastructure, checks: true, settings: true }]);
-      res.json({ ok: true, message: 'Accounting portal schema initialized with tenant settings, tax, invoice numbers, quote numbers, check writing, and DAG proof linkage.', tables, infrastructure, settings });
+      await db.query(`insert into portal_activity_logs (actor, action, entity_type, metadata) values ($1, $2, $3, $4)`, [req.body?.actor || 'system', 'accounting_schema_initialized', 'accounting', { tables, dagLinked: true, infrastructure, checks: true, settings: true, reports: true, budgeting: true }]);
+      res.json({ ok: true, message: 'Accounting portal schema initialized with major reports, detailed cash flow, budgeting, check writing, and DAG proof linkage.', tables, infrastructure, settings });
     } catch (error) { next(error); }
   });
 
-  app.get('/api/accounting/settings', async (req, res, next) => {
-    try { await ensureSchema(); const db = requireDatabase(); await ensureAccountingReady(db); const settings = await getAccountingSettings(db); res.json({ ok: true, settings }); } catch (error) { next(error); }
-  });
+  app.get('/api/accounting/settings', async (req, res, next) => { try { await ensureSchema(); const db = requireDatabase(); await ensureAccountingReady(db); const settings = await getAccountingSettings(db); res.json({ ok: true, settings }); } catch (error) { next(error); } });
+  app.put('/api/accounting/settings', async (req, res, next) => { try { await ensureSchema(); const db = requireDatabase(); await ensureAccountingReady(db); const settings = await updateAccountingSettings(db, req.body || {}); await db.query(`insert into portal_activity_logs (actor, action, entity_type, metadata) values ($1, $2, $3, $4)`, [req.body?.actor || 'accounting', 'accounting_settings_updated', 'accounting_settings', settings]); res.json({ ok: true, settings }); } catch (error) { next(error); } });
+  app.get('/api/accounting/status', async (req, res, next) => { try { await ensureSchema(); const db = requireDatabase(); await ensureAccountingReady(db); const tables = await listAccountingTables(db); const summary = await getAccountingSummary(db); const commandCenter = await buildAccountingCommandCenter(db); const infrastructure = await getAccountingInfrastructureStatus(db); const settings = await getAccountingSettings(db); res.json({ ok: true, tables, summary, commandCenter, infrastructure, settings, ledger: { configured: Boolean(process.env.NEROA_LEDGER_URL && process.env.NEROA_LEDGER_API_KEY) } }); } catch (error) { next(error); } });
 
-  app.put('/api/accounting/settings', async (req, res, next) => {
-    try {
-      await ensureSchema();
-      const db = requireDatabase();
-      await ensureAccountingReady(db);
-      const settings = await updateAccountingSettings(db, req.body || {});
-      await db.query(`insert into portal_activity_logs (actor, action, entity_type, metadata) values ($1, $2, $3, $4)`, [req.body?.actor || 'accounting', 'accounting_settings_updated', 'accounting_settings', settings]);
-      res.json({ ok: true, settings });
-    } catch (error) { next(error); }
-  });
-
-  app.get('/api/accounting/status', async (req, res, next) => {
-    try {
-      await ensureSchema(); const db = requireDatabase(); await ensureAccountingReady(db);
-      const tables = await listAccountingTables(db); const summary = await getAccountingSummary(db); const infrastructure = await getAccountingInfrastructureStatus(db); const settings = await getAccountingSettings(db);
-      res.json({ ok: true, tables, summary, infrastructure, settings, ledger: { configured: Boolean(process.env.NEROA_LEDGER_URL && process.env.NEROA_LEDGER_API_KEY) } });
-    } catch (error) { next(error); }
-  });
+  app.get('/api/accounting/reports/command-center', async (req, res, next) => { try { await ensureSchema(); const db = requireDatabase(); await ensureAccountingReady(db); const report = await buildAccountingCommandCenter(db); res.json({ ok: true, report }); } catch (error) { next(error); } });
+  app.get('/api/accounting/reports/profit-loss', async (req, res, next) => { try { await ensureSchema(); const db = requireDatabase(); await ensureAccountingReady(db); const report = await buildProfitAndLossReport(db, reportParams(req)); res.json({ ok: true, report }); } catch (error) { next(error); } });
+  app.get('/api/accounting/reports/balance-sheet', async (req, res, next) => { try { await ensureSchema(); const db = requireDatabase(); await ensureAccountingReady(db); const report = await buildBalanceSheetReport(db, reportParams(req)); res.json({ ok: true, report }); } catch (error) { next(error); } });
+  app.get('/api/accounting/reports/cash-flow', async (req, res, next) => { try { await ensureSchema(); const db = requireDatabase(); await ensureAccountingReady(db); const report = await buildDetailedCashFlowReport(db, reportParams(req)); res.json({ ok: true, report }); } catch (error) { next(error); } });
+  app.get('/api/accounting/reports/labor', async (req, res, next) => { try { await ensureSchema(); const db = requireDatabase(); await ensureAccountingReady(db); const report = await buildLaborReport(db, reportParams(req)); res.json({ ok: true, report }); } catch (error) { next(error); } });
+  app.get('/api/accounting/reports/budget', async (req, res, next) => { try { await ensureSchema(); const db = requireDatabase(); await ensureAccountingReady(db); const report = await buildBudgetReport(db, reportParams(req)); res.json({ ok: true, report }); } catch (error) { next(error); } });
 
   app.get('/api/accounting/infrastructure/status', async (req, res, next) => { try { await ensureSchema(); const db = requireDatabase(); await ensureAccountingReady(db); const infrastructure = await getAccountingInfrastructureStatus(db); res.json({ ok: true, infrastructure }); } catch (error) { next(error); } });
   app.post('/api/accounting/infrastructure/checks', async (req, res, next) => { try { await ensureSchema(); const db = requireDatabase(); await ensureAccountingReady(db); const check = await recordAccountingModuleCheck(db, req.body?.checkKey || 'manual.infrastructure.review', req.body?.checkStatus || 'passed', req.body?.detail || 'Accounting infrastructure reviewed.', req.body?.metadata || {}); res.json({ ok: true, check }); } catch (error) { next(error); } });
@@ -72,14 +67,7 @@ export function registerAccountingRoutes(app, requireDatabase, ensureSchema) {
   app.post('/api/accounting/vendors', async (req, res, next) => { try { await ensureSchema(); const db = requireDatabase(); await ensureAccountingReady(db); const vendor = await createAccountingVendor(db, req.body || {}); res.json({ ok: true, vendor }); } catch (error) { next(error); } });
 
   app.get('/api/accounting/invoices', async (req, res, next) => { try { await ensureSchema(); const db = requireDatabase(); await ensureAccountingReady(db); const result = await db.query(`select ai.*, ac.customer_name, p.name as project_name from accounting_invoices ai left join accounting_customers ac on ac.id = ai.customer_id left join projects p on p.id = ai.project_id order by ai.created_at desc limit 100`); res.json({ ok: true, invoices: result.rows }); } catch (error) { next(error); } });
-  app.post('/api/accounting/invoices', async (req, res, next) => {
-    try {
-      await ensureSchema(); const db = requireDatabase(); await ensureAccountingReady(db); const proof = getLedgerProofFields(req.body || {}); const invoice = await createAccountingInvoice(db, { ...(req.body || {}), ...proof }); await updateAccountingProofFields(db, 'accounting_invoices', invoice.id, proof);
-      const { ledgerEvent, dagEventId } = await appendAccountingEvent(db, { type: 'accounting.invoice.created', actor: req.body?.actor || 'system', projectId: invoice.project_id ? String(invoice.project_id) : undefined, parentEventIds: req.body?.parentEventIds || [], payload: { entityType: 'accounting_invoice', invoiceId: String(invoice.id), entityId: String(invoice.id), invoiceNumber: invoice.invoice_number, customerId: invoice.customer_id ? String(invoice.customer_id) : null, amount: Number(invoice.total || 0), currency: invoice.currency || req.body?.currency || 'USD', ...proof } });
-      const linkedInvoice = await attachDagEvent(db, 'accounting_invoices', invoice.id, dagEventId) || invoice; await db.query(`insert into portal_activity_logs (actor, action, entity_type, entity_id, metadata) values ($1, $2, $3, $4, $5)`, [req.body?.actor || 'accounting', 'accounting_invoice_created', 'accounting_invoice', String(invoice.id), { invoice: linkedInvoice, ledgerEvent }]); res.json({ ok: true, invoice: linkedInvoice, ledgerEvent });
-    } catch (error) { next(error); }
-  });
-
+  app.post('/api/accounting/invoices', async (req, res, next) => { try { await ensureSchema(); const db = requireDatabase(); await ensureAccountingReady(db); const proof = getLedgerProofFields(req.body || {}); const invoice = await createAccountingInvoice(db, { ...(req.body || {}), ...proof }); await updateAccountingProofFields(db, 'accounting_invoices', invoice.id, proof); const { ledgerEvent, dagEventId } = await appendAccountingEvent(db, { type: 'accounting.invoice.created', actor: req.body?.actor || 'system', projectId: invoice.project_id ? String(invoice.project_id) : undefined, parentEventIds: req.body?.parentEventIds || [], payload: { entityType: 'accounting_invoice', invoiceId: String(invoice.id), entityId: String(invoice.id), invoiceNumber: invoice.invoice_number, customerId: invoice.customer_id ? String(invoice.customer_id) : null, amount: Number(invoice.total || 0), currency: invoice.currency || req.body?.currency || 'USD', ...proof } }); const linkedInvoice = await attachDagEvent(db, 'accounting_invoices', invoice.id, dagEventId) || invoice; await db.query(`insert into portal_activity_logs (actor, action, entity_type, entity_id, metadata) values ($1, $2, $3, $4, $5)`, [req.body?.actor || 'accounting', 'accounting_invoice_created', 'accounting_invoice', String(invoice.id), { invoice: linkedInvoice, ledgerEvent }]); res.json({ ok: true, invoice: linkedInvoice, ledgerEvent }); } catch (error) { next(error); } });
   app.get('/api/accounting/bills', async (req, res, next) => { try { await ensureSchema(); const db = requireDatabase(); await ensureAccountingReady(db); const result = await db.query(`select ab.*, av.vendor_name, p.name as project_name from accounting_bills ab left join accounting_vendors av on av.id = ab.vendor_id left join projects p on p.id = ab.project_id order by ab.created_at desc limit 100`); res.json({ ok: true, bills: result.rows }); } catch (error) { next(error); } });
   app.post('/api/accounting/bills', async (req, res, next) => { try { await ensureSchema(); const db = requireDatabase(); await ensureAccountingReady(db); const proof = getLedgerProofFields(req.body || {}); const bill = await createAccountingBill(db, { ...(req.body || {}), ...proof }); await updateAccountingProofFields(db, 'accounting_bills', bill.id, proof); const { ledgerEvent, dagEventId } = await appendAccountingEvent(db, { type: 'accounting.bill.created', actor: req.body?.actor || 'system', projectId: bill.project_id ? String(bill.project_id) : undefined, payload: { entityType: 'accounting_bill', entityId: String(bill.id), billId: String(bill.id), billNumber: bill.bill_number, vendorId: bill.vendor_id ? String(bill.vendor_id) : null, amount: Number(bill.total || 0), currency: 'USD', ...proof } }); const linkedBill = await attachDagEvent(db, 'accounting_bills', bill.id, dagEventId) || bill; res.json({ ok: true, bill: linkedBill, ledgerEvent }); } catch (error) { next(error); } });
   app.get('/api/accounting/payments', async (req, res, next) => { try { await ensureSchema(); const db = requireDatabase(); await ensureAccountingReady(db); const result = await db.query(`select ap.*, ac.customer_name, av.vendor_name, ai.invoice_number, ab.bill_number from accounting_payments ap left join accounting_customers ac on ac.id = ap.customer_id left join accounting_vendors av on av.id = ap.vendor_id left join accounting_invoices ai on ai.id = ap.invoice_id left join accounting_bills ab on ab.id = ap.bill_id order by ap.payment_date desc, ap.id desc limit 100`); res.json({ ok: true, payments: result.rows }); } catch (error) { next(error); } });
