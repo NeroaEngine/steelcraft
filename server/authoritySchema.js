@@ -45,16 +45,25 @@ const DEFAULT_BUSINESS_PERMISSIONS = [
   'mail.audit.view'
 ];
 
+export function normalizeBusinessAuthorityId(value) {
+  const raw = String(value || '').trim().toUpperCase();
+  if (!raw) return '';
+  if (/^BUSV\d{3,}$/.test(raw)) return raw;
+  const digits = raw.replace(/\D/g, '');
+  return digits ? `BUSV${digits}` : raw;
+}
+
 function normalizeDigits(value, fallback = '321684') {
   const digits = String(value || '').replace(/\D/g, '');
   return digits || fallback;
 }
 
-function authorityDisplayId() {
-  return process.env.BOOTSTRAP_BUSINESS_AUTHORITY_ID || process.env.AUTHORITY_BUSINESS_ID || DEFAULT_BUSINESS_DISPLAY_ID;
+function authorityDisplayId(inputDisplayId = null) {
+  return normalizeBusinessAuthorityId(inputDisplayId || process.env.BOOTSTRAP_BUSINESS_AUTHORITY_ID || process.env.AUTHORITY_BUSINESS_ID || DEFAULT_BUSINESS_DISPLAY_ID);
 }
 
-function authorityUserDisplayId(accountDisplayId, roleClass = ROLE_CLASS.SUPER_ADMIN) {
+function authorityUserDisplayId(accountDisplayId, roleClass = ROLE_CLASS.SUPER_ADMIN, inputDisplayId = null) {
+  if (inputDisplayId) return String(inputDisplayId).trim().toUpperCase();
   const digits = normalizeDigits(accountDisplayId);
   const suffix = process.env.BOOTSTRAP_AUTHORITY_USER_SUFFIX || DEFAULT_FIRST_USER_SUFFIX;
   return process.env.BOOTSTRAP_AUTHORITY_USER_ID || `${accountDisplayId}_US${digits}${roleClass}${suffix}`;
@@ -144,42 +153,94 @@ export async function ensureAuthoritySchema(db) {
   `);
 }
 
-export async function ensureBootstrapBusinessAuthority(db, user = {}) {
+export async function findBusinessAuthority(db, businessAuthorityId) {
   await ensureAuthoritySchema(db);
-  const accountDisplayId = authorityDisplayId();
-  const accountName = process.env.BOOTSTRAP_BUSINESS_NAME || process.env.BOOTSTRAP_COMPANY_NAME || 'Steel Craft';
-  const tenantKey = process.env.BOOTSTRAP_TENANT_KEY || process.env.STEELCRAFT_TENANT_KEY || 'steelcraft';
-  const roleClass = ROLE_CLASS_BY_ERP_ROLE[user.role] || ROLE_CLASS.SUPER_ADMIN;
-  const userDisplayId = authorityUserDisplayId(accountDisplayId, roleClass);
-  const roleLabel = roleClass === ROLE_CLASS.SUPER_ADMIN ? 'SUPER_ADMIN' : user.role || 'USER';
+  const displayId = normalizeBusinessAuthorityId(businessAuthorityId);
+  if (!displayId) return null;
+  const result = await db.query('select * from authority_accounts where authority_type = $1 and display_id = $2 limit 1', ['business', displayId]);
+  return result.rows[0] || null;
+}
+
+export async function resolveOrCreateBusinessAuthority(db, { existingBusinessAuthorityId = null, hasExistingBusinessAuthority = false, legalName, tenantKey = 'steelcraft', raw = {} } = {}) {
+  await ensureAuthoritySchema(db);
+  const displayId = authorityDisplayId(hasExistingBusinessAuthority ? existingBusinessAuthorityId : null);
+  if (hasExistingBusinessAuthority && !existingBusinessAuthorityId) {
+    const error = new Error('BUSV number is required when the business already has an authority account.');
+    error.statusCode = 400;
+    throw error;
+  }
 
   const accountResult = await db.query(
     `insert into authority_accounts (authority_type, display_id, legal_name, tenant_key, status, vault_root_id, guard_policy_id, scan_root_id, raw)
      values ('business', $1, $2, $3, 'active', $4, $5, $6, $7)
      on conflict (display_id)
-     do update set legal_name = excluded.legal_name, tenant_key = excluded.tenant_key, updated_at = now()
+     do update set legal_name = coalesce(nullif(excluded.legal_name, ''), authority_accounts.legal_name), tenant_key = coalesce(excluded.tenant_key, authority_accounts.tenant_key), updated_at = now()
      returning *`,
-    [accountDisplayId, accountName, tenantKey, `vault:${accountDisplayId}`, `guard:${accountDisplayId}`, `scan:${accountDisplayId}`, { source: 'bootstrap_business_authority' }]
+    [displayId, legalName || displayId, tenantKey, `vault:${displayId}`, `guard:${displayId}`, `scan:${displayId}`, { ...raw, provided_existing_busv: Boolean(hasExistingBusinessAuthority) }]
   );
   const authorityAccount = accountResult.rows[0];
 
-  const userResult = await db.query(
+  await recordAuthorityAction(db, {
+    authorityAccount,
+    actionType: hasExistingBusinessAuthority ? 'business_authority_resolved_for_erp' : 'business_authority_created_for_erp',
+    metadata: { tenantKey, displayId, providedExistingBusv: Boolean(hasExistingBusinessAuthority), source_table: 'authority_accounts', source_record_id: String(authorityAccount.id) }
+  });
+
+  return authorityAccount;
+}
+
+export async function createOrResolveAuthorityUser(db, { authorityAccount, email, fullName, erpRole = 'employee', roleClass = null, authorityUserDisplayId: inputDisplayId = null, permissions = null, raw = {} } = {}) {
+  await ensureAuthoritySchema(db);
+  if (!authorityAccount?.id) throw new Error('authorityAccount is required.');
+  if (!email) {
+    const error = new Error('Email is required to create an ERP authority user.');
+    error.statusCode = 400;
+    throw error;
+  }
+  const resolvedRoleClass = roleClass || ROLE_CLASS_BY_ERP_ROLE[erpRole] || ROLE_CLASS.USER;
+  const userDisplayId = authorityUserDisplayId(authorityAccount.display_id, resolvedRoleClass, inputDisplayId);
+  const roleLabel = resolvedRoleClass === ROLE_CLASS.SUPER_ADMIN ? 'SUPER_ADMIN' : erpRole.toUpperCase();
+  const grantedPermissions = permissions || (resolvedRoleClass === ROLE_CLASS.SUPER_ADMIN ? DEFAULT_BUSINESS_PERMISSIONS : ['erp.login', 'erp.vault.capture']);
+
+  const result = await db.query(
     `insert into authority_users (authority_account_id, display_id, email, full_name, role_class, role_label, status, permissions, raw)
      values ($1,$2,$3,$4,$5,$6,'active',$7,$8)
      on conflict (display_id)
      do update set email = excluded.email, full_name = excluded.full_name, role_class = excluded.role_class, role_label = excluded.role_label, permissions = excluded.permissions, updated_at = now()
      returning *`,
-    [authorityAccount.id, userDisplayId, user.email, user.fullName || user.full_name || 'Tenant Admin', roleClass, roleLabel, JSON.stringify(DEFAULT_BUSINESS_PERMISSIONS), { source: 'bootstrap_erp_user' }]
+    [authorityAccount.id, userDisplayId, email, fullName || email, resolvedRoleClass, roleLabel, JSON.stringify(grantedPermissions), raw]
   );
-  const authorityUser = userResult.rows[0];
+  const authorityUser = result.rows[0];
 
   await recordAuthorityAction(db, {
     authorityAccount,
     authorityUser,
-    actionType: 'authority_business_user_bootstrapped',
-    metadata: { tenantKey, email: user.email, role: user.role }
+    actionType: 'authority_user_resolved_for_erp_login',
+    metadata: { email, erpRole, roleClass: resolvedRoleClass, source_table: 'authority_users', source_record_id: String(authorityUser.id) }
   });
 
+  return authorityUser;
+}
+
+export async function ensureBootstrapBusinessAuthority(db, user = {}) {
+  await ensureAuthoritySchema(db);
+  const authorityAccount = await resolveOrCreateBusinessAuthority(db, {
+    existingBusinessAuthorityId: process.env.BOOTSTRAP_BUSINESS_AUTHORITY_ID || process.env.AUTHORITY_BUSINESS_ID || DEFAULT_BUSINESS_DISPLAY_ID,
+    hasExistingBusinessAuthority: Boolean(process.env.BOOTSTRAP_BUSINESS_AUTHORITY_ID || process.env.AUTHORITY_BUSINESS_ID),
+    legalName: process.env.BOOTSTRAP_BUSINESS_NAME || process.env.BOOTSTRAP_COMPANY_NAME || 'Steel Craft',
+    tenantKey: process.env.BOOTSTRAP_TENANT_KEY || process.env.STEELCRAFT_TENANT_KEY || 'steelcraft',
+    raw: { source: 'bootstrap_business_authority' }
+  });
+  const authorityUser = await createOrResolveAuthorityUser(db, {
+    authorityAccount,
+    email: user.email,
+    fullName: user.fullName || user.full_name || 'Tenant Admin',
+    erpRole: user.role || 'admin',
+    roleClass: ROLE_CLASS_BY_ERP_ROLE[user.role] || ROLE_CLASS.SUPER_ADMIN,
+    authorityUserDisplayId: process.env.BOOTSTRAP_AUTHORITY_USER_ID,
+    permissions: DEFAULT_BUSINESS_PERMISSIONS,
+    raw: { source: 'bootstrap_erp_user' }
+  });
   return { authorityAccount, authorityUser };
 }
 
