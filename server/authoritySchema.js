@@ -80,7 +80,7 @@ function guardReceiptId(displayId, actionType) {
 }
 
 export async function ensureAuthoritySchema(db) {
-  await db.query(`create extension if not exists pgcrypto;`);
+  await db.query(`create extension if not exists pgcrypto`);
   await db.query(`
     create table if not exists authority_accounts (
       id uuid primary key default gen_random_uuid(),
@@ -95,8 +95,9 @@ export async function ensureAuthoritySchema(db) {
       raw jsonb not null default '{}'::jsonb,
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now()
-    );
-
+    )
+  `);
+  await db.query(`
     create table if not exists authority_users (
       id uuid primary key default gen_random_uuid(),
       authority_account_id uuid not null references authority_accounts(id) on delete cascade,
@@ -114,8 +115,9 @@ export async function ensureAuthoritySchema(db) {
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now(),
       unique (authority_account_id, email)
-    );
-
+    )
+  `);
+  await db.query(`
     create table if not exists authority_action_events (
       id uuid primary key default gen_random_uuid(),
       authority_account_id uuid not null references authority_accounts(id) on delete cascade,
@@ -132,8 +134,9 @@ export async function ensureAuthoritySchema(db) {
       scan_event_id text,
       metadata_json jsonb not null default '{}'::jsonb,
       created_at timestamptz not null default now()
-    );
-
+    )
+  `);
+  await db.query(`
     create table if not exists vault_memory_refs (
       id uuid primary key default gen_random_uuid(),
       authority_account_id uuid not null references authority_accounts(id) on delete cascade,
@@ -149,7 +152,7 @@ export async function ensureAuthoritySchema(db) {
       metadata_json jsonb not null default '{}'::jsonb,
       created_at timestamptz not null default now(),
       unique (vault_lineage_id)
-    );
+    )
   `);
 }
 
