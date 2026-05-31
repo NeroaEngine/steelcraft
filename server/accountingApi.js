@@ -5,6 +5,7 @@ import { ensureAccountingInfrastructure, getAccountingInfrastructureStatus, reco
 import { attachCheckDagEvent, createAccountingCheck, ensureAccountingChecksSchema, listAccountingChecks, markCheckPrinted } from './accountingChecks.js';
 import { getAccountingSettings, seedAccountingSettings, updateAccountingSettings } from './accountingSettings.js';
 import { buildAccountingCommandCenter, buildBalanceSheetReport, buildBudgetReport, buildDetailedCashFlowReport, buildLaborReport, buildProfitAndLossReport, ensureAccountingReportsSchema, seedDefaultBudget } from './accountingReports.js';
+import { getAccountingReportCatalog } from './accountingReportCatalog.js';
 
 async function ensureAccountingReady(db) {
   await seedAccountingDefaults(db);
@@ -51,6 +52,7 @@ export function registerAccountingRoutes(app, requireDatabase, ensureSchema) {
   app.put('/api/accounting/settings', async (req, res, next) => { try { await ensureSchema(); const db = requireDatabase(); await ensureAccountingReady(db); const settings = await updateAccountingSettings(db, req.body || {}); await db.query(`insert into portal_activity_logs (actor, action, entity_type, metadata) values ($1, $2, $3, $4)`, [req.body?.actor || 'accounting', 'accounting_settings_updated', 'accounting_settings', settings]); res.json({ ok: true, settings }); } catch (error) { next(error); } });
   app.get('/api/accounting/status', async (req, res, next) => { try { await ensureSchema(); const db = requireDatabase(); await ensureAccountingReady(db); const tables = await listAccountingTables(db); const summary = await getAccountingSummary(db); const commandCenter = await buildAccountingCommandCenter(db); const infrastructure = await getAccountingInfrastructureStatus(db); const settings = await getAccountingSettings(db); res.json({ ok: true, tables, summary, commandCenter, infrastructure, settings, ledger: { configured: Boolean(process.env.NEROA_LEDGER_URL && process.env.NEROA_LEDGER_API_KEY) } }); } catch (error) { next(error); } });
 
+  app.get('/api/accounting/reports/catalog', async (req, res, next) => { try { res.json({ ok: true, categories: getAccountingReportCatalog() }); } catch (error) { next(error); } });
   app.get('/api/accounting/reports/command-center', async (req, res, next) => { try { await ensureSchema(); const db = requireDatabase(); await ensureAccountingReady(db); const report = await buildAccountingCommandCenter(db); res.json({ ok: true, report }); } catch (error) { next(error); } });
   app.get('/api/accounting/reports/profit-loss', async (req, res, next) => { try { await ensureSchema(); const db = requireDatabase(); await ensureAccountingReady(db); const report = await buildProfitAndLossReport(db, reportParams(req)); res.json({ ok: true, report }); } catch (error) { next(error); } });
   app.get('/api/accounting/reports/balance-sheet', async (req, res, next) => { try { await ensureSchema(); const db = requireDatabase(); await ensureAccountingReady(db); const report = await buildBalanceSheetReport(db, reportParams(req)); res.json({ ok: true, report }); } catch (error) { next(error); } });
