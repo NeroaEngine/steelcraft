@@ -11,6 +11,7 @@ import { registerAccountingRoutes } from './server/accountingApi.js';
 import { registerAccountingBankingDemoRoutes } from './server/accountingBankingDemoRoutes.js';
 import { registerComptrollerProductionDemoRoutes } from './server/comptrollerProductionDemo.js';
 import { registerNeroaConnectRoutes, ensureNeroaConnectSchema } from './server/neroaConnect.js';
+import { registerErpAuthorityOnboardingRoutes } from './server/erpAuthorityOnboarding.js';
 import { authenticateUser, ensureAuthSchema, listAuthUsers, requestPasswordReset, resetPasswordWithToken, seedAuthUsers, updateUserLanguage } from './server/authSchema.js';
 import { ensureQuoteWorkbookSchema, importQuoteWorkbook } from './server/quoteWorkbook.js';
 import { ensureQuoteTemplateSchema, createTemplateFromWorkbook, listTemplates, getTemplate, updateTemplateVersion, upsertTemplateOverride } from './server/quoteTemplate.js';
@@ -54,24 +55,8 @@ function requireDatabase() { if (!pool) { const error = new Error('DATABASE_URL 
 function safeJson(value) { try { return value ? JSON.parse(value) : null; } catch { return null; } }
 function tenantKey(req) { return req.params.tenantKey || req.query.tenantKey || req.body?.tenantKey || req.body?.tenant_key || steelcraftProfileKey; }
 function normalizeKey(value) { return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'tenant'; }
-function mondayTokenForTenant(key) {
-  const tenantEnv = tenantMondayEnvKey(key);
-  const token = process.env[tenantEnv] || (key === steelcraftProfileKey ? process.env.MONDAY_API_TOKEN : null);
-  if (!token) {
-    const error = new Error(`Monday.com token is not configured for tenant profile "${key}". Set ${tenantEnv}${key === steelcraftProfileKey ? ' or MONDAY_API_TOKEN' : ''}.`);
-    error.statusCode = 500;
-    throw error;
-  }
-  return token;
-}
-
-async function mondayQuery(profileKey, query, variables = {}) {
-  const token = mondayTokenForTenant(profileKey);
-  const response = await fetch(mondayApiUrl, { method: 'POST', headers: { Authorization: token, 'Content-Type': 'application/json' }, body: JSON.stringify({ query, variables }) });
-  const payload = await response.json();
-  if (!response.ok || payload.errors) { const message = payload.errors?.map((item) => item.message).join('; ') || `Monday API returned ${response.status}`; const error = new Error(message); error.statusCode = response.status || 502; throw error; }
-  return payload.data;
-}
+function mondayTokenForTenant(key) { const tenantEnv = tenantMondayEnvKey(key); const token = process.env[tenantEnv] || (key === steelcraftProfileKey ? process.env.MONDAY_API_TOKEN : null); if (!token) { const error = new Error(`Monday.com token is not configured for tenant profile "${key}". Set ${tenantEnv}${key === steelcraftProfileKey ? ' or MONDAY_API_TOKEN' : ''}.`); error.statusCode = 500; throw error; } return token; }
+async function mondayQuery(profileKey, query, variables = {}) { const token = mondayTokenForTenant(profileKey); const response = await fetch(mondayApiUrl, { method: 'POST', headers: { Authorization: token, 'Content-Type': 'application/json' }, body: JSON.stringify({ query, variables }) }); const payload = await response.json(); if (!response.ok || payload.errors) { const message = payload.errors?.map((item) => item.message).join('; ') || `Monday API returned ${response.status}`; const error = new Error(message); error.statusCode = response.status || 502; throw error; } return payload.data; }
 
 async function ensureProfileSchema(db) {
   await db.query(`
@@ -91,85 +76,18 @@ async function ensureProfileSchema(db) {
     on conflict (tenant_key) do nothing;
   `, [steelcraftProfileKey]);
 }
-
-async function ensureTenantColumns(db) {
-  await db.query(`
-    alter table if exists monday_boards add column if not exists tenant_key text not null default 'steelcraft';
-    alter table if exists monday_columns add column if not exists tenant_key text not null default 'steelcraft';
-    alter table if exists monday_items add column if not exists tenant_key text not null default 'steelcraft';
-    alter table if exists steelcraft_workflow_sources add column if not exists tenant_key text not null default 'steelcraft';
-    alter table if exists quote_workbooks add column if not exists tenant_key text not null default 'steelcraft';
-    alter table if exists quote_templates add column if not exists tenant_key text not null default 'steelcraft';
-  `);
-}
-
-async function ensureSchema() {
-  const db = requireDatabase();
-  await db.query(`
-    create table if not exists monday_boards (id text primary key, name text not null, workspace_name text, board_kind text, state text, raw jsonb not null, pulled_at timestamptz not null default now());
-    create table if not exists monday_columns (id text not null, board_id text not null references monday_boards(id) on delete cascade, title text not null, type text, settings jsonb, raw jsonb not null, pulled_at timestamptz not null default now(), primary key (board_id, id));
-    create table if not exists monday_items (id text primary key, board_id text not null references monday_boards(id) on delete cascade, name text not null, group_title text, raw jsonb not null, pulled_at timestamptz not null default now());
-    create table if not exists steelcraft_workflow_sources (id bigserial primary key, source text not null default 'monday_api', source_board_id text, internal_name text not null, classification text, destination jsonb not null default '{}'::jsonb, field_map jsonb not null default '[]'::jsonb, workflow_map jsonb not null default '{}'::jsonb, verification_checklist jsonb not null default '[]'::jsonb, raw jsonb not null default '{}'::jsonb, pulled_at timestamptz not null default now(), unique (source, source_board_id));
-    create table if not exists companies (id bigserial primary key, source text default 'manual', source_id text, name text not null, company_type text, email text, phone text, raw jsonb, created_at timestamptz not null default now(), updated_at timestamptz not null default now(), unique (source, source_id));
-    create table if not exists projects (id bigserial primary key, source text default 'manual', source_id text, name text not null, status text, company_id bigint references companies(id), raw jsonb, created_at timestamptz not null default now(), updated_at timestamptz not null default now(), unique (source, source_id));
-    create table if not exists portal_activity_logs (id bigserial primary key, actor text, action text not null, entity_type text, entity_id text, metadata jsonb, created_at timestamptz not null default now());
-  `);
-  await ensureProfileSchema(db);
-  await ensureAuthSchema(db); await seedAuthUsers(db); await ensureEstimatingSchema(db); await ensureQuoteWorkbookSchema(db); await ensureQuoteTemplateSchema(db); await ensureTenantColumns(db); await ensureImportProfileSchema(db, steelcraftProfileKey); await ensureAccountingSchema(db); await ensureHrSchema(db); await ensureNeroaConnectSchema(db);
-}
-
+async function ensureTenantColumns(db) { await db.query(`alter table if exists monday_boards add column if not exists tenant_key text not null default 'steelcraft'; alter table if exists monday_columns add column if not exists tenant_key text not null default 'steelcraft'; alter table if exists monday_items add column if not exists tenant_key text not null default 'steelcraft'; alter table if exists steelcraft_workflow_sources add column if not exists tenant_key text not null default 'steelcraft'; alter table if exists quote_workbooks add column if not exists tenant_key text not null default 'steelcraft'; alter table if exists quote_templates add column if not exists tenant_key text not null default 'steelcraft';`); }
+async function ensureSchema() { const db = requireDatabase(); await db.query(`create table if not exists monday_boards (id text primary key, name text not null, workspace_name text, board_kind text, state text, raw jsonb not null, pulled_at timestamptz not null default now()); create table if not exists monday_columns (id text not null, board_id text not null references monday_boards(id) on delete cascade, title text not null, type text, settings jsonb, raw jsonb not null, pulled_at timestamptz not null default now(), primary key (board_id, id)); create table if not exists monday_items (id text primary key, board_id text not null references monday_boards(id) on delete cascade, name text not null, group_title text, raw jsonb not null, pulled_at timestamptz not null default now()); create table if not exists steelcraft_workflow_sources (id bigserial primary key, source text not null default 'monday_api', source_board_id text, internal_name text not null, classification text, destination jsonb not null default '{}'::jsonb, field_map jsonb not null default '[]'::jsonb, workflow_map jsonb not null default '{}'::jsonb, verification_checklist jsonb not null default '[]'::jsonb, raw jsonb not null default '{}'::jsonb, pulled_at timestamptz not null default now(), unique (source, source_board_id)); create table if not exists companies (id bigserial primary key, source text default 'manual', source_id text, name text not null, company_type text, email text, phone text, raw jsonb, created_at timestamptz not null default now(), updated_at timestamptz not null default now(), unique (source, source_id)); create table if not exists projects (id bigserial primary key, source text default 'manual', source_id text, name text not null, status text, company_id bigint references companies(id), raw jsonb, created_at timestamptz not null default now(), updated_at timestamptz not null default now(), unique (source, source_id)); create table if not exists portal_activity_logs (id bigserial primary key, actor text, action text not null, entity_type text, entity_id text, metadata jsonb, created_at timestamptz not null default now());`); await ensureProfileSchema(db); await ensureAuthSchema(db); await seedAuthUsers(db); await ensureEstimatingSchema(db); await ensureQuoteWorkbookSchema(db); await ensureQuoteTemplateSchema(db); await ensureTenantColumns(db); await ensureImportProfileSchema(db, steelcraftProfileKey); await ensureAccountingSchema(db); await ensureHrSchema(db); await ensureNeroaConnectSchema(db); }
 async function pullMondayBoards(profileKey) { return mondayQuery(profileKey, `query TenantBoards { boards(limit: 100) { id name board_kind state workspace { id name } columns { id title type settings_str } } }`); }
-async function syncMondayBoards(profileKey = steelcraftProfileKey) {
-  await ensureSchema();
-  const data = await pullMondayBoards(profileKey);
-  for (const board of data.boards) {
-    const sourceId = `${normalizeKey(profileKey)}:${board.id}`;
-    await pool.query(`insert into monday_boards (tenant_key, id, name, workspace_name, board_kind, state, raw, pulled_at) values ($1, $2, $3, $4, $5, $6, $7, now()) on conflict (id) do update set tenant_key = excluded.tenant_key, name = excluded.name, workspace_name = excluded.workspace_name, board_kind = excluded.board_kind, state = excluded.state, raw = excluded.raw, pulled_at = now()`, [profileKey, sourceId, board.name, board.workspace?.name || null, board.board_kind, board.state, board]);
-    await upsertMondaySourceMapping(pool, profileKey, board);
-    for (const column of board.columns || []) await pool.query(`insert into monday_columns (tenant_key, id, board_id, title, type, settings, raw, pulled_at) values ($1, $2, $3, $4, $5, $6, $7, now()) on conflict (board_id, id) do update set tenant_key = excluded.tenant_key, title = excluded.title, type = excluded.type, settings = excluded.settings, raw = excluded.raw, pulled_at = now()`, [profileKey, column.id, sourceId, column.title, column.type, safeJson(column.settings_str), column]);
-  }
-  await pool.query(`insert into portal_activity_logs (actor, action, entity_type, metadata) values ($1, $2, $3, $4)`, ['system', 'monday_boards_synced', 'monday', { tenantKey: profileKey, board_count: data.boards.length }]);
-  return data.boards;
-}
-async function auditSteelCraftWorkflow({ save = false, profileKey = steelcraftProfileKey } = {}) {
-  await ensureSchema();
-  const data = await pullMondayBoards(profileKey);
-  const mapped = profileKey === steelcraftProfileKey ? mapMondayBoardsToSteelCraftWorkflow(data.boards) : { tenantKey: profileKey, mappedWorkflowCount: 0, workflows: [], note: 'Generic Monday profile captured. Map boards to rooms in tenant_monday_source_mappings.' };
-  if (save && profileKey === steelcraftProfileKey) {
-    for (const flow of mapped.workflows) await pool.query(`insert into steelcraft_workflow_sources (tenant_key, source, source_board_id, internal_name, classification, destination, field_map, workflow_map, verification_checklist, raw, pulled_at) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now()) on conflict (source, source_board_id) do update set tenant_key = excluded.tenant_key, internal_name = excluded.internal_name, classification = excluded.classification, destination = excluded.destination, field_map = excluded.field_map, workflow_map = excluded.workflow_map, verification_checklist = excluded.verification_checklist, raw = excluded.raw, pulled_at = now()`, [profileKey, 'monday_api', flow.sourceBoardId, flow.internalName, flow.classification, flow.destination, flow.fieldMap, flow.workflow, flow.verificationChecklist, flow]);
-    await pool.query(`insert into portal_activity_logs (actor, action, entity_type, metadata) values ($1,$2,$3,$4)`, ['system', 'steelcraft_workflow_audit_saved', 'workflow_source', { tenantKey: profileKey, mappedWorkflowCount: mapped.mappedWorkflowCount }]);
-  }
-  return { ...mapped, tenantKey: profileKey };
-}
+async function syncMondayBoards(profileKey = steelcraftProfileKey) { await ensureSchema(); const data = await pullMondayBoards(profileKey); for (const board of data.boards) { const sourceId = `${normalizeKey(profileKey)}:${board.id}`; await pool.query(`insert into monday_boards (tenant_key, id, name, workspace_name, board_kind, state, raw, pulled_at) values ($1, $2, $3, $4, $5, $6, $7, now()) on conflict (id) do update set tenant_key = excluded.tenant_key, name = excluded.name, workspace_name = excluded.workspace_name, board_kind = excluded.board_kind, state = excluded.state, raw = excluded.raw, pulled_at = now()`, [profileKey, sourceId, board.name, board.workspace?.name || null, board.board_kind, board.state, board]); await upsertMondaySourceMapping(pool, profileKey, board); for (const column of board.columns || []) await pool.query(`insert into monday_columns (tenant_key, id, board_id, title, type, settings, raw, pulled_at) values ($1, $2, $3, $4, $5, $6, $7, now()) on conflict (board_id, id) do update set tenant_key = excluded.tenant_key, title = excluded.title, type = excluded.type, settings = excluded.settings, raw = excluded.raw, pulled_at = now()`, [profileKey, column.id, sourceId, column.title, column.type, safeJson(column.settings_str), column]); } await pool.query(`insert into portal_activity_logs (actor, action, entity_type, metadata) values ($1, $2, $3, $4)`, ['system', 'monday_boards_synced', 'monday', { tenantKey: profileKey, board_count: data.boards.length }]); return data.boards; }
+async function auditSteelCraftWorkflow({ save = false, profileKey = steelcraftProfileKey } = {}) { await ensureSchema(); const data = await pullMondayBoards(profileKey); const mapped = profileKey === steelcraftProfileKey ? mapMondayBoardsToSteelCraftWorkflow(data.boards) : { tenantKey: profileKey, mappedWorkflowCount: 0, workflows: [], note: 'Generic Monday profile captured. Map boards to rooms in tenant_monday_source_mappings.' }; if (save && profileKey === steelcraftProfileKey) { for (const flow of mapped.workflows) await pool.query(`insert into steelcraft_workflow_sources (tenant_key, source, source_board_id, internal_name, classification, destination, field_map, workflow_map, verification_checklist, raw, pulled_at) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now()) on conflict (source, source_board_id) do update set tenant_key = excluded.tenant_key, internal_name = excluded.internal_name, classification = excluded.classification, destination = excluded.destination, field_map = excluded.field_map, workflow_map = excluded.workflow_map, verification_checklist = excluded.verification_checklist, raw = excluded.raw, pulled_at = now()`, [profileKey, 'monday_api', flow.sourceBoardId, flow.internalName, flow.classification, flow.destination, flow.fieldMap, flow.workflow, flow.verificationChecklist, flow]); await pool.query(`insert into portal_activity_logs (actor, action, entity_type, metadata) values ($1,$2,$3,$4)`, ['system', 'steelcraft_workflow_audit_saved', 'workflow_source', { tenantKey: profileKey, mappedWorkflowCount: mapped.mappedWorkflowCount }]); } return { ...mapped, tenantKey: profileKey }; }
+async function importProfileWorkbook(req, res, next) { try { await ensureSchema(); const profileKey = tenantKey(req); const mappingKey = req.body?.mappingKey || req.body?.mapping_key || (profileKey === steelcraftProfileKey ? STEELCRAFT_WORKBOOK_MAPPING_KEY : GENERIC_WORKBOOK_MAPPING_KEY); const db = requireDatabase(); if (mappingKey === STEELCRAFT_WORKBOOK_MAPPING_KEY) { const result = await importQuoteWorkbook(db, req.file, req.body.actor || 'estimating'); if (result.workbook?.id) await db.query('update quote_workbooks set tenant_key = $1, updated_at = now() where id = $2', [profileKey, result.workbook.id]); return res.json({ ok: true, tenantKey: profileKey, mappingKey, ...result }); } const result = await profileWorkbookUpload(db, { tenantKey: profileKey, file: req.file, actor: req.body.actor || 'import', mappingKey }); res.json({ ok: true, tenantKey: profileKey, mappingKey, ...result }); } catch (error) { next(error); } }
+async function listTenantWorkbooks(req, res, next) { try { await ensureSchema(); const profileKey = tenantKey(req); const workbooks = await requireDatabase().query(`select qw.id, qw.tenant_key, qw.original_filename, qw.file_size, qw.sheet_count, qw.detected_total, qw.status, qw.estimate_id, qw.created_at, e.project_name, qv.id as quotation_id, qv.total as quote_total from quote_workbooks qw left join estimates e on e.id = qw.estimate_id left join quotation_versions qv on qv.estimate_id = e.id where qw.tenant_key = $1 order by qw.created_at desc limit 20`, [profileKey]); const profileUploads = await listProfileWorkbookUploads(requireDatabase(), profileKey); res.json({ ok: true, tenantKey: profileKey, workbooks: workbooks.rows, profileUploads }); } catch (error) { next(error); } }
 
-async function importProfileWorkbook(req, res, next) {
-  try {
-    await ensureSchema();
-    const profileKey = tenantKey(req);
-    const mappingKey = req.body?.mappingKey || req.body?.mapping_key || (profileKey === steelcraftProfileKey ? STEELCRAFT_WORKBOOK_MAPPING_KEY : GENERIC_WORKBOOK_MAPPING_KEY);
-    const db = requireDatabase();
-    if (mappingKey === STEELCRAFT_WORKBOOK_MAPPING_KEY) {
-      const result = await importQuoteWorkbook(db, req.file, req.body.actor || 'estimating');
-      if (result.workbook?.id) await db.query('update quote_workbooks set tenant_key = $1, updated_at = now() where id = $2', [profileKey, result.workbook.id]);
-      return res.json({ ok: true, tenantKey: profileKey, mappingKey, ...result });
-    }
-    const result = await profileWorkbookUpload(db, { tenantKey: profileKey, file: req.file, actor: req.body.actor || 'import', mappingKey });
-    res.json({ ok: true, tenantKey: profileKey, mappingKey, ...result });
-  } catch (error) { next(error); }
-}
-async function listTenantWorkbooks(req, res, next) {
-  try {
-    await ensureSchema();
-    const profileKey = tenantKey(req);
-    const workbooks = await requireDatabase().query(`select qw.id, qw.tenant_key, qw.original_filename, qw.file_size, qw.sheet_count, qw.detected_total, qw.status, qw.estimate_id, qw.created_at, e.project_name, qv.id as quotation_id, qv.total as quote_total from quote_workbooks qw left join estimates e on e.id = qw.estimate_id left join quotation_versions qv on qv.estimate_id = e.id where qw.tenant_key = $1 order by qw.created_at desc limit 20`, [profileKey]);
-    const profileUploads = await listProfileWorkbookUploads(requireDatabase(), profileKey);
-    res.json({ ok: true, tenantKey: profileKey, workbooks: workbooks.rows, profileUploads });
-  } catch (error) { next(error); }
-}
-
-app.get('/api/build', (req, res) => { res.json({ ok: true, commit: 'tenant-import-mapping-registry', importMappingRegistry: true, reusableWorkbookProfiles: true, tenantMondayProfiles: true }); });
+app.get('/api/build', (req, res) => { res.json({ ok: true, commit: 'business-authority-onboarding', authorityQuestion: 'Do you currently already have a BUSV number?', vaultBacked: true }); });
 app.get('/api/health', async (req, res) => { const checks = { app: 'ok', database: 'not_configured', monday: process.env.MONDAY_API_TOKEN ? 'steelcraft_configured' : 'tenant_specific', spaces: process.env.DO_SPACES_BUCKET ? 'configured' : 'not_configured', auth: 'not_checked', neroaConnect: 'not_checked' }; try { if (pool) { await pool.query('select 1 as ok'); checks.database = 'connected'; checks.auth = 'database_backed'; checks.neroaConnect = 'schema_ready'; } } catch (error) { checks.database = `error: ${error.message}`; checks.auth = 'error'; checks.neroaConnect = 'error'; } res.json({ ok: checks.database === 'connected', checks, steelcraftProfileKey }); });
-app.post('/api/setup/schema', async (req, res, next) => { try { await ensureSchema(); await pool.query(`insert into portal_activity_logs (actor, action, entity_type, metadata) values ($1, $2, $3, $4)`, ['system', 'schema_initialized', 'database', { tenantProfiles: true, importMappings: true, estimating: true, quoteWorkbooks: true, quoteTemplates: true, accounting: true, hr: true, auth: true, steelcraftWorkflow: true, neroaConnect: true }]); res.json({ ok: true, message: 'ERP schema initialized with reusable tenant import mappings. Steel Craft workbook and Monday mappings are profile-scoped.' }); } catch (error) { next(error); } });
+app.post('/api/setup/schema', async (req, res, next) => { try { await ensureSchema(); await pool.query(`insert into portal_activity_logs (actor, action, entity_type, metadata) values ($1, $2, $3, $4)`, ['system', 'schema_initialized', 'database', { tenantProfiles: true, importMappings: true, businessAuthority: true, vaultMemoryRefs: true, estimating: true, quoteWorkbooks: true, quoteTemplates: true, accounting: true, hr: true, auth: true, steelcraftWorkflow: true, neroaConnect: true }]); res.json({ ok: true, message: 'ERP schema initialized with BUSV business authority onboarding and Vault-backed activity refs.' }); } catch (error) { next(error); } });
+registerErpAuthorityOnboardingRoutes(app, requireDatabase, ensureSchema);
 
 app.post('/api/auth/login', async (req, res, next) => { try { await ensureSchema(); const user = await authenticateUser(requireDatabase(), req.body?.email, req.body?.password); if (!user) return res.status(401).json({ ok: false, error: 'Invalid email or password.' }); res.json({ ok: true, user }); } catch (error) { next(error); } });
 app.post('/api/auth/forgot-password', async (req, res, next) => { try { await ensureSchema(); const result = await requestPasswordReset(requireDatabase(), req.body?.email, req.ip); if (result.sent) await pool.query(`insert into portal_activity_logs (actor, action, entity_type, metadata) values ($1,$2,$3,$4)`, ['system', 'password_reset_requested', 'erp_user', { email: req.body?.email, emailProvider: 'neroa_mail_pending' }]); res.json({ ok: true, message: 'If that email exists, a password reset link has been prepared. Email delivery will run through Neroa Mail when that service is connected.' }); } catch (error) { next(error); } });
@@ -182,7 +100,7 @@ app.post('/api/profiles', async (req, res, next) => { try { await ensureSchema()
 app.get('/api/profiles/:tenantKey/import-profile', async (req, res, next) => { try { await ensureSchema(); const profile = await getTenantImportProfile(requireDatabase(), tenantKey(req)); res.json({ ok: true, ...profile }); } catch (error) { next(error); } });
 app.put('/api/profiles/:tenantKey/import-mappings/:mappingKey', async (req, res, next) => { try { await ensureSchema(); const mapping = await upsertTenantImportMapping(requireDatabase(), tenantKey(req), req.params.mappingKey, req.body || {}); res.json({ ok: true, mapping }); } catch (error) { next(error); } });
 
-app.get('/api/estimating/schema/status', async (req, res, next) => { try { await ensureSchema(); const tables = await requireDatabase().query(`select table_name from information_schema.tables where table_schema = 'public' and (table_name in ('tenant_profiles', 'tenant_import_mappings', 'tenant_workbook_uploads', 'tenant_workbook_sheets', 'tenant_monday_source_mappings', 'estimates', 'estimate_cost_lines', 'estimate_deposit_schedule', 'quotation_versions', 'quotation_lines', 'project_checklist_items', 'invoices', 'invoice_lines', 'schedule_of_values', 'change_orders', 'quote_workbooks', 'quote_workbook_sheets', 'quote_templates', 'quote_template_versions', 'quote_template_overrides', 'steelcraft_workflow_sources', 'erp_users', 'erp_password_reset_tokens', 'connect_threads', 'connect_messages', 'connect_route_packets', 'connect_action_packets') or table_name like 'accounting_%') order by table_name`); res.json({ ok: true, tables: tables.rows.map((row) => row.table_name) }); } catch (error) { next(error); } });
+app.get('/api/estimating/schema/status', async (req, res, next) => { try { await ensureSchema(); const tables = await requireDatabase().query(`select table_name from information_schema.tables where table_schema = 'public' and (table_name in ('tenant_profiles', 'tenant_import_mappings', 'tenant_workbook_uploads', 'tenant_workbook_sheets', 'tenant_monday_source_mappings', 'authority_accounts', 'authority_users', 'authority_action_events', 'vault_memory_refs', 'estimates', 'estimate_cost_lines', 'estimate_deposit_schedule', 'quotation_versions', 'quotation_lines', 'project_checklist_items', 'invoices', 'invoice_lines', 'schedule_of_values', 'change_orders', 'quote_workbooks', 'quote_workbook_sheets', 'quote_templates', 'quote_template_versions', 'quote_template_overrides', 'steelcraft_workflow_sources', 'erp_users', 'erp_password_reset_tokens', 'connect_threads', 'connect_messages', 'connect_route_packets', 'connect_action_packets') or table_name like 'accounting_%') order by table_name`); res.json({ ok: true, tables: tables.rows.map((row) => row.table_name) }); } catch (error) { next(error); } });
 app.post('/api/estimating/quote-workbooks', upload.single('workbook'), importProfileWorkbook);
 app.post('/api/profiles/:tenantKey/estimating/quote-workbooks', upload.single('workbook'), importProfileWorkbook);
 app.get('/api/estimating/quote-workbooks', listTenantWorkbooks);
