@@ -1,5 +1,6 @@
 import { commitDemoAccountingWorkerMatches, getDemoBankingData, listAccountingWorkerTasks, runDemoAccountingWorker, seedDemoBankingData } from './accountingBankingDemo.js';
 import { ensureAccountingAiReceiptSchema, listAccountingAiReceipts, markAccountingAiReceiptsCommitted, recordAccountingAiReceipt } from './accountingAiReceipts.js';
+import { approveAccountingExportPackage, buildAccountingExportPackage, getAccountingExportCsv, listAccountingExportPackages } from './accountingExportBridge.js';
 
 export function registerAccountingBankingDemoRoutes(app, requireDatabase, ensureSchema) {
   app.post('/api/accounting/banking/demo/seed', async (req, res, next) => {
@@ -122,6 +123,50 @@ export function registerAccountingBankingDemoRoutes(app, requireDatabase, ensure
       const receipts = await listAccountingAiReceipts(db, 100);
       const latestReport = banking.reports?.[0] || null;
       res.json({ ok: true, banking, tasks, receipts, dailySummary: latestReport?.raw?.dailySummary || null, latestReport });
+    } catch (error) { next(error); }
+  });
+
+  app.post('/api/accounting/export/prepare', async (req, res, next) => {
+    try {
+      await ensureSchema();
+      const db = requireDatabase();
+      const pkg = await buildAccountingExportPackage(db, {
+        destination: req.body?.destination || 'quickbooks_csv',
+        packageType: req.body?.packageType || req.body?.package_type || 'daily_comptroller',
+        tenantId: req.body?.tenantId || req.body?.tenant_id || 'steelcraft-demo'
+      });
+      res.json({ ok: true, package: pkg });
+    } catch (error) { next(error); }
+  });
+
+  app.get('/api/accounting/export/packages', async (req, res, next) => {
+    try {
+      await ensureSchema();
+      const db = requireDatabase();
+      const packages = await listAccountingExportPackages(db, req.query?.tenantId || req.query?.tenant_id || 'steelcraft-demo');
+      res.json({ ok: true, packages });
+    } catch (error) { next(error); }
+  });
+
+  app.post('/api/accounting/export/packages/:id/approve', async (req, res, next) => {
+    try {
+      await ensureSchema();
+      const db = requireDatabase();
+      const pkg = await approveAccountingExportPackage(db, req.params.id, { actor: req.body?.actor || 'customer' });
+      if (!pkg) return res.status(404).json({ ok: false, error: 'Export package not found.' });
+      res.json({ ok: true, package: pkg });
+    } catch (error) { next(error); }
+  });
+
+  app.get('/api/accounting/export/packages/:id.csv', async (req, res, next) => {
+    try {
+      await ensureSchema();
+      const db = requireDatabase();
+      const result = await getAccountingExportCsv(db, req.params.id);
+      if (!result) return res.status(404).send('Export package not found.');
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="accounting-export-${req.params.id}.csv"`);
+      res.send(result.csv);
     } catch (error) { next(error); }
   });
 }
