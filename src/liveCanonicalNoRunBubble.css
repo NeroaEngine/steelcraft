@@ -1,3 +1,7 @@
+.workspace > .workspace-header:has(+ .live-module-shell) {
+  display: none !important;
+}
+
 .live-action-panel .live-module-status-strip .live-module-step button,
 .live-action-panel .live-module-status-strip .live-click-step button,
 .live-action-panel .live-module-status-strip button:not(.live-click-step) {
