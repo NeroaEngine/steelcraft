@@ -1,11 +1,12 @@
 import { ensureAuthSchema } from './authSchema.js';
+import { recordAuthorityAction } from './authoritySchema.js';
 import {
-  ROLE_CLASS_BY_ERP_ROLE,
-  createOrResolveAuthorityUser,
-  normalizeBusinessAuthorityId,
-  recordAuthorityAction,
-  resolveOrCreateBusinessAuthority
-} from './authoritySchema.js';
+  AUTHORITY_START_MODES,
+  BUSINESS_JOIN_METHODS,
+  createAuthorityForSignup,
+  createErpUserUnderAuthority,
+  resolveExistingAuthorityForSignup
+} from './authoritySignupGate.js';
 
 function required(value, label) {
   if (!value) {
@@ -24,109 +25,121 @@ function normalizeTenantKey(value, legalName = 'business') {
     .replace(/^-+|-+$/g, '') || 'business';
 }
 
+function normalizeStartMode(body = {}) {
+  if (body.authority_start_mode) return body.authority_start_mode;
+  if (body.authorityStartMode) return body.authorityStartMode;
+  if (body.hasExistingBusinessAuthority || body.has_existing_business_authority) return 'existing';
+  return 'new_business';
+}
+
 export function registerErpAuthorityOnboardingRoutes(app, requireDatabase, ensureSchema) {
-  app.post('/api/erp/onboarding/business-authority', async (req, res, next) => {
+  app.get('/api/erp/onboarding/authority-start-options', async (req, res, next) => {
+    try {
+      res.json({
+        ok: true,
+        question: 'Do you already have a Neroa authority number?',
+        helperText: 'Already have a Neroa authority number from Mail, Vault, Guard, Forge, Scan, ERP, or the ChatGPT app? Enter it here so we can connect this account to the right authority record.',
+        options: [
+          { value: 'existing', label: 'Yes, I have a PRV or BUSV number' },
+          { value: 'new_personal', label: 'No, create a new personal account' },
+          { value: 'new_business', label: 'No, create a new business account' }
+        ],
+        labels: { PRV: 'personal authority number', BUSV: 'business authority number' },
+        businessJoinMethods: BUSINESS_JOIN_METHODS,
+        rules: [
+          'PRV/BUSV exists -> attach, do not duplicate.',
+          'BUSV join -> never allow by number alone.',
+          'Protected actions fail closed without resolved authority.'
+        ]
+      });
+    } catch (error) { next(error); }
+  });
+
+  app.post('/api/erp/onboarding/authority-signup', async (req, res, next) => {
     try {
       await ensureSchema();
       const db = requireDatabase();
       await ensureAuthSchema(db);
 
-      const hasExistingBusinessAuthority = Boolean(req.body?.hasExistingBusinessAuthority ?? req.body?.has_existing_business_authority);
-      const existingBusinessAuthorityId = req.body?.businessAuthorityId || req.body?.business_authority_id || req.body?.authorityDisplayId || req.body?.authority_display_id || null;
-      const legalName = required(req.body?.businessName || req.body?.business_name || req.body?.legalName || req.body?.legal_name, 'businessName');
-      const tenantKey = normalizeTenantKey(req.body?.tenantKey || req.body?.tenant_key, legalName);
+      const mode = normalizeStartMode(req.body);
+      if (!AUTHORITY_START_MODES.includes(mode)) {
+        return res.status(400).json({ ok: false, error: 'authority_start_mode must be existing, new_personal, or new_business.' });
+      }
+
       const email = required(req.body?.email, 'email');
       const fullName = required(req.body?.fullName || req.body?.full_name, 'fullName');
-      const erpRole = req.body?.role || req.body?.erpRole || req.body?.erp_role || 'admin';
+      const legalName = req.body?.businessName || req.body?.business_name || req.body?.legalName || req.body?.legal_name || fullName;
+      const tenantKey = normalizeTenantKey(req.body?.tenantKey || req.body?.tenant_key, legalName);
+      const erpRole = req.body?.role || req.body?.erpRole || req.body?.erp_role || (mode === 'new_business' ? 'admin' : 'customer');
+      const language = req.body?.language || 'en';
 
-      if (hasExistingBusinessAuthority) required(existingBusinessAuthorityId, 'businessAuthorityId');
+      let resolved;
+      if (mode === 'existing') {
+        const existingAuthorityId = required(req.body?.existing_authority_id || req.body?.existingAuthorityId || req.body?.businessAuthorityId || req.body?.authorityDisplayId, 'existing_authority_id');
+        resolved = await resolveExistingAuthorityForSignup(db, {
+          existingAuthorityId,
+          businessJoinMethod: req.body?.business_join_method || req.body?.businessJoinMethod || null,
+          inviteToken: req.body?.invite_token || req.body?.inviteToken || null,
+          email,
+          fullName
+        });
+      } else {
+        resolved = await createAuthorityForSignup(db, {
+          mode,
+          legalName: fullName,
+          businessName: legalName,
+          tenantKey
+        });
+      }
 
-      const authorityAccount = await resolveOrCreateBusinessAuthority(db, {
-        existingBusinessAuthorityId,
-        hasExistingBusinessAuthority,
-        legalName,
-        tenantKey,
-        raw: {
-          source: 'erp_business_authority_onboarding',
-          provided_existing_busv: hasExistingBusinessAuthority,
-          requested_business_authority_id: existingBusinessAuthorityId || null
-        }
-      });
-
-      const authorityUser = await createOrResolveAuthorityUser(db, {
-        authorityAccount,
-        email,
-        fullName,
-        erpRole,
-        roleClass: ROLE_CLASS_BY_ERP_ROLE[erpRole] || '14',
-        authorityUserDisplayId: req.body?.authorityUserDisplayId || req.body?.authority_user_display_id || null,
-        raw: { source: 'erp_business_authority_onboarding' }
-      });
-
-      const userResult = await db.query(
-        `insert into erp_users (email, full_name, role, role_class, language, status, must_change_password, raw, authority_account_id, authority_user_id, authority_display_id, authority_user_display_id)
-         values ($1,$2,$3,$4,$5,'pending',true,$6,$7,$8,$9,$10)
-         on conflict (email) do update set
-           full_name = excluded.full_name,
-           role = excluded.role,
-           role_class = excluded.role_class,
-           authority_account_id = excluded.authority_account_id,
-           authority_user_id = excluded.authority_user_id,
-           authority_display_id = excluded.authority_display_id,
-           authority_user_display_id = excluded.authority_user_display_id,
-           updated_at = now()
-         returning id, email, full_name, role, role_class, status, authority_display_id, authority_user_display_id`,
-        [
+      const shouldCreateLogin = mode !== 'existing' || resolved.approvedForImmediateLogin;
+      let erpUser = null;
+      let authorityUser = null;
+      if (shouldCreateLogin) {
+        const created = await createErpUserUnderAuthority(db, {
+          authorityAccount: resolved.authorityAccount,
           email,
           fullName,
           erpRole,
-          authorityUser.role_class,
-          req.body?.language || 'en',
-          {
-            source: 'erp_business_authority_onboarding',
-            hasExistingBusinessAuthority,
-            normalizedBusinessAuthorityId: normalizeBusinessAuthorityId(existingBusinessAuthorityId || authorityAccount.display_id)
-          },
-          authorityAccount.id,
-          authorityUser.id,
-          authorityAccount.display_id,
-          authorityUser.display_id
-        ]
-      );
-      const erpUser = userResult.rows[0];
+          language,
+          status: 'pending',
+          authorityUserDisplayId: req.body?.authorityUserDisplayId || req.body?.authority_user_display_id || null,
+          raw: { source: 'erp_authority_signup_gate', authority_start_mode: mode }
+        });
+        erpUser = created.erpUser;
+        authorityUser = created.authorityUser;
+      }
 
       const event = await recordAuthorityAction(db, {
-        authorityAccount,
+        authorityAccount: resolved.authorityAccount,
         authorityUser,
-        actionType: hasExistingBusinessAuthority ? 'erp_login_created_under_existing_busv' : 'erp_login_created_with_new_busv',
+        actionType: mode === 'existing' ? 'erp_signup_existing_authority_gate_completed' : `erp_signup_${mode}_authority_created`,
+        approvalRequired: Boolean(resolved.joinRequest && !resolved.approvedForImmediateLogin),
         metadata: {
-          source_table: 'erp_users',
-          source_record_id: String(erpUser.id),
+          source_table: erpUser ? 'erp_users' : 'authority_join_requests',
+          source_record_id: String(erpUser?.id || resolved.joinRequest?.id || resolved.authorityAccount.id),
+          authority_start_mode: mode,
           tenantKey,
           email,
-          businessName: legalName,
-          hasExistingBusinessAuthority,
-          authorityDisplayId: authorityAccount.display_id,
-          authorityUserDisplayId: authorityUser.display_id
+          businessJoinMethod: req.body?.business_join_method || req.body?.businessJoinMethod || null,
+          startingUserCount: req.body?.starting_user_count || req.body?.startingUserCount || null
         }
       });
 
       res.json({
         ok: true,
-        requiresPasswordSetup: true,
-        authorityQuestionAnswered: true,
-        hasExistingBusinessAuthority,
+        authorityStartMode: mode,
+        requiresApproval: Boolean(resolved.joinRequest && !resolved.approvedForImmediateLogin),
+        requiresPasswordSetup: Boolean(erpUser),
         authorityAccount: {
-          id: authorityAccount.id,
-          displayId: authorityAccount.display_id,
-          legalName: authorityAccount.legal_name,
-          tenantKey: authorityAccount.tenant_key
+          id: resolved.authorityAccount.id,
+          displayId: resolved.authorityAccount.display_id,
+          authorityType: resolved.authorityAccount.authority_type,
+          legalName: resolved.authorityAccount.legal_name,
+          tenantKey: resolved.authorityAccount.tenant_key
         },
-        authorityUser: {
-          id: authorityUser.id,
-          displayId: authorityUser.display_id,
-          roleClass: authorityUser.role_class
-        },
+        authorityUser: authorityUser ? { id: authorityUser.id, displayId: authorityUser.display_id, roleClass: authorityUser.role_class } : null,
+        joinRequest: resolved.joinRequest || null,
         erpUser,
         vault: {
           vaultLineageId: event.vault_lineage_id,
@@ -134,8 +147,16 @@ export function registerErpAuthorityOnboardingRoutes(app, requireDatabase, ensur
           scanEventId: event.scan_event_id
         }
       });
-    } catch (error) {
-      next(error);
-    }
+    } catch (error) { next(error); }
+  });
+
+  app.post('/api/erp/onboarding/business-authority', async (req, res, next) => {
+    req.body = {
+      ...req.body,
+      authority_start_mode: req.body?.hasExistingBusinessAuthority || req.body?.has_existing_business_authority ? 'existing' : 'new_business',
+      existing_authority_id: req.body?.businessAuthorityId || req.body?.business_authority_id || req.body?.authorityDisplayId || req.body?.authority_display_id,
+      business_join_method: req.body?.business_join_method || req.body?.businessJoinMethod || 'admin_approval'
+    };
+    return app._router.handle(req, res, next);
   });
 }
