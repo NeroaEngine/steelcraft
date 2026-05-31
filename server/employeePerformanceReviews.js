@@ -37,8 +37,9 @@ export async function ensureEmployeePerformanceReviewSchema(db) {
       raw jsonb not null default '{}'::jsonb,
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now()
-    );
-
+    )
+  `);
+  await db.query(`
     create table if not exists employee_performance_notes (
       id bigserial primary key,
       employee_id bigint not null references employees(id) on delete cascade,
@@ -54,8 +55,9 @@ export async function ensureEmployeePerformanceReviewSchema(db) {
       guard_ref text,
       raw jsonb not null default '{}'::jsonb,
       created_at timestamptz not null default now()
-    );
-
+    )
+  `);
+  await db.query(`
     create table if not exists employee_review_cycles (
       id bigserial primary key,
       tenant_id text not null default 'steelcraft',
@@ -68,8 +70,9 @@ export async function ensureEmployeePerformanceReviewSchema(db) {
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now(),
       unique (tenant_id, cycle_name)
-    );
-
+    )
+  `);
+  await db.query(`
     create table if not exists employee_reviews (
       id bigserial primary key,
       review_cycle_id bigint not null references employee_review_cycles(id) on delete cascade,
@@ -92,7 +95,7 @@ export async function ensureEmployeePerformanceReviewSchema(db) {
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now(),
       unique (review_cycle_id, employee_id)
-    );
+    )
   `);
 }
 
