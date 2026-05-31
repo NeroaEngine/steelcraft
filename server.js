@@ -15,6 +15,18 @@ import { authenticateUser, ensureAuthSchema, listAuthUsers, requestPasswordReset
 import { ensureQuoteWorkbookSchema, importQuoteWorkbook } from './server/quoteWorkbook.js';
 import { ensureQuoteTemplateSchema, createTemplateFromWorkbook, listTemplates, getTemplate, updateTemplateVersion, upsertTemplateOverride } from './server/quoteTemplate.js';
 import { mapMondayBoardsToSteelCraftWorkflow } from './server/steelcraftWorkflow.js';
+import {
+  GENERIC_WORKBOOK_MAPPING_KEY,
+  STEELCRAFT_WORKBOOK_MAPPING_KEY,
+  ensureImportProfileSchema,
+  getProfileWorkbookUpload,
+  getTenantImportProfile,
+  listProfileWorkbookUploads,
+  profileWorkbookUpload,
+  tenantMondayEnvKey,
+  upsertMondaySourceMapping,
+  upsertTenantImportMapping
+} from './server/importProfiles.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -33,62 +45,31 @@ app.use((req, res, next) => {
   }
   next();
 });
-app.use(express.static(path.join(__dirname, 'dist'), {
-  etag: false,
-  lastModified: false,
-  setHeaders(res, filePath) {
-    if (filePath.endsWith('.html')) res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  }
-}));
+app.use(express.static(path.join(__dirname, 'dist'), { etag: false, lastModified: false, setHeaders(res, filePath) { if (filePath.endsWith('.html')) res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate'); } }));
 
-function getDatabaseUrl() {
-  if (!process.env.DATABASE_URL) return null;
-  const url = new URL(process.env.DATABASE_URL);
-  url.searchParams.delete('sslmode');
-  return url.toString();
-}
+function getDatabaseUrl() { if (!process.env.DATABASE_URL) return null; const url = new URL(process.env.DATABASE_URL); url.searchParams.delete('sslmode'); return url.toString(); }
 const databaseUrl = getDatabaseUrl();
 const pool = databaseUrl ? new Pool({ connectionString: databaseUrl, ssl: { rejectUnauthorized: false } }) : null;
-function requireDatabase() {
-  if (!pool) {
-    const error = new Error('DATABASE_URL is not configured.');
-    error.statusCode = 500;
-    throw error;
-  }
-  return pool;
-}
-function requireMondayToken() {
-  if (!process.env.MONDAY_API_TOKEN) {
-    const error = new Error('MONDAY_API_TOKEN is not configured for the Steel Craft tenant profile.');
-    error.statusCode = 500;
-    throw error;
-  }
-  return process.env.MONDAY_API_TOKEN;
-}
+function requireDatabase() { if (!pool) { const error = new Error('DATABASE_URL is not configured.'); error.statusCode = 500; throw error; } return pool; }
 function safeJson(value) { try { return value ? JSON.parse(value) : null; } catch { return null; } }
-function tenantKey(req) { return req.params.tenantKey || req.query.tenantKey || steelcraftProfileKey; }
-function requireSteelCraftProfile(key) {
-  if (key !== steelcraftProfileKey) {
-    const error = new Error('Monday.com migration is currently installed only on the Steel Craft customer profile. Add this tenant\'s Monday connection before syncing boards.');
-    error.statusCode = 403;
+function tenantKey(req) { return req.params.tenantKey || req.query.tenantKey || req.body?.tenantKey || req.body?.tenant_key || steelcraftProfileKey; }
+function normalizeKey(value) { return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'tenant'; }
+function mondayTokenForTenant(key) {
+  const tenantEnv = tenantMondayEnvKey(key);
+  const token = process.env[tenantEnv] || (key === steelcraftProfileKey ? process.env.MONDAY_API_TOKEN : null);
+  if (!token) {
+    const error = new Error(`Monday.com token is not configured for tenant profile "${key}". Set ${tenantEnv}${key === steelcraftProfileKey ? ' or MONDAY_API_TOKEN' : ''}.`);
+    error.statusCode = 500;
     throw error;
   }
+  return token;
 }
 
-async function mondayQuery(query, variables = {}) {
-  const token = requireMondayToken();
-  const response = await fetch(mondayApiUrl, {
-    method: 'POST',
-    headers: { Authorization: token, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, variables })
-  });
+async function mondayQuery(profileKey, query, variables = {}) {
+  const token = mondayTokenForTenant(profileKey);
+  const response = await fetch(mondayApiUrl, { method: 'POST', headers: { Authorization: token, 'Content-Type': 'application/json' }, body: JSON.stringify({ query, variables }) });
   const payload = await response.json();
-  if (!response.ok || payload.errors) {
-    const message = payload.errors?.map((item) => item.message).join('; ') || `Monday API returned ${response.status}`;
-    const error = new Error(message);
-    error.statusCode = response.status || 502;
-    throw error;
-  }
+  if (!response.ok || payload.errors) { const message = payload.errors?.map((item) => item.message).join('; ') || `Monday API returned ${response.status}`; const error = new Error(message); error.statusCode = response.status || 502; throw error; }
   return payload.data;
 }
 
@@ -106,7 +87,7 @@ async function ensureProfileSchema(db) {
       updated_at timestamptz not null default now()
     );
     insert into tenant_profiles (tenant_key, display_name, profile_type, industry_pack, import_profile)
-    values ($1, 'Steel Craft', 'customer', 'metal_buildings', '{"monday":true,"steelcraftWorkbook":true}'::jsonb)
+    values ($1, 'Steel Craft', 'customer', 'metal_buildings', '{"monday":true,"steelcraftWorkbook":true,"defaultWorkbookMapping":"steelcraft_quote_workbook"}'::jsonb)
     on conflict (tenant_key) do nothing;
   `, [steelcraftProfileKey]);
 }
@@ -134,49 +115,28 @@ async function ensureSchema() {
     create table if not exists portal_activity_logs (id bigserial primary key, actor text, action text not null, entity_type text, entity_id text, metadata jsonb, created_at timestamptz not null default now());
   `);
   await ensureProfileSchema(db);
-  await ensureAuthSchema(db); await seedAuthUsers(db); await ensureEstimatingSchema(db); await ensureQuoteWorkbookSchema(db); await ensureQuoteTemplateSchema(db); await ensureTenantColumns(db); await ensureAccountingSchema(db); await ensureHrSchema(db); await ensureNeroaConnectSchema(db);
+  await ensureAuthSchema(db); await seedAuthUsers(db); await ensureEstimatingSchema(db); await ensureQuoteWorkbookSchema(db); await ensureQuoteTemplateSchema(db); await ensureTenantColumns(db); await ensureImportProfileSchema(db, steelcraftProfileKey); await ensureAccountingSchema(db); await ensureHrSchema(db); await ensureNeroaConnectSchema(db);
 }
 
-async function pullMondayBoards() {
-  return mondayQuery(`query SteelCraftBoards { boards(limit: 100) { id name board_kind state workspace { id name } columns { id title type settings_str } } }`);
-}
+async function pullMondayBoards(profileKey) { return mondayQuery(profileKey, `query TenantBoards { boards(limit: 100) { id name board_kind state workspace { id name } columns { id title type settings_str } } }`); }
 async function syncMondayBoards(profileKey = steelcraftProfileKey) {
-  requireSteelCraftProfile(profileKey);
   await ensureSchema();
-  const data = await pullMondayBoards();
+  const data = await pullMondayBoards(profileKey);
   for (const board of data.boards) {
-    await pool.query(
-      `insert into monday_boards (tenant_key, id, name, workspace_name, board_kind, state, raw, pulled_at)
-       values ($1, $2, $3, $4, $5, $6, $7, now())
-       on conflict (id) do update set tenant_key = excluded.tenant_key, name = excluded.name, workspace_name = excluded.workspace_name, board_kind = excluded.board_kind, state = excluded.state, raw = excluded.raw, pulled_at = now()`,
-      [profileKey, board.id, board.name, board.workspace?.name || null, board.board_kind, board.state, board]
-    );
-    for (const column of board.columns || []) {
-      await pool.query(
-        `insert into monday_columns (tenant_key, id, board_id, title, type, settings, raw, pulled_at)
-         values ($1, $2, $3, $4, $5, $6, $7, now())
-         on conflict (board_id, id) do update set tenant_key = excluded.tenant_key, title = excluded.title, type = excluded.type, settings = excluded.settings, raw = excluded.raw, pulled_at = now()`,
-        [profileKey, column.id, board.id, column.title, column.type, safeJson(column.settings_str), column]
-      );
-    }
+    const sourceId = `${normalizeKey(profileKey)}:${board.id}`;
+    await pool.query(`insert into monday_boards (tenant_key, id, name, workspace_name, board_kind, state, raw, pulled_at) values ($1, $2, $3, $4, $5, $6, $7, now()) on conflict (id) do update set tenant_key = excluded.tenant_key, name = excluded.name, workspace_name = excluded.workspace_name, board_kind = excluded.board_kind, state = excluded.state, raw = excluded.raw, pulled_at = now()`, [profileKey, sourceId, board.name, board.workspace?.name || null, board.board_kind, board.state, board]);
+    await upsertMondaySourceMapping(pool, profileKey, board);
+    for (const column of board.columns || []) await pool.query(`insert into monday_columns (tenant_key, id, board_id, title, type, settings, raw, pulled_at) values ($1, $2, $3, $4, $5, $6, $7, now()) on conflict (board_id, id) do update set tenant_key = excluded.tenant_key, title = excluded.title, type = excluded.type, settings = excluded.settings, raw = excluded.raw, pulled_at = now()`, [profileKey, column.id, sourceId, column.title, column.type, safeJson(column.settings_str), column]);
   }
   await pool.query(`insert into portal_activity_logs (actor, action, entity_type, metadata) values ($1, $2, $3, $4)`, ['system', 'monday_boards_synced', 'monday', { tenantKey: profileKey, board_count: data.boards.length }]);
   return data.boards;
 }
 async function auditSteelCraftWorkflow({ save = false, profileKey = steelcraftProfileKey } = {}) {
-  requireSteelCraftProfile(profileKey);
   await ensureSchema();
-  const data = await pullMondayBoards();
-  const mapped = mapMondayBoardsToSteelCraftWorkflow(data.boards);
-  if (save) {
-    for (const flow of mapped.workflows) {
-      await pool.query(
-        `insert into steelcraft_workflow_sources (tenant_key, source, source_board_id, internal_name, classification, destination, field_map, workflow_map, verification_checklist, raw, pulled_at)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now())
-         on conflict (source, source_board_id) do update set tenant_key = excluded.tenant_key, internal_name = excluded.internal_name, classification = excluded.classification, destination = excluded.destination, field_map = excluded.field_map, workflow_map = excluded.workflow_map, verification_checklist = excluded.verification_checklist, raw = excluded.raw, pulled_at = now()`,
-        [profileKey, 'monday_api', flow.sourceBoardId, flow.internalName, flow.classification, flow.destination, flow.fieldMap, flow.workflow, flow.verificationChecklist, flow]
-      );
-    }
+  const data = await pullMondayBoards(profileKey);
+  const mapped = profileKey === steelcraftProfileKey ? mapMondayBoardsToSteelCraftWorkflow(data.boards) : { tenantKey: profileKey, mappedWorkflowCount: 0, workflows: [], note: 'Generic Monday profile captured. Map boards to rooms in tenant_monday_source_mappings.' };
+  if (save && profileKey === steelcraftProfileKey) {
+    for (const flow of mapped.workflows) await pool.query(`insert into steelcraft_workflow_sources (tenant_key, source, source_board_id, internal_name, classification, destination, field_map, workflow_map, verification_checklist, raw, pulled_at) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now()) on conflict (source, source_board_id) do update set tenant_key = excluded.tenant_key, internal_name = excluded.internal_name, classification = excluded.classification, destination = excluded.destination, field_map = excluded.field_map, workflow_map = excluded.workflow_map, verification_checklist = excluded.verification_checklist, raw = excluded.raw, pulled_at = now()`, [profileKey, 'monday_api', flow.sourceBoardId, flow.internalName, flow.classification, flow.destination, flow.fieldMap, flow.workflow, flow.verificationChecklist, flow]);
     await pool.query(`insert into portal_activity_logs (actor, action, entity_type, metadata) values ($1,$2,$3,$4)`, ['system', 'steelcraft_workflow_audit_saved', 'workflow_source', { tenantKey: profileKey, mappedWorkflowCount: mapped.mappedWorkflowCount }]);
   }
   return { ...mapped, tenantKey: profileKey };
@@ -186,16 +146,30 @@ async function importProfileWorkbook(req, res, next) {
   try {
     await ensureSchema();
     const profileKey = tenantKey(req);
+    const mappingKey = req.body?.mappingKey || req.body?.mapping_key || (profileKey === steelcraftProfileKey ? STEELCRAFT_WORKBOOK_MAPPING_KEY : GENERIC_WORKBOOK_MAPPING_KEY);
     const db = requireDatabase();
-    const result = await importQuoteWorkbook(db, req.file, req.body.actor || 'estimating');
-    if (result.workbook?.id) await db.query('update quote_workbooks set tenant_key = $1, updated_at = now() where id = $2', [profileKey, result.workbook.id]);
-    res.json({ ok: true, tenantKey: profileKey, ...result });
+    if (mappingKey === STEELCRAFT_WORKBOOK_MAPPING_KEY) {
+      const result = await importQuoteWorkbook(db, req.file, req.body.actor || 'estimating');
+      if (result.workbook?.id) await db.query('update quote_workbooks set tenant_key = $1, updated_at = now() where id = $2', [profileKey, result.workbook.id]);
+      return res.json({ ok: true, tenantKey: profileKey, mappingKey, ...result });
+    }
+    const result = await profileWorkbookUpload(db, { tenantKey: profileKey, file: req.file, actor: req.body.actor || 'import', mappingKey });
+    res.json({ ok: true, tenantKey: profileKey, mappingKey, ...result });
+  } catch (error) { next(error); }
+}
+async function listTenantWorkbooks(req, res, next) {
+  try {
+    await ensureSchema();
+    const profileKey = tenantKey(req);
+    const workbooks = await requireDatabase().query(`select qw.id, qw.tenant_key, qw.original_filename, qw.file_size, qw.sheet_count, qw.detected_total, qw.status, qw.estimate_id, qw.created_at, e.project_name, qv.id as quotation_id, qv.total as quote_total from quote_workbooks qw left join estimates e on e.id = qw.estimate_id left join quotation_versions qv on qv.estimate_id = e.id where qw.tenant_key = $1 order by qw.created_at desc limit 20`, [profileKey]);
+    const profileUploads = await listProfileWorkbookUploads(requireDatabase(), profileKey);
+    res.json({ ok: true, tenantKey: profileKey, workbooks: workbooks.rows, profileUploads });
   } catch (error) { next(error); }
 }
 
-app.get('/api/build', (req, res) => { res.json({ ok: true, commit: 'tenant-profile-import-scope', accountingHardLock: true, neroaConnect: true, comptrollerProductionDemo: true }); });
-app.get('/api/health', async (req, res) => { const checks = { app: 'ok', database: 'not_configured', monday: process.env.MONDAY_API_TOKEN ? 'steelcraft_configured' : 'not_configured', spaces: process.env.DO_SPACES_BUCKET ? 'configured' : 'not_configured', auth: 'not_checked', neroaConnect: 'not_checked' }; try { if (pool) { await pool.query('select 1 as ok'); checks.database = 'connected'; checks.auth = 'database_backed'; checks.neroaConnect = 'schema_ready'; } } catch (error) { checks.database = `error: ${error.message}`; checks.auth = 'error'; checks.neroaConnect = 'error'; } res.json({ ok: checks.database === 'connected', checks, steelcraftProfileKey }); });
-app.post('/api/setup/schema', async (req, res, next) => { try { await ensureSchema(); await pool.query(`insert into portal_activity_logs (actor, action, entity_type, metadata) values ($1, $2, $3, $4)`, ['system', 'schema_initialized', 'database', { tenantProfiles: true, estimating: true, quoteWorkbooks: true, quoteTemplates: true, accounting: true, hr: true, auth: true, steelcraftWorkflow: true, neroaConnect: true }]); res.json({ ok: true, message: 'ERP schema initialized with tenant profiles. Steel Craft Monday and workbook imports are scoped to the Steel Craft profile.' }); } catch (error) { next(error); } });
+app.get('/api/build', (req, res) => { res.json({ ok: true, commit: 'tenant-import-mapping-registry', importMappingRegistry: true, reusableWorkbookProfiles: true, tenantMondayProfiles: true }); });
+app.get('/api/health', async (req, res) => { const checks = { app: 'ok', database: 'not_configured', monday: process.env.MONDAY_API_TOKEN ? 'steelcraft_configured' : 'tenant_specific', spaces: process.env.DO_SPACES_BUCKET ? 'configured' : 'not_configured', auth: 'not_checked', neroaConnect: 'not_checked' }; try { if (pool) { await pool.query('select 1 as ok'); checks.database = 'connected'; checks.auth = 'database_backed'; checks.neroaConnect = 'schema_ready'; } } catch (error) { checks.database = `error: ${error.message}`; checks.auth = 'error'; checks.neroaConnect = 'error'; } res.json({ ok: checks.database === 'connected', checks, steelcraftProfileKey }); });
+app.post('/api/setup/schema', async (req, res, next) => { try { await ensureSchema(); await pool.query(`insert into portal_activity_logs (actor, action, entity_type, metadata) values ($1, $2, $3, $4)`, ['system', 'schema_initialized', 'database', { tenantProfiles: true, importMappings: true, estimating: true, quoteWorkbooks: true, quoteTemplates: true, accounting: true, hr: true, auth: true, steelcraftWorkflow: true, neroaConnect: true }]); res.json({ ok: true, message: 'ERP schema initialized with reusable tenant import mappings. Steel Craft workbook and Monday mappings are profile-scoped.' }); } catch (error) { next(error); } });
 
 app.post('/api/auth/login', async (req, res, next) => { try { await ensureSchema(); const user = await authenticateUser(requireDatabase(), req.body?.email, req.body?.password); if (!user) return res.status(401).json({ ok: false, error: 'Invalid email or password.' }); res.json({ ok: true, user }); } catch (error) { next(error); } });
 app.post('/api/auth/forgot-password', async (req, res, next) => { try { await ensureSchema(); const result = await requestPasswordReset(requireDatabase(), req.body?.email, req.ip); if (result.sent) await pool.query(`insert into portal_activity_logs (actor, action, entity_type, metadata) values ($1,$2,$3,$4)`, ['system', 'password_reset_requested', 'erp_user', { email: req.body?.email, emailProvider: 'neroa_mail_pending' }]); res.json({ ok: true, message: 'If that email exists, a password reset link has been prepared. Email delivery will run through Neroa Mail when that service is connected.' }); } catch (error) { next(error); } });
@@ -204,13 +178,16 @@ app.get('/api/auth/users', async (req, res, next) => { try { await ensureSchema(
 app.patch('/api/auth/users/:id/language', async (req, res, next) => { try { await ensureSchema(); const user = await updateUserLanguage(requireDatabase(), req.params.id, req.body?.language || 'en'); if (!user) return res.status(404).json({ ok: false, error: 'User not found.' }); res.json({ ok: true, user }); } catch (error) { next(error); } });
 
 app.get('/api/profiles', async (req, res, next) => { try { await ensureSchema(); const profiles = await requireDatabase().query('select * from tenant_profiles order by lower(display_name)'); res.json({ ok: true, profiles: profiles.rows }); } catch (error) { next(error); } });
-app.post('/api/profiles', async (req, res, next) => { try { await ensureSchema(); const key = req.body.tenantKey || req.body.tenant_key; const name = req.body.displayName || req.body.display_name || key; if (!key) return res.status(400).json({ ok: false, error: 'tenantKey is required.' }); const result = await requireDatabase().query(`insert into tenant_profiles (tenant_key, display_name, industry_pack, uiux_profile, import_profile) values ($1,$2,$3,$4,$5) on conflict (tenant_key) do update set display_name = excluded.display_name, industry_pack = excluded.industry_pack, uiux_profile = excluded.uiux_profile, import_profile = excluded.import_profile, updated_at = now() returning *`, [key, name, req.body.industryPack || null, req.body.uiuxProfile || {}, req.body.importProfile || {}]); res.json({ ok: true, profile: result.rows[0] }); } catch (error) { next(error); } });
+app.post('/api/profiles', async (req, res, next) => { try { await ensureSchema(); const key = req.body.tenantKey || req.body.tenant_key; const name = req.body.displayName || req.body.display_name || key; if (!key) return res.status(400).json({ ok: false, error: 'tenantKey is required.' }); const result = await requireDatabase().query(`insert into tenant_profiles (tenant_key, display_name, industry_pack, uiux_profile, import_profile) values ($1,$2,$3,$4,$5) on conflict (tenant_key) do update set display_name = excluded.display_name, industry_pack = excluded.industry_pack, uiux_profile = excluded.uiux_profile, import_profile = excluded.import_profile, updated_at = now() returning *`, [key, name, req.body.industryPack || null, req.body.uiuxProfile || {}, req.body.importProfile || { defaultWorkbookMapping: GENERIC_WORKBOOK_MAPPING_KEY }]); await upsertTenantImportMapping(requireDatabase(), key, GENERIC_WORKBOOK_MAPPING_KEY, { mappingType: 'workbook', label: `${name} generic workbook intake`, parser: 'generic_workbook_profiler_v1', mapping: { key: GENERIC_WORKBOOK_MAPPING_KEY, label: `${name} generic workbook intake`, fields: [], ranges: [] } }); res.json({ ok: true, profile: result.rows[0] }); } catch (error) { next(error); } });
+app.get('/api/profiles/:tenantKey/import-profile', async (req, res, next) => { try { await ensureSchema(); const profile = await getTenantImportProfile(requireDatabase(), tenantKey(req)); res.json({ ok: true, ...profile }); } catch (error) { next(error); } });
+app.put('/api/profiles/:tenantKey/import-mappings/:mappingKey', async (req, res, next) => { try { await ensureSchema(); const mapping = await upsertTenantImportMapping(requireDatabase(), tenantKey(req), req.params.mappingKey, req.body || {}); res.json({ ok: true, mapping }); } catch (error) { next(error); } });
 
-app.get('/api/estimating/schema/status', async (req, res, next) => { try { await ensureSchema(); const tables = await requireDatabase().query(`select table_name from information_schema.tables where table_schema = 'public' and (table_name in ('tenant_profiles', 'estimates', 'estimate_cost_lines', 'estimate_deposit_schedule', 'quotation_versions', 'quotation_lines', 'project_checklist_items', 'invoices', 'invoice_lines', 'schedule_of_values', 'change_orders', 'quote_workbooks', 'quote_workbook_sheets', 'quote_templates', 'quote_template_versions', 'quote_template_overrides', 'steelcraft_workflow_sources', 'erp_users', 'erp_password_reset_tokens', 'connect_threads', 'connect_messages', 'connect_route_packets', 'connect_action_packets') or table_name like 'accounting_%') order by table_name`); res.json({ ok: true, tables: tables.rows.map((row) => row.table_name) }); } catch (error) { next(error); } });
+app.get('/api/estimating/schema/status', async (req, res, next) => { try { await ensureSchema(); const tables = await requireDatabase().query(`select table_name from information_schema.tables where table_schema = 'public' and (table_name in ('tenant_profiles', 'tenant_import_mappings', 'tenant_workbook_uploads', 'tenant_workbook_sheets', 'tenant_monday_source_mappings', 'estimates', 'estimate_cost_lines', 'estimate_deposit_schedule', 'quotation_versions', 'quotation_lines', 'project_checklist_items', 'invoices', 'invoice_lines', 'schedule_of_values', 'change_orders', 'quote_workbooks', 'quote_workbook_sheets', 'quote_templates', 'quote_template_versions', 'quote_template_overrides', 'steelcraft_workflow_sources', 'erp_users', 'erp_password_reset_tokens', 'connect_threads', 'connect_messages', 'connect_route_packets', 'connect_action_packets') or table_name like 'accounting_%') order by table_name`); res.json({ ok: true, tables: tables.rows.map((row) => row.table_name) }); } catch (error) { next(error); } });
 app.post('/api/estimating/quote-workbooks', upload.single('workbook'), importProfileWorkbook);
 app.post('/api/profiles/:tenantKey/estimating/quote-workbooks', upload.single('workbook'), importProfileWorkbook);
-app.get('/api/estimating/quote-workbooks', async (req, res, next) => { try { await ensureSchema(); const profileKey = tenantKey(req); const workbooks = await requireDatabase().query(`select qw.id, qw.tenant_key, qw.original_filename, qw.file_size, qw.sheet_count, qw.detected_total, qw.status, qw.estimate_id, qw.created_at, e.project_name, qv.id as quotation_id, qv.total as quote_total from quote_workbooks qw left join estimates e on e.id = qw.estimate_id left join quotation_versions qv on qv.estimate_id = e.id where qw.tenant_key = $1 order by qw.created_at desc limit 20`, [profileKey]); res.json({ ok: true, tenantKey: profileKey, workbooks: workbooks.rows }); } catch (error) { next(error); } });
-app.get('/api/profiles/:tenantKey/estimating/quote-workbooks', async (req, res, next) => { req.query.tenantKey = req.params.tenantKey; return app._router.handle(req, res, next); });
+app.get('/api/estimating/quote-workbooks', listTenantWorkbooks);
+app.get('/api/profiles/:tenantKey/estimating/quote-workbooks', listTenantWorkbooks);
+app.get('/api/profiles/:tenantKey/workbook-uploads/:id', async (req, res, next) => { try { await ensureSchema(); const uploadRecord = await getProfileWorkbookUpload(requireDatabase(), tenantKey(req), req.params.id); if (!uploadRecord) return res.status(404).json({ ok: false, error: 'Workbook upload not found for this profile.' }); res.json({ ok: true, tenantKey: tenantKey(req), ...uploadRecord }); } catch (error) { next(error); } });
 app.get('/api/estimating/quote-workbooks/:id', async (req, res, next) => { try { await ensureSchema(); const db = requireDatabase(); const profileKey = tenantKey(req); const workbook = await db.query(`select * from quote_workbooks where id = $1 and tenant_key = $2`, [req.params.id, profileKey]); if (!workbook.rows[0]) return res.status(404).json({ ok: false, error: 'Quote workbook not found for this tenant profile.' }); const sheets = await db.query(`select sheet_name, row_count, column_count, detected_numbers, preview_rows from quote_workbook_sheets where workbook_id = $1 order by id`, [req.params.id]); const fields = await db.query(`select * from quote_workbook_metadata_fields where workbook_id = $1 order by id`, [req.params.id]); const ranges = await db.query(`select * from quote_workbook_metadata_ranges where workbook_id = $1 order by id`, [req.params.id]); const formulas = await db.query(`select * from quote_workbook_formulas where workbook_id = $1 order by sheet_name, cell_address`, [req.params.id]); const automations = await db.query(`select * from quote_workbook_automations where workbook_id = $1 order by id`, [req.params.id]); res.json({ ok: true, tenantKey: profileKey, workbook: workbook.rows[0], sheets: sheets.rows, fields: fields.rows, ranges: ranges.rows, formulas: formulas.rows, automations: automations.rows }); } catch (error) { next(error); } });
 app.post('/api/estimating/quote-workbooks/:id/create-template', async (req, res, next) => { try { await ensureSchema(); const db = requireDatabase(); const profileKey = tenantKey(req); const workbook = await db.query('select id from quote_workbooks where id = $1 and tenant_key = $2', [req.params.id, profileKey]); if (!workbook.rows[0]) return res.status(404).json({ ok: false, error: 'Quote workbook not found for this tenant profile.' }); const template = await createTemplateFromWorkbook(db, req.params.id, req.body.actor || 'estimating'); if (template.template?.id) await db.query('update quote_templates set tenant_key = $1, updated_at = now() where id = $2', [profileKey, template.template.id]); res.json({ ok: true, tenantKey: profileKey, ...template }); } catch (error) { next(error); } });
 app.get('/api/estimating/quote-templates', async (req, res, next) => { try { await ensureSchema(); const profileKey = tenantKey(req); const templates = await listTemplates(requireDatabase()); res.json({ ok: true, tenantKey: profileKey, templates: templates.filter((item) => (item.tenant_key || steelcraftProfileKey) === profileKey) }); } catch (error) { next(error); } });
@@ -224,12 +201,13 @@ registerComptrollerProductionDemoRoutes(app);
 registerNeroaConnectRoutes(app, requireDatabase, ensureSchema);
 
 app.get('/api/hr/schema/status', async (req, res, next) => { try { await ensureSchema(); const tables = await requireDatabase().query(`select table_name from information_schema.tables where table_schema = 'public' and table_name in ('employees', 'pto_policies', 'pto_balances', 'pto_requests', 'company_holidays', 'handbook_documents', 'handbook_acknowledgements', 'onboarding_checklists', 'onboarding_tasks', 'training_courses', 'training_lessons', 'employee_training_assignments') order by table_name`); res.json({ ok: true, tables: tables.rows.map((row) => row.table_name) }); } catch (error) { next(error); } });
-app.get('/api/monday/boards', async (req, res, next) => { try { const profileKey = tenantKey(req); requireSteelCraftProfile(profileKey); const data = await pullMondayBoards(); res.json({ ok: true, tenantKey: profileKey, boards: data.boards }); } catch (error) { next(error); } });
-app.get('/api/profiles/:tenantKey/monday/boards', async (req, res, next) => { try { const profileKey = tenantKey(req); requireSteelCraftProfile(profileKey); const data = await pullMondayBoards(); res.json({ ok: true, tenantKey: profileKey, boards: data.boards }); } catch (error) { next(error); } });
+app.get('/api/monday/boards', async (req, res, next) => { try { const profileKey = tenantKey(req); const data = await pullMondayBoards(profileKey); res.json({ ok: true, tenantKey: profileKey, boards: data.boards }); } catch (error) { next(error); } });
+app.get('/api/profiles/:tenantKey/monday/boards', async (req, res, next) => { try { const profileKey = tenantKey(req); const data = await pullMondayBoards(profileKey); res.json({ ok: true, tenantKey: profileKey, boards: data.boards }); } catch (error) { next(error); } });
 app.post('/api/monday/sync-boards', async (req, res, next) => { try { const profileKey = tenantKey(req); const boards = await syncMondayBoards(profileKey); res.json({ ok: true, tenantKey: profileKey, syncedBoards: boards.length }); } catch (error) { next(error); } });
 app.post('/api/profiles/:tenantKey/monday/sync-boards', async (req, res, next) => { try { const profileKey = tenantKey(req); const boards = await syncMondayBoards(profileKey); res.json({ ok: true, tenantKey: profileKey, syncedBoards: boards.length }); } catch (error) { next(error); } });
-app.get('/api/monday/migration/start', async (req, res, next) => { try { const profileKey = tenantKey(req); const boards = await syncMondayBoards(profileKey); res.json({ ok: true, tenantKey: profileKey, message: 'Steel Craft Monday source board and column structure synced only into the Steel Craft tenant profile.', syncedBoards: boards.length, next: 'Review /api/steelcraft/workflow/audit?save=true.' }); } catch (error) { next(error); } });
-app.get('/api/monday/migration/summary', async (req, res, next) => { try { await ensureSchema(); const profileKey = tenantKey(req); const boards = await pool.query(`select b.id, b.name, b.workspace_name, b.board_kind, b.state, b.pulled_at, count(c.id)::int as column_count from monday_boards b left join monday_columns c on c.board_id = b.id and c.tenant_key = b.tenant_key where b.tenant_key = $1 group by b.id order by lower(b.name)`, [profileKey]); res.json({ ok: true, tenantKey: profileKey, boards: boards.rows }); } catch (error) { next(error); } });
+app.get('/api/monday/migration/start', async (req, res, next) => { try { const profileKey = tenantKey(req); const boards = await syncMondayBoards(profileKey); res.json({ ok: true, tenantKey: profileKey, message: `${profileKey} Monday source board and column structure synced into its tenant profile.`, syncedBoards: boards.length, next: profileKey === steelcraftProfileKey ? 'Review /api/steelcraft/workflow/audit?save=true.' : 'Map boards in tenant_monday_source_mappings before enabling room automations.' }); } catch (error) { next(error); } });
+app.get('/api/monday/migration/summary', async (req, res, next) => { try { await ensureSchema(); const profileKey = tenantKey(req); const boards = await pool.query(`select b.id, b.name, b.workspace_name, b.board_kind, b.state, b.pulled_at, count(c.id)::int as column_count from monday_boards b left join monday_columns c on c.board_id = b.id and c.tenant_key = b.tenant_key where b.tenant_key = $1 group by b.id order by lower(b.name)`, [profileKey]); const mappings = await pool.query('select * from tenant_monday_source_mappings where tenant_key = $1 order by lower(board_name)', [profileKey]); res.json({ ok: true, tenantKey: profileKey, boards: boards.rows, mappings: mappings.rows }); } catch (error) { next(error); } });
+app.put('/api/profiles/:tenantKey/monday/mappings/:boardId', async (req, res, next) => { try { await ensureSchema(); const result = await requireDatabase().query(`update tenant_monday_source_mappings set destination_portal = $3, mapping_status = coalesce($4, mapping_status), column_profile = coalesce($5, column_profile), updated_at = now() where tenant_key = $1 and board_id = $2 returning *`, [tenantKey(req), req.params.boardId, req.body.destinationPortal || req.body.destination_portal || null, req.body.mappingStatus || req.body.mapping_status || null, req.body.columnProfile || req.body.column_profile || null]); if (!result.rows[0]) return res.status(404).json({ ok: false, error: 'Monday board mapping not found for this profile.' }); res.json({ ok: true, mapping: result.rows[0] }); } catch (error) { next(error); } });
 app.get('/api/steelcraft/workflow/audit', async (req, res, next) => { try { const mapped = await auditSteelCraftWorkflow({ save: req.query.save === 'true', profileKey: tenantKey(req) }); res.json(mapped); } catch (error) { next(error); } });
 app.get('/api/steelcraft/workflow/sources', async (req, res, next) => { try { await ensureSchema(); const profileKey = tenantKey(req); const result = await requireDatabase().query(`select id, tenant_key, source, source_board_id, internal_name, classification, destination, workflow_map, verification_checklist, pulled_at from steelcraft_workflow_sources where tenant_key = $1 order by internal_name`, [profileKey]); res.json({ ok: true, tenantKey: profileKey, sources: result.rows }); } catch (error) { next(error); } });
 app.get('/api/spaces/status', async (req, res, next) => { try { if (!process.env.DO_SPACES_KEY || !process.env.DO_SPACES_SECRET || !process.env.DO_SPACES_ENDPOINT) return res.json({ ok: false, configured: false }); const client = new S3Client({ endpoint: process.env.DO_SPACES_ENDPOINT, region: process.env.DO_SPACES_REGION || 'us-east-1', credentials: { accessKeyId: process.env.DO_SPACES_KEY, secretAccessKey: process.env.DO_SPACES_SECRET } }); await client.send(new ListBucketsCommand({})); res.json({ ok: true, configured: true, bucket: process.env.DO_SPACES_BUCKET || null }); } catch (error) { next(error); } });
