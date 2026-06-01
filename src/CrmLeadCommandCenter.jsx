@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import './crm.css';
 
 const customers = [
   {
