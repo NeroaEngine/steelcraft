@@ -1,11 +1,12 @@
 name: steelcraft-staging-lane-00-uiux
-static_sites:
-  - name: steelcraft-portal-preview
-    github:
-      repo: NeroaEngine/steelcraft
-      branch: staging-lane-00-uiux
-      deploy_on_push: true
-    build_command: npm run build
-    output_dir: dist
-    routes:
-      - path: /
+services:
+- name: steelcraft-portal-preview
+  github:
+    repo: NeroaEngine/steelcraft
+    branch: staging-lane-00-uiux
+    deploy_on_push: true
+  environment_slug: node-js
+  build_command: npm run build
+  run_command: node server.js
+  routes:
+  - path: /
