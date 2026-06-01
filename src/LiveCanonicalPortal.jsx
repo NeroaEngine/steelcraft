@@ -19,13 +19,13 @@ function Metric({ row }) {
 }
 
 function SimpleGrid({ title, rows }) {
-  return <div className="live-module-grid"><article className="live-module-card"><h3>{title}</h3><div className="live-module-list">{rows.map((row) => <div className="live-module-row" key={row[0]}><div><strong>{row[0]}</strong><span>{row[1]}</span></div><b>{row[2]}</b></div>)}</div></article></div>;
+  return <div className="live-module-grid crm-wide-grid"><article className="live-module-card crm-wide-card"><h3>{title}</h3><div className="live-module-list">{rows.map((row) => <div className="live-module-row" key={row[0]}><div><strong>{row[0]}</strong><span>{row[1]}</span></div><b>{row[2]}</b></div>)}</div></article></div>;
 }
 
 function CustomerList({ customers, activeId, setActiveId }) {
-  return <article className="live-module-card">
+  return <article className="live-module-card crm-list-card">
     <h3>Customer list</h3>
-    <div className="live-module-list">
+    <div className="live-module-list crm-customer-list">
       {customers.map((customer) => <div className="live-module-row live-module-row-action" key={customer.id}>
         <button type="button" onClick={() => setActiveId(customer.id)}>
           <strong>{customer.name}</strong>
@@ -50,13 +50,13 @@ function ContactsCrm({ Header, id }) {
 
   return <>
     {Header ? <Header id={id} /> : null}
-    <section className="live-module-shell canonical-force-live">
-      <article className="live-module-card">
+    <section className="live-module-shell canonical-force-live crm-room-shell">
+      <article className="live-module-card crm-hero-card">
         <p className="eyebrow">CRM</p>
         <h2>Contacts / CRM</h2>
         <p>Customer and contact list first. Lead inbox, timeline, inbound lead details, and AI communication tracking stay inside the dropdown below.</p>
-        <div className="live-module-actions">
-          <label style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="live-module-actions crm-detail-selector">
+          <label>
             <strong>Open CRM detail</strong>
             <select value={drawer} onChange={(event) => setDrawer(event.target.value)}>
               <option value="none">Customer list only</option>
@@ -70,7 +70,7 @@ function ContactsCrm({ Header, id }) {
         </div>
       </article>
 
-      <div className="live-module-grid">
+      <div className="live-module-grid crm-wide-grid">
         <CustomerList customers={customers} activeId={activeId} setActiveId={setActiveId} />
       </div>
 
