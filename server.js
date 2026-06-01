@@ -39,8 +39,24 @@ async function query(text, params = []) {
   return pool.query(text, params);
 }
 
+async function runStatements(sql) {
+  const statements = sql.split(';').map((statement) => statement.trim()).filter(Boolean);
+  for (const statement of statements) {
+    await query(statement);
+  }
+}
+
+function canExecuteWebsiteOptimizations(access = {}) {
+  return Boolean(
+    access.githubRepoConnected ||
+    access.cmsConnected ||
+    access.uploadedSiteFiles ||
+    access.domainOwnershipVerified
+  );
+}
+
 async function initHrSchema() {
-  await query(`
+  await runStatements(`
     CREATE TABLE IF NOT EXISTS employees (
       id SERIAL PRIMARY KEY,
       name TEXT NOT NULL,
@@ -125,6 +141,67 @@ async function initHrSchema() {
   `);
 }
 
+async function initCrmWebsiteSchema() {
+  await runStatements(`
+    CREATE TABLE IF NOT EXISTS crm_website_profiles (
+      id SERIAL PRIMARY KEY,
+      company_name TEXT NOT NULL DEFAULT '',
+      domain TEXT NOT NULL DEFAULT '',
+      website_url TEXT NOT NULL,
+      industry_guess TEXT NOT NULL DEFAULT '',
+      business_summary TEXT NOT NULL DEFAULT '',
+      service_summary TEXT NOT NULL DEFAULT '',
+      lead_score INTEGER NOT NULL DEFAULT 0,
+      seo_score INTEGER NOT NULL DEFAULT 0,
+      trust_score INTEGER NOT NULL DEFAULT 0,
+      conversion_score INTEGER NOT NULL DEFAULT 0,
+      crawl_status TEXT NOT NULL DEFAULT 'Not crawled',
+      last_crawled_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS crm_website_optimizer_access (
+      id SERIAL PRIMARY KEY,
+      website_profile_id INTEGER NOT NULL UNIQUE REFERENCES crm_website_profiles(id) ON DELETE CASCADE,
+      github_repo_connected BOOLEAN NOT NULL DEFAULT FALSE,
+      cms_connected BOOLEAN NOT NULL DEFAULT FALSE,
+      uploaded_site_files BOOLEAN NOT NULL DEFAULT FALSE,
+      domain_ownership_verified BOOLEAN NOT NULL DEFAULT FALSE,
+      verified_by_user_id INTEGER,
+      verified_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS crm_website_pages (
+      id SERIAL PRIMARY KEY,
+      website_profile_id INTEGER NOT NULL REFERENCES crm_website_profiles(id) ON DELETE CASCADE,
+      url TEXT NOT NULL,
+      page_type TEXT NOT NULL DEFAULT 'public',
+      title TEXT NOT NULL DEFAULT '',
+      meta_description TEXT NOT NULL DEFAULT '',
+      status_code INTEGER NOT NULL DEFAULT 0,
+      indexed_allowed BOOLEAN NOT NULL DEFAULT TRUE,
+      extracted_text_summary TEXT NOT NULL DEFAULT '',
+      detected_ctas TEXT[] NOT NULL DEFAULT '{}',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS crm_website_recommendations (
+      id SERIAL PRIMARY KEY,
+      website_profile_id INTEGER NOT NULL REFERENCES crm_website_profiles(id) ON DELETE CASCADE,
+      recommendation_type TEXT NOT NULL DEFAULT 'Recommendation',
+      title TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      requires_source_access BOOLEAN NOT NULL DEFAULT FALSE,
+      execution_status TEXT NOT NULL DEFAULT 'Recommendation-only',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+}
+
 async function seedHrData() {
   const employeeCount = await query('SELECT COUNT(*)::int AS count FROM employees');
   if (employeeCount.rows[0].count === 0) {
@@ -163,6 +240,50 @@ async function seedHrData() {
   }
 }
 
+async function seedCrmWebsiteData() {
+  const profileCount = await query('SELECT COUNT(*)::int AS count FROM crm_website_profiles');
+  if (profileCount.rows[0].count > 0) return;
+
+  const profile = await query(
+    `INSERT INTO crm_website_profiles (company_name, domain, website_url, industry_guess, business_summary, service_summary, lead_score, seo_score, trust_score, conversion_score, crawl_status, last_crawled_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW()) RETURNING id`,
+    [
+      'Prospect Company',
+      'example.com',
+      'https://example.com',
+      'Local services',
+      'Public website profile created for CRM lead intelligence.',
+      'Services, contact paths, public calls to action, metadata, schema, and trust signals are ready for review.',
+      78,
+      64,
+      72,
+      58,
+      'Public analysis ready',
+    ]
+  );
+  const profileId = profile.rows[0].id;
+
+  await query('INSERT INTO crm_website_optimizer_access (website_profile_id) VALUES ($1) ON CONFLICT DO NOTHING', [profileId]);
+  await query(
+    'INSERT INTO crm_website_pages (website_profile_id, url, page_type, title, meta_description, status_code, extracted_text_summary, detected_ctas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+    [profileId, 'https://example.com', 'homepage', 'Example Domain', 'Public website analysis placeholder', 200, 'Homepage can be analyzed publicly without repo access.', ['Contact', 'Request quote']]
+  );
+
+  const recommendations = [
+    ['Conversion', 'Improve homepage headline and primary call to action.', 'Visible as a recommendation without source access. Requires source access before execution.', true],
+    ['SEO', 'Add service-area pages for target markets.', 'Recommendation can be generated from public data. Page creation requires CMS/repo/files access.', true],
+    ['Schema', 'Add organization, local business, and service schema where appropriate.', 'Schema can be recommended publicly. Source changes require verified access.', true],
+    ['Trust', 'Strengthen contact path with phone, quote request, and form visibility.', 'Can be discussed in outreach before source access is granted.', false],
+  ];
+
+  for (const [type, title, description, requiresAccess] of recommendations) {
+    await query(
+      'INSERT INTO crm_website_recommendations (website_profile_id, recommendation_type, title, description, requires_source_access) VALUES ($1,$2,$3,$4,$5)',
+      [profileId, type, title, description, requiresAccess]
+    );
+  }
+}
+
 async function hrPayload() {
   const employees = rows(await query('SELECT * FROM employees ORDER BY id'));
   const ptoRequests = rows(await query('SELECT * FROM pto_requests ORDER BY created_at DESC, id DESC'));
@@ -187,6 +308,40 @@ async function hrPayload() {
   };
 }
 
+async function crmWebsitePayload() {
+  await initCrmWebsiteSchema();
+  await seedCrmWebsiteData();
+
+  const profiles = rows(await query('SELECT * FROM crm_website_profiles ORDER BY updated_at DESC, id DESC'));
+  const accessRows = rows(await query('SELECT * FROM crm_website_optimizer_access ORDER BY id'));
+  const pageRows = rows(await query('SELECT * FROM crm_website_pages ORDER BY id'));
+  const recommendationRows = rows(await query('SELECT * FROM crm_website_recommendations ORDER BY id'));
+
+  return profiles.map((profile) => {
+    const sourceAccess = accessRows.find((access) => access.websiteProfileId === profile.id) || {};
+    return {
+      ...profile,
+      sourceAccess,
+      canAnalyzeWebsite: true,
+      canRecommendOptimizations: true,
+      canExecuteOptimizations: canExecuteWebsiteOptimizations(sourceAccess),
+      pages: pageRows.filter((page) => page.websiteProfileId === profile.id),
+      recommendations: recommendationRows.filter((recommendation) => recommendation.websiteProfileId === profile.id),
+    };
+  });
+}
+
+async function crmWebsiteProfileWithAccess(profileId) {
+  const profile = toCamel((await query('SELECT * FROM crm_website_profiles WHERE id = $1', [profileId])).rows[0]);
+  if (!profile) return null;
+  const sourceAccess = toCamel((await query('SELECT * FROM crm_website_optimizer_access WHERE website_profile_id = $1', [profileId])).rows[0]) || {};
+  return {
+    ...profile,
+    sourceAccess,
+    canExecuteOptimizations: canExecuteWebsiteOptimizations(sourceAccess),
+  };
+}
+
 app.get('/api/health', async (_req, res) => {
   try {
     await query('SELECT 1');
@@ -199,8 +354,10 @@ app.get('/api/health', async (_req, res) => {
 app.post('/api/setup/schema', async (_req, res) => {
   try {
     await initHrSchema();
+    await initCrmWebsiteSchema();
     await seedHrData();
-    res.json({ ok: true, message: 'HR schema initialized and seeded' });
+    await seedCrmWebsiteData();
+    res.json({ ok: true, message: 'HR and CRM Website Intelligence schemas initialized and seeded' });
   } catch (error) {
     res.status(500).json({ ok: false, error: error.message });
   }
@@ -212,6 +369,20 @@ app.get('/api/hr/schema/status', async (_req, res) => {
       SELECT table_name FROM information_schema.tables
       WHERE table_schema = 'public'
       AND table_name IN ('employees','pto_requests','hr_support_requests','handbook_documents','handbook_acknowledgements','training_courses','training_lessons','employee_training_assignments')
+      ORDER BY table_name
+    `);
+    res.json({ ok: true, tables: result.rows.map((row) => row.table_name) });
+  } catch (error) {
+    res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.get('/api/crm/website-intelligence/schema/status', async (_req, res) => {
+  try {
+    const result = await query(`
+      SELECT table_name FROM information_schema.tables
+      WHERE table_schema = 'public'
+      AND table_name IN ('crm_website_profiles','crm_website_optimizer_access','crm_website_pages','crm_website_recommendations')
       ORDER BY table_name
     `);
     res.json({ ok: true, tables: result.rows.map((row) => row.table_name) });
@@ -323,6 +494,85 @@ app.patch('/api/hr/training/assignments/:courseId/complete', async (req, res) =>
     await query('UPDATE employee_training_assignments SET completed_at = NOW() WHERE course_id = $1 AND employee_id = $2', [req.params.courseId, req.body.employeeId]);
     res.json({ ok: true });
   } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+app.get('/api/crm/website-intelligence', async (_req, res) => {
+  try {
+    res.json(await crmWebsitePayload());
+  } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
+});
+
+app.post('/api/crm/website-intelligence/crawl', async (req, res) => {
+  try {
+    await initCrmWebsiteSchema();
+    const { companyName = 'New prospect', websiteUrl } = req.body;
+    if (!websiteUrl) return res.status(400).json({ ok: false, error: 'websiteUrl is required' });
+    const domain = String(websiteUrl).replace(/^https?:\/\//, '').replace(/\/.*$/, '').toLowerCase();
+    const profile = await query(
+      `INSERT INTO crm_website_profiles (company_name, domain, website_url, industry_guess, business_summary, service_summary, lead_score, seo_score, trust_score, conversion_score, crawl_status, last_crawled_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW()) RETURNING *`,
+      [companyName, domain, websiteUrl, 'Pending AI classification', 'Public website crawl queued for CRM lead intelligence.', 'Public services and CTA analysis pending.', 0, 0, 0, 0, 'Public crawl queued']
+    );
+    const profileId = profile.rows[0].id;
+    await query('INSERT INTO crm_website_optimizer_access (website_profile_id) VALUES ($1) ON CONFLICT DO NOTHING', [profileId]);
+    await query('INSERT INTO crm_website_recommendations (website_profile_id, recommendation_type, title, description, requires_source_access) VALUES ($1,$2,$3,$4,$5)', [profileId, 'Access', 'Optimizer remains locked until source access is verified.', 'Public analysis and recommendations are allowed, but execution requires repo, CMS, uploaded files, or verified domain ownership.', true]);
+    res.status(201).json(await crmWebsiteProfileWithAccess(profileId));
+  } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
+});
+
+app.patch('/api/crm/website-intelligence/:id/access', async (req, res) => {
+  try {
+    await initCrmWebsiteSchema();
+    const profileId = req.params.id;
+    const {
+      githubRepoConnected = false,
+      cmsConnected = false,
+      uploadedSiteFiles = false,
+      domainOwnershipVerified = false,
+      verifiedByUserId = null,
+    } = req.body;
+
+    const result = await query(
+      `INSERT INTO crm_website_optimizer_access (website_profile_id, github_repo_connected, cms_connected, uploaded_site_files, domain_ownership_verified, verified_by_user_id, verified_at)
+       VALUES ($1,$2,$3,$4,$5,$6, CASE WHEN ($2 OR $3 OR $4 OR $5) THEN NOW() ELSE NULL END)
+       ON CONFLICT (website_profile_id) DO UPDATE SET
+         github_repo_connected = EXCLUDED.github_repo_connected,
+         cms_connected = EXCLUDED.cms_connected,
+         uploaded_site_files = EXCLUDED.uploaded_site_files,
+         domain_ownership_verified = EXCLUDED.domain_ownership_verified,
+         verified_by_user_id = EXCLUDED.verified_by_user_id,
+         verified_at = EXCLUDED.verified_at,
+         updated_at = NOW()
+       RETURNING *`,
+      [profileId, githubRepoConnected, cmsConnected, uploadedSiteFiles, domainOwnershipVerified, verifiedByUserId]
+    );
+
+    const access = toCamel(result.rows[0]);
+    res.json({ ok: true, sourceAccess: access, canExecuteOptimizations: canExecuteWebsiteOptimizations(access) });
+  } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
+});
+
+app.post('/api/crm/website-intelligence/:id/optimizer/execute', async (req, res) => {
+  try {
+    await initCrmWebsiteSchema();
+    const profile = await crmWebsiteProfileWithAccess(req.params.id);
+    if (!profile) return res.status(404).json({ ok: false, error: 'Website profile not found' });
+    if (!profile.canExecuteOptimizations) {
+      return res.status(403).json({
+        ok: false,
+        error: 'Optimizer locked: verified source access is required before execution.',
+        allowedWithoutAccess: ['crawl public pages', 'score website', 'generate recommendations', 'generate outreach'],
+        requiredAccess: ['connected GitHub repo', 'connected CMS', 'uploaded site files', 'verified domain ownership'],
+      });
+    }
+
+    const { title = 'Optimizer execution task', description = 'Execution approved by verified source access.' } = req.body;
+    const task = await query(
+      'INSERT INTO crm_website_recommendations (website_profile_id, recommendation_type, title, description, requires_source_access, execution_status) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
+      [profile.id, 'Execution', title, description, true, 'Ready for approval']
+    );
+    res.status(201).json({ ok: true, task: toCamel(task.rows[0]) });
+  } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
 });
 
 app.use(express.static(path.join(__dirname, 'dist')));
