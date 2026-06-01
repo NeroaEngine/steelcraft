@@ -17,24 +17,50 @@ const customers = [
 
 const crmTools = ['Lead Inbox', 'Timeline', 'Inbound Leads', 'AI Communication', 'Website Intelligence', 'Website Optimizer', 'CRM Audit', 'Handoffs', 'Master Records'];
 
+const saasButton = {
+  border: '0',
+  borderRadius: 14,
+  padding: '12px 16px',
+  background: 'linear-gradient(135deg, var(--brand-accent), #c95d63)',
+  color: 'white',
+  fontWeight: 900,
+  boxShadow: '0 12px 28px rgba(0,0,0,.28)'
+};
+
+const ghostButton = {
+  border: '1px solid var(--line)',
+  borderRadius: 14,
+  padding: '12px 16px',
+  background: 'rgba(255,255,255,.06)',
+  color: 'var(--text)',
+  fontWeight: 900
+};
+
 const crmStyles = {
-  shell: { width: 'min(1460px, 100%)', margin: '0 auto', display: 'grid', gap: 18 },
-  hero: { display: 'grid', gridTemplateColumns: '1fr auto', gap: 18, alignItems: 'end', padding: 30 },
-  heroTitle: { fontSize: 'clamp(42px, 5vw, 70px)', lineHeight: .92, margin: '10px 0 8px', letterSpacing: '-0.06em' },
-  toolbar: { display: 'grid', gridTemplateColumns: 'minmax(260px, 1fr) auto auto', gap: 10, alignItems: 'center' },
-  summary: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 14 },
-  stat: { padding: 20 },
-  layout: { display: 'grid', gridTemplateColumns: 'minmax(0, 1.55fr) minmax(420px, .75fr)', gap: 18, alignItems: 'start' },
-  card: { padding: 24 },
+  shell: { width: 'min(1320px, 100%)', margin: '0 auto', display: 'grid', gap: 18, justifyItems: 'center' },
+  listCard: { width: 'min(1180px, calc(100vw - 90px))', padding: 30, margin: '0 auto' },
+  listHeader: { display: 'grid', gridTemplateColumns: '1fr auto', gap: 18, alignItems: 'start', marginBottom: 20 },
+  title: { fontSize: 'clamp(34px, 4vw, 54px)', lineHeight: .95, margin: '8px 0', letterSpacing: '-0.05em' },
+  subText: { color: 'var(--muted)', margin: 0, lineHeight: 1.55 },
+  headerRight: { display: 'grid', gap: 12, justifyItems: 'end' },
+  chips: { display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 10 },
+  chip: { border: '1px solid var(--line)', borderRadius: 18, padding: '10px 14px', background: 'rgba(255,255,255,.04)', minWidth: 96 },
+  chipLabel: { display: 'block', color: 'var(--muted)', fontSize: 11, letterSpacing: '.08em', textTransform: 'uppercase', fontWeight: 900 },
+  chipValue: { display: 'block', fontSize: 26, fontWeight: 950, marginTop: 4 },
+  actions: { display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap' },
+  search: { width: 330, maxWidth: '100%' },
+  tools: { display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end', marginBottom: 18 },
   table: { display: 'grid', gap: 10, overflowX: 'auto' },
-  row: { minWidth: 1040, display: 'grid', gridTemplateColumns: '1.35fr 1fr .9fr .8fr .9fr 1.2fr .8fr .45fr', gap: 12, alignItems: 'center', textAlign: 'left' },
-  head: { color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.08em', fontSize: 12, fontWeight: 900, padding: '0 12px' },
-  dataRow: { width: '100%', border: '1px solid var(--line)', borderRadius: 18, background: 'var(--surface-alt)', color: 'var(--text)', padding: 16 },
-  selected: { borderColor: 'var(--brand-accent)', boxShadow: 'inset 5px 0 0 var(--brand-accent)' },
-  form: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 14 },
+  row: { minWidth: 1040, display: 'grid', gridTemplateColumns: '1.4fr 1fr .9fr .8fr .9fr 1.1fr .8fr .45fr', gap: 14, alignItems: 'center', textAlign: 'left' },
+  head: { color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.08em', fontSize: 12, fontWeight: 900, padding: '0 14px' },
+  dataRow: { width: '100%', border: '1px solid var(--line)', borderRadius: 18, background: 'var(--surface-alt)', color: 'var(--text)', padding: 18, boxShadow: '0 14px 34px rgba(0,0,0,.16)' },
+  overlay: { position: 'fixed', inset: 0, zIndex: 40, display: 'grid', placeItems: 'start center', padding: '110px 24px 40px', background: 'rgba(0,0,0,.54)', backdropFilter: 'blur(6px)' },
+  record: { width: 'min(1040px, calc(100vw - 80px))', padding: 34, borderRadius: 28, boxShadow: '0 28px 90px rgba(0,0,0,.55)' },
+  recordHeader: { display: 'flex', justifyContent: 'space-between', gap: 18, alignItems: 'start', marginBottom: 20 },
+  recordTitle: { fontSize: 'clamp(30px, 4vw, 48px)', lineHeight: 1, margin: '8px 0', letterSpacing: '-0.05em' },
+  form: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 },
   full: { gridColumn: '1 / -1' },
-  actions: { display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 18, flexWrap: 'wrap' },
-  tools: { display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 16, gridColumn: '1 / -1' }
+  recordActions: { display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, flexWrap: 'wrap' }
 };
 
 function Metric({ row }) {
@@ -50,10 +76,10 @@ function Field({ label, children, full = false }) {
 }
 
 function ContactsCrm({ Header, id }) {
-  const [activeId, setActiveId] = useState(1);
+  const [activeId, setActiveId] = useState(null);
   const [query, setQuery] = useState('');
   const [showTools, setShowTools] = useState(false);
-  const active = customers.find((customer) => customer.id === activeId) || customers[0];
+  const active = customers.find((customer) => customer.id === activeId) || null;
   const filtered = useMemo(() => {
     const clean = query.trim().toLowerCase();
     if (!clean) return customers;
@@ -63,57 +89,63 @@ function ContactsCrm({ Header, id }) {
   return <>
     {Header ? <Header id={id} /> : null}
     <section className="live-module-shell canonical-force-live" style={crmStyles.shell}>
-      <article className="live-module-card" style={crmStyles.hero}>
-        <div>
-          <p className="eyebrow">CRM</p>
-          <h2 style={crmStyles.heroTitle}>Customers</h2>
-          <p>Company records, contacts, account ownership, activity, value, and customer notes.</p>
+      <article className="live-module-card" style={crmStyles.listCard}>
+        <div style={crmStyles.listHeader}>
+          <div>
+            <p className="eyebrow">CRM</p>
+            <h2 style={crmStyles.title}>Customer List</h2>
+            <p style={crmStyles.subText}>Search, open, and manage customer records from one clean customer database.</p>
+          </div>
+          <div style={crmStyles.headerRight}>
+            <div style={crmStyles.chips}>
+              <div style={crmStyles.chip}><span style={crmStyles.chipLabel}>Total customers</span><strong style={crmStyles.chipValue}>280</strong></div>
+              <div style={crmStyles.chip}><span style={crmStyles.chipLabel}>Needs review</span><strong style={crmStyles.chipValue}>1</strong></div>
+            </div>
+            <div style={crmStyles.actions}>
+              <input style={crmStyles.search} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search customers..." aria-label="Search customers" />
+              <button type="button" style={saasButton}>Add Customer</button>
+              <button type="button" style={ghostButton} onClick={() => setShowTools((value) => !value)}>More</button>
+            </div>
+          </div>
         </div>
-        <div style={crmStyles.toolbar}>
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search customers, contacts, email, status..." aria-label="Search customers" />
-          <button type="button">Add Customer</button>
-          <button type="button" onClick={() => setShowTools((value) => !value)}>More</button>
-        </div>
-        {showTools && <div style={crmStyles.tools}>{crmTools.map((tool) => <button type="button" key={tool}>{tool}</button>)}</div>}
-      </article>
 
-      <div style={crmStyles.summary}>
-        <article className="live-module-card" style={crmStyles.stat}><span>Total customers</span><h3>{customers.length}</h3></article>
-        <article className="live-module-card" style={crmStyles.stat}><span>Active accounts</span><h3>{customers.filter((customer) => customer.status === 'Active').length}</h3></article>
-        <article className="live-module-card" style={crmStyles.stat}><span>Open value</span><h3>$289.7k</h3></article>
-        <article className="live-module-card" style={crmStyles.stat}><span>Needs review</span><h3>1</h3></article>
-      </div>
+        {showTools && <div style={crmStyles.tools}>{crmTools.map((tool) => <button type="button" style={ghostButton} key={tool}>{tool}</button>)}</div>}
 
-      <div style={crmStyles.layout}>
-        <article className="live-module-card" style={crmStyles.card}>
-          <div className="module-head"><h3>Customer List</h3><span>{filtered.length} shown</span></div>
-          <div style={crmStyles.table}>
-            <div style={{ ...crmStyles.row, ...crmStyles.head }}><span>Company</span><span>Contact</span><span>Type</span><span>Status</span><span>Owner</span><span>Last Activity</span><span>Value</span><span></span></div>
-            {filtered.map((customer) => <button type="button" key={customer.id} onClick={() => setActiveId(customer.id)} style={{ ...crmStyles.row, ...crmStyles.dataRow, ...(active.id === customer.id ? crmStyles.selected : {}) }}>
+        <div style={crmStyles.table}>
+          <div style={{ ...crmStyles.row, ...crmStyles.head }}><span>Company</span><span>Contact</span><span>Type</span><span>Status</span><span>Owner</span><span>Last Activity</span><span>Value</span><span></span></div>
+          {filtered.map((customer) => <button type="button" key={customer.id} onClick={() => setActiveId(customer.id)} style={crmStyles.dataRow}>
+            <div style={crmStyles.row}>
               <strong>{customer.company}</strong><span>{customer.contact}</span><span>{customer.type}</span><b>{customer.status}</b><span>{customer.owner}</span><span>{customer.activity}</span><strong>{customer.value}</strong><b>Open</b>
-            </button>)}
-          </div>
-        </article>
-
-        <aside className="live-module-card" style={crmStyles.card}>
-          <p className="eyebrow">Customer Record</p>
-          <h3>{active.company}</h3>
-          <p>{active.notes}</p>
-          <div style={crmStyles.form}>
-            <Field label="Company"><input value={active.company} readOnly /></Field>
-            <Field label="Primary Contact"><input value={active.contact} readOnly /></Field>
-            <Field label="Customer Type"><input value={active.type} readOnly /></Field>
-            <Field label="Owner"><input value={active.owner} readOnly /></Field>
-            <Field label="Phone"><input value={active.phone} readOnly /></Field>
-            <Field label="Email"><input value={active.email} readOnly /></Field>
-            <Field label="Location"><input value={active.location} readOnly /></Field>
-            <Field label="Open Value"><input value={active.value} readOnly /></Field>
-            <Field label="Notes" full><textarea rows="4" value={active.notes} readOnly /></Field>
-          </div>
-          <div style={crmStyles.actions}><button type="button">Edit Record</button><button type="button">Save</button></div>
-        </aside>
-      </div>
+            </div>
+          </button>)}
+        </div>
+      </article>
     </section>
+
+    {active && <div style={crmStyles.overlay} onClick={() => setActiveId(null)}>
+      <aside className="live-module-card" style={crmStyles.record} onClick={(event) => event.stopPropagation()}>
+        <div style={crmStyles.recordHeader}>
+          <div>
+            <p className="eyebrow">Customer Record</p>
+            <h3 style={crmStyles.recordTitle}>{active.company}</h3>
+            <p>{active.notes}</p>
+          </div>
+          <button type="button" style={ghostButton} onClick={() => setActiveId(null)}>Close</button>
+        </div>
+        <div style={crmStyles.form}>
+          <Field label="Company"><input value={active.company} readOnly /></Field>
+          <Field label="Primary Contact"><input value={active.contact} readOnly /></Field>
+          <Field label="Customer Type"><input value={active.type} readOnly /></Field>
+          <Field label="Owner"><input value={active.owner} readOnly /></Field>
+          <Field label="Phone"><input value={active.phone} readOnly /></Field>
+          <Field label="Email"><input value={active.email} readOnly /></Field>
+          <Field label="Location"><input value={active.location} readOnly /></Field>
+          <Field label="Open Value"><input value={active.value} readOnly /></Field>
+          <Field label="Notes" full><textarea rows="4" value={active.notes} readOnly /></Field>
+        </div>
+        <div style={crmStyles.recordActions}><button type="button" style={ghostButton}>Edit Record</button><button type="button" style={saasButton}>Save</button></div>
+      </aside>
+    </div>}
   </>;
 }
 
