@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 
 const genericModules = {
   admin: { title: 'Admin', intro: 'Tenant controls, users, roles, portal access, setup, security, and audit controls.', metrics: [['Users', '6', 'Authenticated roles'], ['Portals', '12', 'Enabled'], ['Setup', 'Open', 'Guided setup'], ['Audit', 'Ready', 'Proof events']] },
@@ -9,10 +9,33 @@ const genericModules = {
 };
 
 const customers = [
-  { id: 1, name: 'Customer A', company: 'Zillow lead', source: 'Zillow', status: 'Hot Lead', lastEvent: 'SMS reply received', owner: 'Sales Team', next: 'Call back now', score: 92, timeline: ['Lead email received', 'Lead parsed', 'Call attempted', 'SMS delivered', 'SMS reply received', 'AI moved lead to Hot Lead'] },
-  { id: 2, name: 'Customer B', company: 'Realtor.com lead', source: 'Realtor.com', status: 'Opened Message', lastEvent: 'Email opened', owner: 'Sales Team', next: 'Send follow-up text', score: 74, timeline: ['Lead email received', 'Lead parsed', 'Call attempted', 'SMS delivered', 'Tracked email sent', 'Email opened'] },
-  { id: 3, name: 'Customer C', company: 'Website form lead', source: 'Website Form', status: 'Needs Review', lastEvent: 'Missing phone', owner: 'Unassigned', next: 'Review missing phone number', score: 38, timeline: ['Website form received', 'Email captured', 'Tracked email queued', 'AI routed to manual review'] }
+  { id: 1, company: 'Acme Steel Supply', contact: 'Jordan Miles', type: 'Customer', phone: '(555) 014-1188', email: 'jordan@acmesteel.com', status: 'Active', owner: 'Sales Team', activity: 'Quote updated today', value: '$84,200', location: 'Pittsburgh, PA', notes: 'Structural steel supply and fabrication support for commercial projects.' },
+  { id: 2, company: 'North Ridge Builders', contact: 'Taylor Grant', type: 'General Contractor', phone: '(555) 018-4472', email: 'taylor@northridgebuilders.com', status: 'Prospect', owner: 'Estimating', activity: 'Bid request received', value: '$142,000', location: 'Cleveland, OH', notes: 'Commercial construction projects and subcontractor coordination.' },
+  { id: 3, company: 'Summit Industrial', contact: 'Morgan Lee', type: 'Industrial Client', phone: '(555) 016-9090', email: 'morgan@summitindustrial.com', status: 'Active', owner: 'Operations', activity: 'Maintenance scope reviewed', value: '$63,500', location: 'Columbus, OH', notes: 'Plant maintenance, platforms, rails, and miscellaneous metals.' },
+  { id: 4, company: 'Keystone Fabrication Group', contact: 'Riley Carter', type: 'Partner', phone: '(555) 011-5528', email: 'riley@keystonefab.com', status: 'On Hold', owner: 'Admin', activity: 'Insurance document pending', value: '$0', location: 'Youngstown, OH', notes: 'Partner record requires paperwork review before new work is assigned.' }
 ];
+
+const crmTools = ['Lead Inbox', 'Timeline', 'Inbound Leads', 'AI Communication', 'Website Intelligence', 'Website Optimizer', 'CRM Audit', 'Handoffs', 'Master Records'];
+
+const crmStyles = {
+  shell: { width: 'min(1460px, 100%)', margin: '0 auto', display: 'grid', gap: 18 },
+  hero: { display: 'grid', gridTemplateColumns: '1fr auto', gap: 18, alignItems: 'end', padding: 30 },
+  heroTitle: { fontSize: 'clamp(42px, 5vw, 70px)', lineHeight: .92, margin: '10px 0 8px', letterSpacing: '-0.06em' },
+  toolbar: { display: 'grid', gridTemplateColumns: 'minmax(260px, 1fr) auto auto', gap: 10, alignItems: 'center' },
+  summary: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 14 },
+  stat: { padding: 20 },
+  layout: { display: 'grid', gridTemplateColumns: 'minmax(0, 1.55fr) minmax(420px, .75fr)', gap: 18, alignItems: 'start' },
+  card: { padding: 24 },
+  table: { display: 'grid', gap: 10, overflowX: 'auto' },
+  row: { minWidth: 1040, display: 'grid', gridTemplateColumns: '1.35fr 1fr .9fr .8fr .9fr 1.2fr .8fr .45fr', gap: 12, alignItems: 'center', textAlign: 'left' },
+  head: { color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.08em', fontSize: 12, fontWeight: 900, padding: '0 12px' },
+  dataRow: { width: '100%', border: '1px solid var(--line)', borderRadius: 18, background: 'var(--surface-alt)', color: 'var(--text)', padding: 16 },
+  selected: { borderColor: 'var(--brand-accent)', boxShadow: 'inset 5px 0 0 var(--brand-accent)' },
+  form: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 14 },
+  full: { gridColumn: '1 / -1' },
+  actions: { display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 18, flexWrap: 'wrap' },
+  tools: { display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 16, gridColumn: '1 / -1' }
+};
 
 function Metric({ row }) {
   return <div className="live-module-metric"><strong>{row[0]}</strong><b>{row[1]}</b><span>{row[2]}</span></div>;
@@ -22,63 +45,74 @@ function SimpleGrid({ title, rows }) {
   return <div className="live-module-grid crm-wide-grid"><article className="live-module-card crm-wide-card"><h3>{title}</h3><div className="live-module-list">{rows.map((row) => <div className="live-module-row" key={row[0]}><div><strong>{row[0]}</strong><span>{row[1]}</span></div><b>{row[2]}</b></div>)}</div></article></div>;
 }
 
-function CustomerList({ customers, activeId, setActiveId }) {
-  return <article className="live-module-card crm-list-card">
-    <h3>Customer list</h3>
-    <div className="live-module-list crm-customer-list">
-      {customers.map((customer) => <div className="live-module-row live-module-row-action" key={customer.id}>
-        <button type="button" onClick={() => setActiveId(customer.id)}>
-          <strong>{customer.name}</strong>
-          <span>{customer.company} - {customer.source} - {customer.owner}</span>
-        </button>
-        <b>{customer.status}</b>
-        <div className="live-row-actions">
-          <button type="button" onClick={() => setActiveId(customer.id)}>Open</button>
-          <button type="button" onClick={() => setActiveId(customer.id)}>Call</button>
-          <button type="button" onClick={() => setActiveId(customer.id)}>Text</button>
-          <button type="button" onClick={() => setActiveId(customer.id)}>Route</button>
-        </div>
-      </div>)}
-    </div>
-  </article>;
+function Field({ label, children, full = false }) {
+  return <label style={full ? crmStyles.full : undefined}><span>{label}</span>{children}</label>;
 }
 
 function ContactsCrm({ Header, id }) {
   const [activeId, setActiveId] = useState(1);
-  const [drawer, setDrawer] = useState('none');
+  const [query, setQuery] = useState('');
+  const [showTools, setShowTools] = useState(false);
   const active = customers.find((customer) => customer.id === activeId) || customers[0];
+  const filtered = useMemo(() => {
+    const clean = query.trim().toLowerCase();
+    if (!clean) return customers;
+    return customers.filter((customer) => [customer.company, customer.contact, customer.type, customer.phone, customer.email, customer.status, customer.owner, customer.location].some((value) => value.toLowerCase().includes(clean)));
+  }, [query]);
 
   return <>
     {Header ? <Header id={id} /> : null}
-    <section className="live-module-shell canonical-force-live crm-room-shell">
-      <article className="live-module-card crm-hero-card">
-        <p className="eyebrow">CRM</p>
-        <h2>Contacts / CRM</h2>
-        <p>Customer and contact list first. Lead inbox, timeline, inbound lead details, and AI communication tracking stay inside the dropdown below.</p>
-        <div className="live-module-actions crm-detail-selector">
-          <label>
-            <strong>Open CRM detail</strong>
-            <select value={drawer} onChange={(event) => setDrawer(event.target.value)}>
-              <option value="none">Customer list only</option>
-              <option value="leadInbox">Lead inbox</option>
-              <option value="inboundLead">Selected inbound lead</option>
-              <option value="timeline">Lead timeline</option>
-              <option value="ai">AI and communication tracking</option>
-              <option value="settings">CRM settings</option>
-            </select>
-          </label>
+    <section className="live-module-shell canonical-force-live" style={crmStyles.shell}>
+      <article className="live-module-card" style={crmStyles.hero}>
+        <div>
+          <p className="eyebrow">CRM</p>
+          <h2 style={crmStyles.heroTitle}>Customers</h2>
+          <p>Company records, contacts, account ownership, activity, value, and customer notes.</p>
         </div>
+        <div style={crmStyles.toolbar}>
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search customers, contacts, email, status..." aria-label="Search customers" />
+          <button type="button">Add Customer</button>
+          <button type="button" onClick={() => setShowTools((value) => !value)}>More</button>
+        </div>
+        {showTools && <div style={crmStyles.tools}>{crmTools.map((tool) => <button type="button" key={tool}>{tool}</button>)}</div>}
       </article>
 
-      <div className="live-module-grid crm-wide-grid">
-        <CustomerList customers={customers} activeId={activeId} setActiveId={setActiveId} />
+      <div style={crmStyles.summary}>
+        <article className="live-module-card" style={crmStyles.stat}><span>Total customers</span><h3>{customers.length}</h3></article>
+        <article className="live-module-card" style={crmStyles.stat}><span>Active accounts</span><h3>{customers.filter((customer) => customer.status === 'Active').length}</h3></article>
+        <article className="live-module-card" style={crmStyles.stat}><span>Open value</span><h3>$289.7k</h3></article>
+        <article className="live-module-card" style={crmStyles.stat}><span>Needs review</span><h3>1</h3></article>
       </div>
 
-      {drawer === 'leadInbox' && <SimpleGrid title="Lead inbox" rows={customers.map((customer) => [customer.company, `${customer.source} - ${customer.lastEvent}`, customer.status])} />}
-      {drawer === 'inboundLead' && <SimpleGrid title={`Selected inbound lead: ${active.name}`} rows={[[active.company, `${active.source} - ${active.lastEvent}`, active.status], ['Lead score', String(active.score), 'AI priority'], ['Next action', active.next, 'Recommended'], ['Owner', active.owner, 'Assigned']]} />}
-      {drawer === 'timeline' && <SimpleGrid title={`Lead timeline: ${active.name}`} rows={active.timeline.map((event, index) => [`Step ${index + 1}`, event, 'Tracked'])} />}
-      {drawer === 'ai' && <SimpleGrid title="AI and communication tracking" rows={[['AI summary', `${active.source} lead is in ${active.status}. Latest engagement: ${active.lastEvent}.`, 'Visible'], ['Next action', active.next, 'Recommended'], ['Email tracking', 'Tracks opens and clicks when sent by the system.', 'Tracked'], ['SMS tracking', 'Tracks sent, delivered, failed, replies, and tracked links.', 'Tracked']]} />}
-      {drawer === 'settings' && <SimpleGrid title="CRM settings" rows={[['Lead inboxes', 'Configure inbound lead sources.', 'Admin'], ['Communication settings', 'Configure calls, texts, callbacks, and replies.', 'Admin'], ['Email tracking', 'Configure opens, clicks, and bounces.', 'Admin'], ['Schema fields', 'Define contacts, companies, sources, and lead fields.', 'Admin'], ['Merge rules', 'Duplicate detection and canonical contact rules.', 'Admin'], ['Audit requirements', 'Proof, handoffs, and approvals live here.', 'Admin']]} />}
+      <div style={crmStyles.layout}>
+        <article className="live-module-card" style={crmStyles.card}>
+          <div className="module-head"><h3>Customer List</h3><span>{filtered.length} shown</span></div>
+          <div style={crmStyles.table}>
+            <div style={{ ...crmStyles.row, ...crmStyles.head }}><span>Company</span><span>Contact</span><span>Type</span><span>Status</span><span>Owner</span><span>Last Activity</span><span>Value</span><span></span></div>
+            {filtered.map((customer) => <button type="button" key={customer.id} onClick={() => setActiveId(customer.id)} style={{ ...crmStyles.row, ...crmStyles.dataRow, ...(active.id === customer.id ? crmStyles.selected : {}) }}>
+              <strong>{customer.company}</strong><span>{customer.contact}</span><span>{customer.type}</span><b>{customer.status}</b><span>{customer.owner}</span><span>{customer.activity}</span><strong>{customer.value}</strong><b>Open</b>
+            </button>)}
+          </div>
+        </article>
+
+        <aside className="live-module-card" style={crmStyles.card}>
+          <p className="eyebrow">Customer Record</p>
+          <h3>{active.company}</h3>
+          <p>{active.notes}</p>
+          <div style={crmStyles.form}>
+            <Field label="Company"><input value={active.company} readOnly /></Field>
+            <Field label="Primary Contact"><input value={active.contact} readOnly /></Field>
+            <Field label="Customer Type"><input value={active.type} readOnly /></Field>
+            <Field label="Owner"><input value={active.owner} readOnly /></Field>
+            <Field label="Phone"><input value={active.phone} readOnly /></Field>
+            <Field label="Email"><input value={active.email} readOnly /></Field>
+            <Field label="Location"><input value={active.location} readOnly /></Field>
+            <Field label="Open Value"><input value={active.value} readOnly /></Field>
+            <Field label="Notes" full><textarea rows="4" value={active.notes} readOnly /></Field>
+          </div>
+          <div style={crmStyles.actions}><button type="button">Edit Record</button><button type="button">Save</button></div>
+        </aside>
+      </div>
     </section>
   </>;
 }
