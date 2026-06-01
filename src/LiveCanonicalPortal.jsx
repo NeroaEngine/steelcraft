@@ -8,10 +8,10 @@ const genericModules = {
   employee: { title: 'Employee Self-Service', intro: 'Employee profile, PTO requests, handbook acknowledgements, training assignments, documents, and HR help.', metrics: [['Training', '4 due', 'Assignments'], ['PTO', '2', 'Pending'], ['Docs', '12', 'Files'], ['Help', 'Live', 'Support']] }
 };
 
-const crmLeads = [
-  { id: 1, label: 'Inbound lead A', stage: 'Hot Lead', source: 'Zillow', event: 'SMS reply received', score: 92, next: 'Call back now', timeline: ['Lead email received', 'Lead parsed', 'Call attempted', 'SMS delivered', 'SMS reply received', 'AI moved lead to Hot Lead'] },
-  { id: 2, label: 'Inbound lead B', stage: 'Opened Message', source: 'Realtor.com', event: 'Email opened', score: 74, next: 'Send follow-up text', timeline: ['Lead email received', 'Lead parsed', 'Call attempted', 'SMS delivered', 'Tracked email sent', 'Email opened'] },
-  { id: 3, label: 'Inbound lead C', stage: 'Needs Review', source: 'Website Form', event: 'Missing phone', score: 38, next: 'Review missing phone number', timeline: ['Website form received', 'Email captured', 'Tracked email queued', 'AI routed to manual review'] }
+const customers = [
+  { id: 1, name: 'Customer A', company: 'Zillow lead', source: 'Zillow', status: 'Hot Lead', lastEvent: 'SMS reply received', owner: 'Sales Team', next: 'Call back now', score: 92, timeline: ['Lead email received', 'Lead parsed', 'Call attempted', 'SMS delivered', 'SMS reply received', 'AI moved lead to Hot Lead'] },
+  { id: 2, name: 'Customer B', company: 'Realtor.com lead', source: 'Realtor.com', status: 'Opened Message', lastEvent: 'Email opened', owner: 'Sales Team', next: 'Send follow-up text', score: 74, timeline: ['Lead email received', 'Lead parsed', 'Call attempted', 'SMS delivered', 'Tracked email sent', 'Email opened'] },
+  { id: 3, name: 'Customer C', company: 'Website form lead', source: 'Website Form', status: 'Needs Review', lastEvent: 'Missing phone', owner: 'Unassigned', next: 'Review missing phone number', score: 38, timeline: ['Website form received', 'Email captured', 'Tracked email queued', 'AI routed to manual review'] }
 ];
 
 function Metric({ row }) {
@@ -22,43 +22,63 @@ function SimpleGrid({ title, rows }) {
   return <div className="live-module-grid"><article className="live-module-card"><h3>{title}</h3><div className="live-module-list">{rows.map((row) => <div className="live-module-row" key={row[0]}><div><strong>{row[0]}</strong><span>{row[1]}</span></div><b>{row[2]}</b></div>)}</div></article></div>;
 }
 
+function CustomerList({ customers, activeId, setActiveId }) {
+  return <article className="live-module-card">
+    <h3>Customer list</h3>
+    <div className="live-module-list">
+      {customers.map((customer) => <div className="live-module-row live-module-row-action" key={customer.id}>
+        <button type="button" onClick={() => setActiveId(customer.id)}>
+          <strong>{customer.name}</strong>
+          <span>{customer.company} - {customer.source} - {customer.owner}</span>
+        </button>
+        <b>{customer.status}</b>
+        <div className="live-row-actions">
+          <button type="button" onClick={() => setActiveId(customer.id)}>Open</button>
+          <button type="button" onClick={() => setActiveId(customer.id)}>Call</button>
+          <button type="button" onClick={() => setActiveId(customer.id)}>Text</button>
+          <button type="button" onClick={() => setActiveId(customer.id)}>Route</button>
+        </div>
+      </div>)}
+    </div>
+  </article>;
+}
+
 function ContactsCrm({ Header, id }) {
-  const [tab, setTab] = useState('Dashboard');
   const [activeId, setActiveId] = useState(1);
-  const active = crmLeads.find((lead) => lead.id === activeId) || crmLeads[0];
-  const hot = crmLeads.filter((lead) => lead.stage === 'Hot Lead').length;
-  const opened = crmLeads.filter((lead) => /opened/i.test(lead.event)).length;
-  const replies = crmLeads.filter((lead) => /reply/i.test(lead.event)).length;
-  const tabs = ['Dashboard', 'Lead Inbox', 'Conversations', 'Pipeline', 'Reports', 'Settings'];
+  const [drawer, setDrawer] = useState('none');
+  const active = customers.find((customer) => customer.id === activeId) || customers[0];
 
   return <>
     {Header ? <Header id={id} /> : null}
     <section className="live-module-shell canonical-force-live">
       <article className="live-module-card">
-        <p className="eyebrow">Live CRM module</p>
+        <p className="eyebrow">CRM</p>
         <h2>Contacts / CRM</h2>
-        <p>Lead intake, call and text follow-up, tracked email, AI summaries, pipeline routing, conversations, contacts, companies, and follow-up visibility.</p>
-        <div className="live-module-actions">{tabs.map((item) => <button type="button" key={item} onClick={() => setTab(item)}>{item}</button>)}</div>
-        <div className="live-module-metrics">
-          <Metric row={['New leads today', String(crmLeads.length), 'Inbound sources']} />
-          <Metric row={['Hot leads', String(hot), 'Replies / answered calls']} />
-          <Metric row={['Email opened', String(opened), 'Tracked opens']} />
-          <Metric row={['SMS replies', String(replies), 'Two-way conversations']} />
+        <p>Customer and contact list first. Lead inbox, timeline, inbound lead details, and AI communication tracking stay inside the dropdown below.</p>
+        <div className="live-module-actions">
+          <label style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <strong>Open CRM detail</strong>
+            <select value={drawer} onChange={(event) => setDrawer(event.target.value)}>
+              <option value="none">Customer list only</option>
+              <option value="leadInbox">Lead inbox</option>
+              <option value="inboundLead">Selected inbound lead</option>
+              <option value="timeline">Lead timeline</option>
+              <option value="ai">AI and communication tracking</option>
+              <option value="settings">CRM settings</option>
+            </select>
+          </label>
         </div>
       </article>
 
-      {tab === 'Dashboard' && <div className="live-module-grid">
-        <article className="live-module-card"><h3>Live lead inbox</h3><div className="live-module-list">{crmLeads.map((lead) => <div className="live-module-row live-module-row-action" key={lead.id}><button type="button" onClick={() => setActiveId(lead.id)}><strong>{lead.label}</strong><span>{lead.source} - {lead.stage}</span></button><b>{lead.event}</b><div className="live-row-actions"><button type="button" onClick={() => setActiveId(lead.id)}>Open</button><button type="button" onClick={() => setActiveId(lead.id)}>Call</button><button type="button" onClick={() => setActiveId(lead.id)}>Text</button><button type="button" onClick={() => setActiveId(lead.id)}>Route</button></div></div>)}</div></article>
-        <article className="live-module-card"><h3>{active.label}</h3><div className="live-module-proof"><strong>AI summary</strong><span>{active.source} lead is in {active.stage}. Latest engagement: {active.event}. Recommended next action: {active.next}.</span></div><div className="live-module-metrics"><Metric row={['Stage', active.stage, 'AI routed']} /><Metric row={['Score', String(active.score), 'Lead priority']} /><Metric row={['Source', active.source, 'Lead source']} /><Metric row={['Next', active.next, 'Recommended']} /></div></article>
-        <article className="live-module-card"><h3>Lead timeline</h3><div className="live-module-status-strip">{active.timeline.map((event, index) => <button className="live-module-step" type="button" key={event}><b>{index + 1}</b><span>{event}</span></button>)}</div></article>
-        <article className="live-module-card"><h3>AI and communication tracking</h3><div className="live-module-proof"><strong>AI role</strong><span>AI parses inbound leads, scores urgency, summarizes activity, recommends next action, and routes pipeline stage.</span></div><div className="live-module-proof"><strong>Tracking note</strong><span>Email can track opens and clicks when sent by the system. SMS tracks sent, delivered, failed, replies, and tracked links.</span></div></article>
-      </div>}
+      <div className="live-module-grid">
+        <CustomerList customers={customers} activeId={activeId} setActiveId={setActiveId} />
+      </div>
 
-      {tab === 'Lead Inbox' && <SimpleGrid title="Inbound lead sources" rows={[['Zillow inbox', 'Parse lead emails and queue fast response.', 'Active'], ['Realtor.com inbox', 'Parse lead emails and capture source.', 'Active'], ['Website forms', 'Capture quote requests and route missing info.', 'Active'], ['Manual entry', 'Create lead from call, referral, or import.', 'Ready']]} />}
-      {tab === 'Conversations' && <SimpleGrid title="Communication tracking" rows={[['Call connected', 'Picked up or connected status.', 'Tracked'], ['Call missed', 'No answer, voicemail, failed, or busy.', 'Tracked'], ['SMS delivered', 'Delivery callback.', 'Tracked'], ['SMS replied', 'Inbound reply updates lead stage.', 'Hot'], ['Email opened', 'Open event from tracked email.', 'Tracked'], ['Email clicked', 'Tracked link click event.', 'Engaged']]} />}
-      {tab === 'Pipeline' && <SimpleGrid title="Pipeline stages" rows={[['New Lead', 'Received but not yet engaged.', 'Open'], ['Hot Lead', 'Reply or call connected.', 'Priority'], ['Opened Message', 'Email opened or clicked.', 'Engaged'], ['Follow Up', 'Delivered but no reply yet.', 'Due'], ['Appointment Set', 'Meeting booked.', 'Booked'], ['Needs Review', 'Missing contact info or duplicate check.', 'Review']]} />}
-      {tab === 'Reports' && <SimpleGrid title="Source performance" rows={[['Zillow', '14 leads', '93% contacted'], ['Realtor.com', '9 leads', '89% contacted'], ['Website Forms', '7 leads', '71% contacted']]} />}
-      {tab === 'Settings' && <SimpleGrid title="CRM setup" rows={[['Lead inboxes', 'Configure inbound email sources.', 'Admin'], ['Communication settings', 'Configure calls, texts, callbacks, and replies.', 'Admin'], ['Email tracking', 'Configure tracked opens, clicks, and bounces.', 'Admin'], ['Schema fields', 'Define contacts, companies, sources, and lead fields.', 'Admin'], ['Merge rules', 'Duplicate detection and canonical contact rules.', 'Admin'], ['Audit requirements', 'Proof, handoffs, and approvals live here.', 'Admin']]} />}
+      {drawer === 'leadInbox' && <SimpleGrid title="Lead inbox" rows={customers.map((customer) => [customer.company, `${customer.source} - ${customer.lastEvent}`, customer.status])} />}
+      {drawer === 'inboundLead' && <SimpleGrid title={`Selected inbound lead: ${active.name}`} rows={[[active.company, `${active.source} - ${active.lastEvent}`, active.status], ['Lead score', String(active.score), 'AI priority'], ['Next action', active.next, 'Recommended'], ['Owner', active.owner, 'Assigned']]} />}
+      {drawer === 'timeline' && <SimpleGrid title={`Lead timeline: ${active.name}`} rows={active.timeline.map((event, index) => [`Step ${index + 1}`, event, 'Tracked'])} />}
+      {drawer === 'ai' && <SimpleGrid title="AI and communication tracking" rows={[['AI summary', `${active.source} lead is in ${active.status}. Latest engagement: ${active.lastEvent}.`, 'Visible'], ['Next action', active.next, 'Recommended'], ['Email tracking', 'Tracks opens and clicks when sent by the system.', 'Tracked'], ['SMS tracking', 'Tracks sent, delivered, failed, replies, and tracked links.', 'Tracked']]} />}
+      {drawer === 'settings' && <SimpleGrid title="CRM settings" rows={[['Lead inboxes', 'Configure inbound lead sources.', 'Admin'], ['Communication settings', 'Configure calls, texts, callbacks, and replies.', 'Admin'], ['Email tracking', 'Configure opens, clicks, and bounces.', 'Admin'], ['Schema fields', 'Define contacts, companies, sources, and lead fields.', 'Admin'], ['Merge rules', 'Duplicate detection and canonical contact rules.', 'Admin'], ['Audit requirements', 'Proof, handoffs, and approvals live here.', 'Admin']]} />}
     </section>
   </>;
 }
