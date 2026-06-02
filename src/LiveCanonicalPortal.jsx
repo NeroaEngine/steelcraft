@@ -21,32 +21,26 @@ const prospects = [
   { id: 103, name: 'Pat Riley', company: 'Riley Farm Buildings', source: 'Website Form', sourceDetail: 'Submitted contact form from the company website.', phone: '(555) 012-9005', email: 'pat@rileyfarm.com', status: 'Ready to Contact', owner: 'Estimating', action: 'Notify owner and schedule call', ai: 'Prospect needs a small agricultural storage building and wants a callback this week.', received: 'Today' }
 ];
 
+const customerActivities = {
+  1: [['Email', 'Quote revision sent and stored on customer record.', 'Today'], ['Call', 'Reviewed lead time and material release schedule.', 'Yesterday'], ['Note', 'Prefers email for formal quotes and approvals.', 'Saved']],
+  2: [['Email', 'Bid approval email stored under customer file.', 'Today'], ['Meeting', 'Follow-up meeting scheduled with estimating.', 'Tomorrow'], ['Text', 'Reminder text queued for project scope confirmation.', 'Scheduled']],
+  3: [['Call', 'Maintenance scope reviewed with operations contact.', 'May 28'], ['Email', 'Platform detail questions sent to customer.', 'May 27'], ['Note', 'Track drawings and approvals carefully.', 'Saved']],
+  4: [['Email', 'Insurance document request sent.', 'Pending'], ['Note', 'Hold new work until paperwork is current.', 'Saved'], ['Follow-up', 'Schedule reminder to check COI status.', 'Next week']]
+};
+
+const prospectActivities = {
+  101: [['Inbound', 'Facebook Ad captured the request and created a prospect record.', '12 min ago'], ['AI summary', 'AI detected pricing, timeline, and consultation questions.', '10 min ago'], ['Scheduled', 'First response text sequence is ready to send.', 'Next']],
+  102: [['Inbound', 'Google Ads form submitted with building dimensions.', '48 min ago'], ['Email', 'Quote intake checklist is drafted but not sent.', 'Pending'], ['Follow-up', 'Call if no reply after email is opened.', 'Next']],
+  103: [['Inbound', 'Website form submitted with preferred callback window.', 'Today'], ['Owner alert', 'Estimating should be notified before end of day.', 'Ready'], ['Call', 'Schedule a call and send a calendar link.', 'Next']]
+};
+
 const workflowCopy = {
-  inbox: {
-    title: 'Lead Inbox',
-    text: 'All new prospect requests land here first. Facebook, Google Ads, website forms, email leads, referrals, and call-ins are normalized into prospect records before they become customers.',
-    rows: [['Facebook Ad', '1 new prospect', 'Auto-routed'], ['Google Ads', '1 follow-up needed', 'Sales Team'], ['Website Form', '1 ready to contact', 'Estimating']]
-  },
-  timeline: {
-    title: 'Timeline',
-    text: 'Shows the prospect journey: source captured, AI summary created, owner notified, text/email sent, reply received, meeting booked, and converted to customer.',
-    rows: [['12 min ago', 'Facebook lead captured', 'New'], ['10 min ago', 'AI summarized request', 'Complete'], ['Next', 'Start text sequence', 'Recommended']]
-  },
-  inbound: {
-    title: 'Inbound Leads',
-    text: 'Inbound lead routing identifies where the prospect came from and what information was submitted so the team knows what to do next.',
-    rows: [['Source', 'Facebook, Google, website, email, referral, phone', 'Tracked'], ['Routing', 'Assign owner by source, service, and region', 'Ready'], ['Customer status', 'Stays prospect until converted', 'Clean CRM']]
-  },
-  ai: {
-    title: 'AI Communication',
-    text: 'AI drafts the first response, detects urgency, recommends the channel, and can hand the prospect to Neroa Connect for text, call, email, or calendar follow-up.',
-    rows: [['Suggested text', 'Hi, this is Steel Craft. We received your request and can help.', 'Draft'], ['Suggested email', 'Quote intake checklist and next-step questions.', 'Draft'], ['Suggested call', 'AI call or owner call to book a meeting.', 'Ready']]
-  },
-  automate: {
-    title: 'Automate Follow-up',
-    text: 'Build the prospect follow-up sequence here. This is where Neroa Connect, Twilio, email, AI calls, and calendar links become an automated workflow.',
-    rows: [['Day 1', 'Send first text and owner notification', 'Text'], ['Day 2', 'Send email with intake questions and booking link', 'Email'], ['Days 3-5', 'Daily text follow-up if no reply', 'Sequence'], ['Every 5 days', 'Long-term nurture until closed or converted', 'Nurture'], ['Read receipt / reply', 'Trigger AI call or meeting link', 'Automation']]
-  }
+  inbox: { title: 'Lead Inbox', text: 'All new prospect requests land here first. Facebook, Google Ads, website forms, email leads, referrals, and call-ins are normalized into prospect records before they become customers.', rows: [['Facebook Ad', '1 new prospect', 'Auto-routed'], ['Google Ads', '1 follow-up needed', 'Sales Team'], ['Website Form', '1 ready to contact', 'Estimating']] },
+  timeline: { title: 'Timeline', text: 'Shows the prospect journey: source captured, AI summary created, owner notified, text/email sent, reply received, meeting booked, and converted to customer.', rows: [['12 min ago', 'Facebook lead captured', 'New'], ['10 min ago', 'AI summarized request', 'Complete'], ['Next', 'Start text sequence', 'Recommended']] },
+  inbound: { title: 'Inbound Leads', text: 'Inbound lead routing identifies where the prospect came from and what information was submitted so the team knows what to do next.', rows: [['Source', 'Facebook, Google, website, email, referral, phone', 'Tracked'], ['Routing', 'Assign owner by source, service, and region', 'Ready'], ['Customer status', 'Stays prospect until converted', 'Clean CRM']] },
+  ai: { title: 'AI Communication', text: 'AI drafts the first response, detects urgency, recommends the channel, and can hand the prospect to Neroa Connect for text, call, email, or calendar follow-up.', rows: [['Suggested text', 'Hi, this is Steel Craft. We received your request and can help.', 'Draft'], ['Suggested email', 'Quote intake checklist and next-step questions.', 'Draft'], ['Suggested call', 'AI call or owner call to book a meeting.', 'Ready']] },
+  automate: { title: 'Automate Follow-up', text: 'Build the prospect follow-up sequence here. This is where Neroa Connect, Twilio, email, AI calls, and calendar links become an automated workflow.', rows: [['Day 1', 'Send first text and owner notification', 'Text'], ['Day 2', 'Send email with intake questions and booking link', 'Email'], ['Days 3-5', 'Daily text follow-up if no reply', 'Sequence'], ['Every 5 days', 'Long-term nurture until closed or converted', 'Nurture'], ['Read receipt / reply', 'Trigger AI call or meeting link', 'Automation']] },
+  activity: { title: 'Activity + Scheduled Follow-up', text: 'Track every contact attempt and schedule the next touch. Phone calls, texts, emails, notes, owner updates, and meeting links should all write back to the prospect history.', rows: [['Log contact', 'Record a call, text, email, note, or meeting.', 'Manual'], ['Schedule email', 'Pick a date/time and save the email draft.', 'Scheduled'], ['Schedule call', 'Create a call task or AI call step.', 'Task'], ['Meeting link', 'Send a calendar link and track booking status.', 'Calendar'], ['Next touch', 'Set the next follow-up date and assigned owner.', 'Required']] }
 };
 
 const saasButton = { border: '0', borderRadius: 14, padding: '12px 16px', background: 'linear-gradient(135deg, var(--brand-accent), #c95d63)', color: 'white', fontWeight: 900, boxShadow: '0 12px 28px rgba(0,0,0,.28)' };
@@ -76,18 +70,45 @@ const crmStyles = {
   prospectRow: { minWidth: 1040, display: 'grid', gridTemplateColumns: '1.2fr 1fr .9fr 1fr .9fr 1.2fr .8fr', gap: 14, alignItems: 'center', textAlign: 'left' },
   head: { color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.08em', fontSize: 12, fontWeight: 900, padding: '0 14px' },
   dataRow: { width: '100%', border: '1px solid var(--line)', borderRadius: 18, background: 'var(--surface-alt)', color: 'var(--text)', padding: 18, boxShadow: '0 14px 34px rgba(0,0,0,.16)' },
-  overlay: { position: 'fixed', inset: 0, zIndex: 40, display: 'grid', placeItems: 'start center', padding: '110px 24px 40px', background: 'rgba(0,0,0,.54)', backdropFilter: 'blur(6px)' },
-  record: { width: 'min(1040px, calc(100vw - 80px))', padding: 34, borderRadius: 28, boxShadow: '0 28px 90px rgba(0,0,0,.55)' },
+  overlay: { position: 'fixed', inset: 0, zIndex: 40, display: 'grid', placeItems: 'start center', padding: '80px 24px 40px', background: 'rgba(0,0,0,.54)', backdropFilter: 'blur(6px)', overflowY: 'auto' },
+  record: { width: 'min(1120px, calc(100vw - 80px))', padding: 34, borderRadius: 28, boxShadow: '0 28px 90px rgba(0,0,0,.55)' },
   recordHeader: { display: 'flex', justifyContent: 'space-between', gap: 18, alignItems: 'start', marginBottom: 20 },
   recordTitle: { fontSize: 'clamp(30px, 4vw, 48px)', lineHeight: 1, margin: '8px 0', letterSpacing: '-0.05em' },
   form: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 },
   full: { gridColumn: '1 / -1' },
-  recordActions: { display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, flexWrap: 'wrap' }
+  recordActions: { display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, flexWrap: 'wrap' },
+  recordGrid: { display: 'grid', gridTemplateColumns: 'minmax(0, .9fr) minmax(360px, .7fr)', gap: 18, alignItems: 'start', marginTop: 18 },
+  miniCard: { border: '1px solid var(--line)', borderRadius: 18, padding: 16, background: 'rgba(255,255,255,.04)' },
+  textarea: { minHeight: 96 }
 };
 
 function Metric({ row }) { return <div className="live-module-metric"><strong>{row[0]}</strong><b>{row[1]}</b><span>{row[2]}</span></div>; }
 function SimpleGrid({ title, rows }) { return <div className="live-module-grid crm-wide-grid"><article className="live-module-card crm-wide-card"><h3>{title}</h3><div className="live-module-list">{rows.map((row) => <div className="live-module-row" key={row[0]}><div><strong>{row[0]}</strong><span>{row[1]}</span></div><b>{row[2]}</b></div>)}</div></article></div>; }
 function Field({ label, children, full = false }) { return <label style={full ? crmStyles.full : undefined}><span>{label}</span>{children}</label>; }
+
+function ActivityPanel({ rows = [] }) {
+  return <section style={crmStyles.miniCard}>
+    <p className="eyebrow">Communication History</p>
+    <h3>Emails, texts, calls, notes</h3>
+    <p style={crmStyles.subText}>Connected email, Twilio texts, calls, AI calls, notes, and calendar activity should all save to this record.</p>
+    <div style={crmStyles.panelGrid}>{rows.map((row) => <div style={crmStyles.panelRow} key={`${row[0]}-${row[2]}`}><strong>{row[0]}</strong><span>{row[1]}</span><b>{row[2]}</b></div>)}</div>
+  </section>;
+}
+
+function FollowUpPanel({ prospect = false }) {
+  return <section style={crmStyles.miniCard}>
+    <p className="eyebrow">Next Touch</p>
+    <h3>Log or schedule contact</h3>
+    <div style={crmStyles.form}>
+      <Field label="Contact type"><select defaultValue="call"><option value="call">Phone call</option><option value="text">Text message</option><option value="email">Email</option><option value="note">Note</option><option value="meeting">Meeting</option><option value="ai-call">AI call</option></select></Field>
+      <Field label="Date / time"><input placeholder="Tomorrow at 9:00 AM" /></Field>
+      <Field label="Assigned owner"><input placeholder="Sales Team" /></Field>
+      <Field label="Status"><select defaultValue="scheduled"><option value="logged">Logged</option><option value="scheduled">Scheduled</option><option value="sent">Sent</option><option value="completed">Completed</option></select></Field>
+      <Field label="Notes" full><textarea style={crmStyles.textarea} placeholder="What happened, or what should be sent next?" /></Field>
+    </div>
+    <div style={crmStyles.recordActions}><button type="button" style={ghostButton}>Log activity</button><button type="button" style={ghostButton}>Schedule email</button><button type="button" style={ghostButton}>Schedule call</button>{prospect && <button type="button" style={saasButton}>Start automation</button>}</div>
+  </section>;
+}
 
 function WorkflowPanel({ mode }) {
   const data = workflowCopy[mode];
@@ -97,9 +118,10 @@ function WorkflowPanel({ mode }) {
     <h3>{data.title}</h3>
     <p style={crmStyles.subText}>{data.text}</p>
     <div style={crmStyles.panelGrid}>{data.rows.map((row) => <div style={crmStyles.panelRow} key={row[0]}><strong>{row[0]}</strong><span>{row[1]}</span><b>{row[2]}</b></div>)}</div>
-    {mode === 'automate' && <div style={crmStyles.recordActions}>
+    {(mode === 'automate' || mode === 'activity') && <div style={crmStyles.recordActions}>
       <button type="button" style={saasButton}>Set up Neroa Connect</button>
       <button type="button" style={ghostButton}>Build text sequence</button>
+      <button type="button" style={ghostButton}>Schedule email</button>
       <button type="button" style={ghostButton}>Add calendar link</button>
       <button type="button" style={ghostButton}>Create AI call step</button>
     </div>}
@@ -111,7 +133,7 @@ function ContactsCrm({ Header, id }) {
   const [activeCustomerId, setActiveCustomerId] = useState(null);
   const [activeProspectId, setActiveProspectId] = useState(null);
   const [query, setQuery] = useState('');
-  const [workflow, setWorkflow] = useState('automate');
+  const [workflow, setWorkflow] = useState('activity');
   const activeCustomer = customers.find((customer) => customer.id === activeCustomerId) || null;
   const activeProspect = prospects.find((prospect) => prospect.id === activeProspectId) || null;
   const rows = tab === 'customers' ? customers : prospects;
@@ -127,51 +149,23 @@ function ContactsCrm({ Header, id }) {
       <article className="live-module-card" style={crmStyles.listCard}>
         <div style={crmStyles.tabs}>
           <button type="button" style={tabButton(tab === 'customers')} onClick={() => { setTab('customers'); setQuery(''); }}>Customer List</button>
-          <button type="button" style={tabButton(tab === 'prospects')} onClick={() => { setTab('prospects'); setQuery(''); setWorkflow('automate'); }}>Prospect Customers</button>
+          <button type="button" style={tabButton(tab === 'prospects')} onClick={() => { setTab('prospects'); setQuery(''); setWorkflow('activity'); }}>Prospect Customers</button>
         </div>
 
         <div style={crmStyles.listHeader}>
-          <div>
-            <p className="eyebrow">CRM</p>
-            <h2 style={crmStyles.title}>{tab === 'customers' ? 'Customer List' : 'Prospect Customers'}</h2>
-            <p style={crmStyles.subText}>{tab === 'customers' ? 'Search, open, and manage customer records from one clean customer database.' : 'Inbound leads from Facebook, Google, website, email, referral, and calls land here before they become customers.'}</p>
-          </div>
-          <div style={crmStyles.headerRight}>
-            <div style={crmStyles.chips}>
-              <div style={crmStyles.chip}><span style={crmStyles.chipLabel}>{tab === 'customers' ? 'Total customers' : 'Open prospects'}</span><strong style={crmStyles.chipValue}>{tab === 'customers' ? '280' : prospects.length}</strong></div>
-              <div style={crmStyles.chip}><span style={crmStyles.chipLabel}>Needs review</span><strong style={crmStyles.chipValue}>1</strong></div>
-            </div>
-            <div style={crmStyles.actions}>
-              <input style={crmStyles.search} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={tab === 'customers' ? 'Search customers...' : 'Search prospects...'} aria-label="Search CRM" />
-              <button type="button" style={saasButton}>{tab === 'customers' ? 'Add Customer' : 'Add Prospect'}</button>
-            </div>
-          </div>
+          <div><p className="eyebrow">CRM</p><h2 style={crmStyles.title}>{tab === 'customers' ? 'Customer List' : 'Prospect Customers'}</h2><p style={crmStyles.subText}>{tab === 'customers' ? 'Search, open, and manage customer records from one clean customer database.' : 'Inbound leads from Facebook, Google, website, email, referral, and calls land here before they become customers.'}</p></div>
+          <div style={crmStyles.headerRight}><div style={crmStyles.chips}><div style={crmStyles.chip}><span style={crmStyles.chipLabel}>{tab === 'customers' ? 'Total customers' : 'Open prospects'}</span><strong style={crmStyles.chipValue}>{tab === 'customers' ? '280' : prospects.length}</strong></div><div style={crmStyles.chip}><span style={crmStyles.chipLabel}>Needs review</span><strong style={crmStyles.chipValue}>1</strong></div></div><div style={crmStyles.actions}><input style={crmStyles.search} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={tab === 'customers' ? 'Search customers...' : 'Search prospects...'} aria-label="Search CRM" /><button type="button" style={saasButton}>{tab === 'customers' ? 'Add Customer' : 'Add Prospect'}</button></div></div>
         </div>
 
-        {tab === 'prospects' && <>
-          <div style={crmStyles.tools}>
-            <button type="button" style={tabButton(workflow === 'automate')} onClick={() => setWorkflow('automate')}>Automate</button>
-            <button type="button" style={ghostButton} onClick={() => setWorkflow('inbox')}>Lead Inbox</button>
-            <button type="button" style={ghostButton} onClick={() => setWorkflow('timeline')}>Timeline</button>
-            <button type="button" style={ghostButton} onClick={() => setWorkflow('inbound')}>Inbound Leads</button>
-            <button type="button" style={ghostButton} onClick={() => setWorkflow('ai')}>AI Communication</button>
-          </div>
-          <WorkflowPanel mode={workflow} />
-        </>}
+        {tab === 'prospects' && <><div style={crmStyles.tools}><button type="button" style={tabButton(workflow === 'activity')} onClick={() => setWorkflow('activity')}>Activity</button><button type="button" style={ghostButton} onClick={() => setWorkflow('automate')}>Automate</button><button type="button" style={ghostButton} onClick={() => setWorkflow('inbox')}>Lead Inbox</button><button type="button" style={ghostButton} onClick={() => setWorkflow('timeline')}>Timeline</button><button type="button" style={ghostButton} onClick={() => setWorkflow('inbound')}>Inbound Leads</button><button type="button" style={ghostButton} onClick={() => setWorkflow('ai')}>AI Communication</button></div><WorkflowPanel mode={workflow} /></>}
 
-        {tab === 'customers' ? <div style={crmStyles.table}>
-          <div style={{ ...crmStyles.row, ...crmStyles.head }}><span>Company</span><span>Contact</span><span>Type</span><span>Status</span><span>Owner</span><span>Last Activity</span><span>Value</span><span></span></div>
-          {filtered.map((customer) => <button type="button" key={customer.id} onClick={() => setActiveCustomerId(customer.id)} style={crmStyles.dataRow}><div style={crmStyles.row}><strong>{customer.company}</strong><span>{customer.contact}</span><span>{customer.type}</span><b>{customer.status}</b><span>{customer.owner}</span><span>{customer.activity}</span><strong>{customer.value}</strong><b>Open</b></div></button>)}
-        </div> : <div style={crmStyles.table}>
-          <div style={{ ...crmStyles.prospectRow, ...crmStyles.head }}><span>Prospect</span><span>Source</span><span>Status</span><span>Owner</span><span>Received</span><span>AI next action</span><span></span></div>
-          {filtered.map((prospect) => <button type="button" key={prospect.id} onClick={() => setActiveProspectId(prospect.id)} style={crmStyles.dataRow}><div style={crmStyles.prospectRow}><strong>{prospect.company}</strong><span>{prospect.source}</span><b>{prospect.status}</b><span>{prospect.owner}</span><span>{prospect.received}</span><span>{prospect.action}</span><b>Open</b></div></button>)}
-        </div>}
+        {tab === 'customers' ? <div style={crmStyles.table}><div style={{ ...crmStyles.row, ...crmStyles.head }}><span>Company</span><span>Contact</span><span>Type</span><span>Status</span><span>Owner</span><span>Last Activity</span><span>Value</span><span></span></div>{filtered.map((customer) => <button type="button" key={customer.id} onClick={() => setActiveCustomerId(customer.id)} style={crmStyles.dataRow}><div style={crmStyles.row}><strong>{customer.company}</strong><span>{customer.contact}</span><span>{customer.type}</span><b>{customer.status}</b><span>{customer.owner}</span><span>{customer.activity}</span><strong>{customer.value}</strong><b>Open</b></div></button>)}</div> : <div style={crmStyles.table}><div style={{ ...crmStyles.prospectRow, ...crmStyles.head }}><span>Prospect</span><span>Source</span><span>Status</span><span>Owner</span><span>Received</span><span>AI next action</span><span></span></div>{filtered.map((prospect) => <button type="button" key={prospect.id} onClick={() => setActiveProspectId(prospect.id)} style={crmStyles.dataRow}><div style={crmStyles.prospectRow}><strong>{prospect.company}</strong><span>{prospect.source}</span><b>{prospect.status}</b><span>{prospect.owner}</span><span>{prospect.received}</span><span>{prospect.action}</span><b>Open</b></div></button>)}</div>}
       </article>
     </section>
 
-    {activeCustomer && <div style={crmStyles.overlay} onClick={() => setActiveCustomerId(null)}><aside className="live-module-card" style={crmStyles.record} onClick={(event) => event.stopPropagation()}><div style={crmStyles.recordHeader}><div><p className="eyebrow">Customer Record</p><h3 style={crmStyles.recordTitle}>{activeCustomer.company}</h3><p>{activeCustomer.notes}</p></div><button type="button" style={ghostButton} onClick={() => setActiveCustomerId(null)}>Close</button></div><div style={crmStyles.form}><Field label="Company"><input value={activeCustomer.company} readOnly /></Field><Field label="Primary Contact"><input value={activeCustomer.contact} readOnly /></Field><Field label="Customer Type"><input value={activeCustomer.type} readOnly /></Field><Field label="Owner"><input value={activeCustomer.owner} readOnly /></Field><Field label="Phone"><input value={activeCustomer.phone} readOnly /></Field><Field label="Email"><input value={activeCustomer.email} readOnly /></Field><Field label="Location"><input value={activeCustomer.location} readOnly /></Field><Field label="Open Value"><input value={activeCustomer.value} readOnly /></Field><Field label="Notes" full><textarea rows="4" value={activeCustomer.notes} readOnly /></Field></div><div style={crmStyles.recordActions}><button type="button" style={ghostButton}>Edit Record</button><button type="button" style={saasButton}>Save</button></div></aside></div>}
+    {activeCustomer && <div style={crmStyles.overlay} onClick={() => setActiveCustomerId(null)}><aside className="live-module-card" style={crmStyles.record} onClick={(event) => event.stopPropagation()}><div style={crmStyles.recordHeader}><div><p className="eyebrow">Customer Record</p><h3 style={crmStyles.recordTitle}>{activeCustomer.company}</h3><p>{activeCustomer.notes}</p></div><button type="button" style={ghostButton} onClick={() => setActiveCustomerId(null)}>Close</button></div><div style={crmStyles.recordGrid}><div><div style={crmStyles.form}><Field label="Company"><input value={activeCustomer.company} readOnly /></Field><Field label="Primary Contact"><input value={activeCustomer.contact} readOnly /></Field><Field label="Customer Type"><input value={activeCustomer.type} readOnly /></Field><Field label="Owner"><input value={activeCustomer.owner} readOnly /></Field><Field label="Phone"><input value={activeCustomer.phone} readOnly /></Field><Field label="Email"><input value={activeCustomer.email} readOnly /></Field><Field label="Location"><input value={activeCustomer.location} readOnly /></Field><Field label="Open Value"><input value={activeCustomer.value} readOnly /></Field><Field label="Notes" full><textarea rows="4" value={activeCustomer.notes} readOnly /></Field></div><div style={crmStyles.recordActions}><button type="button" style={ghostButton}>Edit Record</button><button type="button" style={saasButton}>Save</button></div></div><div style={{ display: 'grid', gap: 16 }}><ActivityPanel rows={customerActivities[activeCustomer.id]} /><FollowUpPanel /></div></div></aside></div>}
 
-    {activeProspect && <div style={crmStyles.overlay} onClick={() => setActiveProspectId(null)}><aside className="live-module-card" style={crmStyles.record} onClick={(event) => event.stopPropagation()}><div style={crmStyles.recordHeader}><div><p className="eyebrow">Prospect Customer</p><h3 style={crmStyles.recordTitle}>{activeProspect.company}</h3><p>{activeProspect.sourceDetail}</p></div><button type="button" style={ghostButton} onClick={() => setActiveProspectId(null)}>Close</button></div><div style={crmStyles.form}><Field label="Prospect Name"><input value={activeProspect.name} readOnly /></Field><Field label="Lead Source"><input value={activeProspect.source} readOnly /></Field><Field label="Phone"><input value={activeProspect.phone} readOnly /></Field><Field label="Email"><input value={activeProspect.email} readOnly /></Field><Field label="Status"><input value={activeProspect.status} readOnly /></Field><Field label="Owner"><input value={activeProspect.owner} readOnly /></Field><Field label="AI Summary" full><textarea rows="4" value={activeProspect.ai} readOnly /></Field></div><div style={crmStyles.recordActions}><button type="button" style={saasButton}>Automate Follow-up</button><button type="button" style={ghostButton}>Send Text</button><button type="button" style={ghostButton}>Send Email</button><button type="button" style={ghostButton}>AI Call</button><button type="button" style={ghostButton}>Send Calendar Link</button><button type="button" style={saasButton}>Convert to Customer</button></div><p style={crmStyles.subText}>Automations run through Neroa Connect: Twilio for text/calls, email for follow-up, and calendar links for booking meetings.</p></aside></div>}
+    {activeProspect && <div style={crmStyles.overlay} onClick={() => setActiveProspectId(null)}><aside className="live-module-card" style={crmStyles.record} onClick={(event) => event.stopPropagation()}><div style={crmStyles.recordHeader}><div><p className="eyebrow">Prospect Customer</p><h3 style={crmStyles.recordTitle}>{activeProspect.company}</h3><p>{activeProspect.sourceDetail}</p></div><button type="button" style={ghostButton} onClick={() => setActiveProspectId(null)}>Close</button></div><div style={crmStyles.recordGrid}><div><div style={crmStyles.form}><Field label="Prospect Name"><input value={activeProspect.name} readOnly /></Field><Field label="Lead Source"><input value={activeProspect.source} readOnly /></Field><Field label="Phone"><input value={activeProspect.phone} readOnly /></Field><Field label="Email"><input value={activeProspect.email} readOnly /></Field><Field label="Status"><input value={activeProspect.status} readOnly /></Field><Field label="Owner"><input value={activeProspect.owner} readOnly /></Field><Field label="AI Summary" full><textarea rows="4" value={activeProspect.ai} readOnly /></Field></div><div style={crmStyles.recordActions}><button type="button" style={saasButton}>Automate Follow-up</button><button type="button" style={ghostButton}>Send Text</button><button type="button" style={ghostButton}>Send Email</button><button type="button" style={ghostButton}>AI Call</button><button type="button" style={ghostButton}>Send Calendar Link</button><button type="button" style={saasButton}>Convert to Customer</button></div><p style={crmStyles.subText}>Automations run through Neroa Connect: Twilio for text/calls, email for follow-up, and calendar links for booking meetings.</p></div><div style={{ display: 'grid', gap: 16 }}><ActivityPanel rows={prospectActivities[activeProspect.id]} /><FollowUpPanel prospect /></div></div></aside></div>}
   </>;
 }
 
