@@ -85,7 +85,7 @@ function Nav({ active, open }) {
   </nav>;
 }
 
-function Today({ open, health }) {
+function Today({ open }) {
   return <>
     <section className="accounting-stat-grid">{todayStats.map(([label, value, detail]) => <Stat key={label} label={label} value={value} detail={detail} />)}</section>
     <section className="accounting-workspace-grid">
@@ -98,7 +98,6 @@ function Today({ open, health }) {
       <Table title="Billing queue" rows={billingRows} empty="No billing items." />
       <Table title="Collections watch" rows={arRows} empty="No AR items." />
       <Table title="Vendor approval queue" rows={apRows} empty="No AP items." />
-      <Card title="System health" description="Accounting is loaded as the full accounting room with billing, purchasing, AR, AP, SOV, reports, and Comptroller workflow."><pre className="accounting-json-preview">{JSON.stringify(health || { status: 'checking' }, null, 2)}</pre></Card>
     </section>
   </>;
 }
@@ -131,7 +130,7 @@ export default function AccountingPortal() {
   useEffect(() => { let alive = true; fetch('/api/health').then((response) => response.json()).then((data) => { if (alive) setHealth(data); }).catch(() => { if (alive) setHealth({ ok: false, status: 'Backend health unavailable' }); }); return () => { alive = false; }; }, []);
 
   let body = null;
-  if (active === 'today') body = <Today open={open} health={health} />;
+  if (active === 'today') body = <Today open={open} />;
   else if (active === 'billing') body = <Billing />;
   else if (active === 'insurance') body = <Insurance />;
   else if (active === 'purchase-orders') body = <PurchaseOrders />;
