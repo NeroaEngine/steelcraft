@@ -258,204 +258,78 @@
 
 .accounting-worker-item b {
   color: var(--brand-accent);
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
 }
 
-.accounting-live-form {
-  display: grid;
-  gap: 14px;
+/* Accounting readability hardening: these cards are buttons, so prevent global button text styles from turning content black. */
+.accounting-workflow-card,
+.accounting-workflow-card:visited,
+.accounting-workflow-card:hover,
+.accounting-workflow-card:focus,
+.accounting-workflow-card:active {
+  color: var(--text) !important;
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--brand-accent) 9%, transparent), transparent 36%),
+    color-mix(in srgb, var(--surface) 88%, #000 12%) !important;
+  border: 1px solid color-mix(in srgb, var(--line) 82%, var(--brand-accent) 18%) !important;
+  box-shadow: 0 18px 42px rgb(0 0 0 / 0.22);
 }
 
-.accounting-card-section {
-  padding: 14px;
-  margin: 0;
-  border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--surface-alt) 55%, transparent);
+.accounting-workflow-card h2,
+.accounting-workflow-card strong,
+.accounting-workflow-card b,
+.accounting-form-card h2,
+.accounting-focus-grid .feature h2,
+.accounting-report-tile h2,
+.accounting-table-row strong {
+  color: var(--text) !important;
 }
 
-.accounting-card-section + .accounting-card-section {
-  margin-top: 0;
+.accounting-workflow-card p,
+.accounting-workflow-card span,
+.accounting-form-card p,
+.accounting-focus-grid .feature p,
+.accounting-report-tile p,
+.accounting-table-row span {
+  color: var(--muted) !important;
 }
 
-.accounting-card-section h3 {
-  margin: 0 0 12px;
-  font-size: 0.82rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--brand-accent);
+.accounting-table-row b,
+.accounting-stat small {
+  color: color-mix(in srgb, var(--brand-accent) 88%, white 12%) !important;
 }
 
-.accounting-card-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(180px, 1fr));
-  gap: 12px;
+.accounting-stat span,
+.accounting-stat strong,
+.accounting-stat small {
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.28);
 }
 
-.accounting-card-grid label,
-.accounting-live-form label {
-  margin: 0;
-}
-
-.accounting-card-grid input,
-.accounting-card-grid select,
-.accounting-card-grid textarea,
-.accounting-live-form input,
-.accounting-live-form select,
-.accounting-live-form textarea {
-  min-height: 42px;
-}
-
-.accounting-card-grid textarea,
-.accounting-live-form textarea {
-  min-height: 76px;
-}
-
-.accounting-page-format {
-  display: grid !important;
-  grid-template-columns: minmax(0, 0.94fr) minmax(320px, 0.56fr);
-  gap: 16px;
-  max-width: 1120px;
-  margin-inline: auto;
-  align-items: start;
-}
-
-.accounting-page-format > .accounting-primary-card {
-  grid-column: 1;
-}
-
-.accounting-page-format > .accounting-side-stack {
-  grid-column: 2;
-  display: grid;
-  gap: 16px;
-  align-content: start;
-}
-
-.accounting-page-format > .accounting-side-stack > .feature:nth-child(2) {
-  order: -3;
-}
-
-.accounting-page-format > .accounting-side-stack > .feature:nth-child(3) {
-  order: -2;
-}
-
-.accounting-page-format > .accounting-side-stack > .feature:nth-child(1) {
-  order: -1;
-}
-
-.accounting-primary-card,
-.accounting-side-stack > .feature {
-  width: 100%;
-  min-height: 0 !important;
-}
-
-.accounting-primary-card .accounting-card-grid {
-  grid-template-columns: repeat(2, minmax(170px, 1fr));
-}
-
-.accounting-primary-card .accounting-live-form > button {
-  justify-self: start;
-  min-width: 170px;
-}
-
-.accounting-side-stack .accounting-form-card h2 {
-  font-size: clamp(22px, 1.8vw, 30px);
-}
-
-.accounting-side-stack .accounting-card-grid {
-  grid-template-columns: 1fr;
-}
-
-.accounting-side-stack .accounting-table-row {
-  grid-template-columns: 1fr;
-  gap: 4px;
-}
-
-.accounting-table {
-  display: grid;
-  gap: 8px;
-}
-
-.accounting-table-row {
-  min-height: 52px;
-  display: grid;
-  grid-template-columns: minmax(160px, 0.75fr) minmax(160px, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--surface-alt) 62%, transparent);
-}
-
-.accounting-table-row b {
-  justify-self: end;
-}
-
-.accounting-empty {
-  min-height: 64px;
-  display: grid;
-  align-items: center;
-}
-
-.accounting-actions-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-@media (max-width: 1180px) {
-  .workspace {
-    max-width: 100%;
-  }
-
+@media (max-width: 980px) {
   .accounting-nav-row,
-  .accounting-page-format,
   .accounting-report-picker {
     grid-template-columns: 1fr;
   }
 
-  .accounting-header-actions.compact {
-    justify-content: flex-start;
-  }
-
-  .accounting-focus-grid,
   .accounting-workspace-grid,
-  .accounting-data-grid,
   .accounting-stat-grid,
-  .accounting-reports-grid,
-  .accounting-report-room {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .accounting-stat-grid.mini,
+  .accounting-data-grid {
+    grid-template-columns: 1fr 1fr;
   }
 
   .accounting-focus-grid > .feature,
-  .accounting-focus-grid > .feature:first-child,
-  .accounting-page-format > .accounting-primary-card,
-  .accounting-page-format > .accounting-side-stack {
-    grid-column: auto;
+  .accounting-reports-grid > .feature,
+  .accounting-reports-grid > .accounting-report-tile,
+  .accounting-report-room > .feature {
+    grid-column: 1 / -1;
   }
 }
 
-@media (max-width: 720px) {
-  .accounting-focus-grid,
+@media (max-width: 640px) {
   .accounting-workspace-grid,
-  .accounting-data-grid,
   .accounting-stat-grid,
-  .accounting-card-grid,
-  .accounting-primary-card .accounting-card-grid,
-  .accounting-reports-grid,
-  .accounting-report-room {
+  .accounting-stat-grid.mini,
+  .accounting-data-grid {
     grid-template-columns: 1fr;
-  }
-
-  .accounting-table-row,
-  .accounting-worker-item {
-    grid-template-columns: 1fr;
-  }
-
-  .accounting-table-row b {
-    justify-self: start;
   }
 }
