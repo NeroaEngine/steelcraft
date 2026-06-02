@@ -11,8 +11,8 @@ const sections = [
   ['sov', 'Schedule of Values', 'Project billing schedule, percent complete, and retainage'],
   ['change-orders', 'Change Orders', 'Pending, approved, billed, and rejected changes'],
   ['reports', 'Reports', 'Financial report library and accounting snapshots'],
-  ['comptroller', 'Neroa Comptroller', 'AI matching, review, approval, and posting control'],
-  ['setup', 'Setup', 'Bank feed, accounting rules, exports, and guardrails']
+  ['comptroller', 'Neroa Comptroller', 'AI matching, review, approval, and posting workflow'],
+  ['setup', 'Setup', 'Bank feed, accounting rules, exports, and posting preferences']
 ];
 const validSections = new Set(sections.map(([id]) => id));
 
@@ -92,13 +92,13 @@ function Today({ open, health }) {
       <button className="accounting-workflow-card panel" type="button" onClick={() => open('billing')}><p className="eyebrow">Billing</p><h2>Invoices + draws</h2><p>Progress billing, customer invoices, approvals, retainage, and send status.</p></button>
       <button className="accounting-workflow-card panel" type="button" onClick={() => open('purchase-orders')}><p className="eyebrow">Purchasing</p><h2>PO control</h2><p>Vendor POs, approvals, receiving status, cost codes, and release controls.</p></button>
       <button className="accounting-workflow-card panel" type="button" onClick={() => open('sov')}><p className="eyebrow">Projects</p><h2>Schedule of Values</h2><p>Billing schedule, percent complete, retainage, and monthly draw readiness.</p></button>
-      <button className="accounting-workflow-card panel" type="button" onClick={() => open('comptroller')}><p className="eyebrow">AI</p><h2>Neroa Comptroller</h2><p>AI match suggestions stay behind review and approval before posting.</p></button>
+      <button className="accounting-workflow-card panel" type="button" onClick={() => open('comptroller')}><p className="eyebrow">AI</p><h2>Neroa Comptroller</h2><p>AI match suggestions move through normal review before posting.</p></button>
     </section>
     <section className="accounting-focus-grid accounting-balanced-grid">
       <Table title="Billing queue" rows={billingRows} empty="No billing items." />
       <Table title="Collections watch" rows={arRows} empty="No AR items." />
       <Table title="Vendor approval queue" rows={apRows} empty="No AP items." />
-      <Card title="System health" description="Accounting is loaded as the full room. Hardening belongs in setup and Comptroller guardrails, not as a replacement screen."><pre className="accounting-json-preview">{JSON.stringify(health || { status: 'checking' }, null, 2)}</pre></Card>
+      <Card title="System health" description="Accounting is loaded as the full accounting room with billing, purchasing, AR, AP, SOV, reports, and Comptroller workflow."><pre className="accounting-json-preview">{JSON.stringify(health || { status: 'checking' }, null, 2)}</pre></Card>
     </section>
   </>;
 }
@@ -107,21 +107,21 @@ function Billing() { return <section className="accounting-focus-grid accounting
 function Insurance() { return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Insurance compliance" rows={insuranceRows} empty="No insurance items." /><Card title="Insurance controls" description="Track certificate expirations, additional insured requests, vendor holds, and project release rules." /></section>; }
 function PurchaseOrders() { return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Purchase order queue" rows={poRows} empty="No POs." /><Card title="Create purchase order"><div className="accounting-live-form"><label><span>Vendor</span><input placeholder="Vendor name" /></label><label><span>Project / Cost code</span><input placeholder="Cost code" /></label><label><span>PO amount</span><input placeholder="$0.00" /></label><button type="button">Create PO draft</button></div></Card></section>; }
 function Receivables() { return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Accounts receivable" rows={arRows} empty="No receivables." /><Card title="Collection actions" description="Send statement, schedule follow-up, mark promise-to-pay, or route to owner review." /></section>; }
-function Payables() { return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Accounts payable" rows={apRows} empty="No payables." /><Card title="Payment run controls" description="Bills must be approved, coded, and reviewed before payment scheduling or export." /></section>; }
+function Payables() { return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Accounts payable" rows={apRows} empty="No payables." /><Card title="Payment run controls" description="Bills should be approved, coded, and reviewed before payment scheduling or export." /></section>; }
 function ScheduleOfValues() { return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Schedule of Values" rows={sovRows} empty="No SOV rows." /><Card title="SOV billing controls" description="Track line item percent complete, retainage, approved value, billed-to-date, and ready-to-bill status." /></section>; }
 function ChangeOrders() { return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Change order queue" rows={changeOrderRows} empty="No change orders." /><Card title="Change order controls" description="Pending changes should not hit billing until approved. Approved changes can flow into SOV and invoice draft queues." /></section>; }
 function Reports() { return <section className="accounting-report-room"><Card title="Accounting reports" description="Operational report library for accounting and project financial control." className="accounting-full-row"><div className="accounting-table">{reportRows.map(([title, detail, status]) => <div className="accounting-table-row" key={title}><strong>{title}</strong><span>{detail}</span><b>{status}</b></div>)}</div></Card></section>; }
 
 function Comptroller({ open, health }) {
   const rows = [
-    ['Bank feed', 'Connect Plaid, bank import, or approved production feed before matching.', 'Needs setup'],
-    ['AI matching', 'Suggests matches with confidence, reason codes, and human review.', 'Guarded'],
-    ['Approval gate', 'Approved matches can post; rejected matches stay unmatched.', 'Required'],
-    ['Audit trail', 'Every post should create a Scan/Vault/Guard trace.', 'Required']
+    ['Bank feed', 'Connect Plaid, bank import, or approved accounting feed before matching.', 'Needs setup'],
+    ['AI matching', 'Suggests matches with confidence and clear reason codes.', 'Ready'],
+    ['Review workflow', 'User reviews, edits, approves, or rejects each suggested match.', 'Available'],
+    ['Posting controls', 'Approved matches can post to books or export to the accounting system.', 'Ready']
   ];
-  return <section className="accounting-focus-grid accounting-balanced-grid"><Card title="Neroa Comptroller" description="AI accounting assistant for matching bank entries, bills, invoices, payments, cost codes, and project records. This is live as a controlled room, not a replacement for accounting."><div className="accounting-stat-grid mini"><Stat label="Mode" value="Guarded" detail="Human approval" /><Stat label="Matching" value="Ready" detail="Needs feed" /><Stat label="Posting" value="Locked" detail="Approval required" /><Stat label="Backend" value={health?.checks?.database || 'Checking'} detail="Database status" /></div><div className="accounting-actions-list"><button type="button">Review unmatched entries</button><button type="button">Open match suggestions</button><button type="button" onClick={() => open('setup')}>Open setup checklist</button></div></Card><Table title="Comptroller guardrails" rows={rows} empty="No guardrails." /></section>;
+  return <section className="accounting-focus-grid accounting-balanced-grid"><Card title="Neroa Comptroller" description="AI accounting assistant for matching bank entries, bills, invoices, payments, cost codes, and project records."><div className="accounting-stat-grid mini"><Stat label="Mode" value="Review" detail="User controlled" /><Stat label="Matching" value="Ready" detail="Needs feed" /><Stat label="Posting" value="Approval" detail="User confirms" /><Stat label="Backend" value={health?.checks?.database || 'Checking'} detail="Database status" /></div><div className="accounting-actions-list"><button type="button">Review unmatched entries</button><button type="button">Open match suggestions</button><button type="button" onClick={() => open('setup')}>Open setup</button></div></Card><Table title="Comptroller workflow" rows={rows} empty="No workflow items." /></section>;
 }
-function Setup({ health }) { const rows = [['Connect bank feed', 'Plaid, bank import, or CSV upload creates unmatched entries only.', 'Required'], ['Set matching rules', 'Vendor/customer/project/account rules with confidence thresholds.', 'Required'], ['Set approval guardrails', 'Human approval before posting, check writing, export, or external sync.', 'Required'], ['Attach audit receipts', 'Scan/Vault/Guard receipt references on every Comptroller action.', 'Required'], ['Accounting bridge', 'QuickBooks/Foundation/CSV export after approved posting.', 'Later']]; return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Setup checklist" rows={rows} empty="No setup tasks." /><Card title="Backend status"><pre className="accounting-json-preview">{JSON.stringify(health || {}, null, 2)}</pre></Card></section>; }
+function Setup({ health }) { const rows = [['Connect bank feed', 'Plaid, bank import, or CSV upload creates accounting entries for review.', 'Required'], ['Set matching rules', 'Vendor, customer, project, and account rules with confidence thresholds.', 'Required'], ['Set approval preferences', 'Choose who can approve posting, payments, exports, and syncs.', 'Required'], ['Set posting workflow', 'Choose whether entries post internally, export to QuickBooks/Foundation, or both.', 'Required'], ['Accounting bridge', 'QuickBooks/Foundation/CSV export after user-approved posting.', 'Later']]; return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Accounting setup" rows={rows} empty="No setup tasks." /><Card title="Backend status"><pre className="accounting-json-preview">{JSON.stringify(health || {}, null, 2)}</pre></Card></section>; }
 
 export default function AccountingPortal() {
   const [active, setActive] = useState(pathSection);
