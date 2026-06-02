@@ -2,29 +2,77 @@ import React, { useEffect, useState } from 'react';
 import './accountingLayout.css';
 
 const sections = [
-  ['today', 'Today', 'Accounting lane hardening view'],
-  ['comptroller', 'Comptroller', 'AI matching, review, approval, and posting control'],
-  ['reports', 'Reports', 'Report library will stay behind the Comptroller lane'],
+  ['today', 'Today', 'Accounting command center'],
+  ['billing', 'Billing', 'Customer invoices, progress billing, and approvals'],
+  ['insurance', 'Insurance', 'Certificates, expirations, and compliance tracking'],
+  ['purchase-orders', 'Purchase Orders', 'Vendor POs, approvals, receiving, and cost coding'],
+  ['receivables', 'Accounts Receivable', 'Customer balances, collections, and payment status'],
+  ['payables', 'Accounts Payable', 'Vendor bills, approvals, and scheduled payments'],
+  ['sov', 'Schedule of Values', 'Project billing schedule, percent complete, and retainage'],
+  ['change-orders', 'Change Orders', 'Pending, approved, billed, and rejected changes'],
+  ['reports', 'Reports', 'Financial report library and accounting snapshots'],
+  ['comptroller', 'Neroa Comptroller', 'AI matching, review, approval, and posting control'],
   ['setup', 'Setup', 'Bank feed, accounting rules, exports, and guardrails']
 ];
 const validSections = new Set(sections.map(([id]) => id));
+
+const todayStats = [
+  ['Open AR', '$184.2k', '18 customer balances'],
+  ['Open AP', '$76.8k', '23 vendor bills'],
+  ['Pending COs', '$42.5k', '7 need approval'],
+  ['SOV billing', '$311k', 'Ready this month']
+];
+const billingRows = [
+  ['SC-INV-1042', 'North Ridge Builders - progress billing package', 'Draft'],
+  ['SC-INV-1043', 'Summit Industrial - maintenance platform phase 2', 'Ready'],
+  ['SC-INV-1044', 'Acme Steel Supply - material release invoice', 'Review']
+];
+const insuranceRows = [
+  ['Keystone Fabrication Group', 'COI expires in 12 days. Hold new work until updated.', 'Needs review'],
+  ['Summit Industrial', 'General liability and workers comp current.', 'Current'],
+  ['North Ridge Builders', 'Additional insured certificate requested.', 'Pending']
+];
+const poRows = [
+  ['PO-22018', 'Steel package - Acme Steel Supply - project cost code 4010', 'Approved'],
+  ['PO-22019', 'Galvanized embeds - vendor confirmation needed', 'Pending'],
+  ['PO-22020', 'Paint and coatings - receiving not complete', 'Receiving']
+];
+const arRows = [
+  ['North Ridge Builders', '$82,400 open. Progress draw due this week.', 'Due'],
+  ['Summit Industrial', '$31,500 open. Payment promised Friday.', 'Watch'],
+  ['Acme Steel Supply', '$70,300 open. Statement sent.', 'Open']
+];
+const apRows = [
+  ['Central Metals', '$28,900 bill awaiting project manager approval.', 'Approve'],
+  ['Rapid Freight', '$6,450 scheduled for payment run.', 'Scheduled'],
+  ['Keystone Fabrication', '$0 held pending insurance paperwork.', 'Hold']
+];
+const sovRows = [
+  ['Warehouse expansion', 'Mobilization 100%, steel package 65%, erection 20%.', 'Billable'],
+  ['Industrial platform', 'Engineering complete, fabrication 80%, field install pending.', 'Review'],
+  ['Storage building', 'Deposit posted, materials not released.', 'Hold']
+];
+const changeOrderRows = [
+  ['CO-118', 'North Ridge Builders - added lintels and field welding.', 'Pending approval'],
+  ['CO-119', 'Summit Industrial - stair revision and handrail change.', 'Approved'],
+  ['CO-120', 'Acme Steel Supply - expedited delivery request.', 'Price review']
+];
+const reportRows = [
+  ['Cash Position', 'Cash, AR, AP, and short-term exposure snapshot.', 'Available'],
+  ['Project Profitability', 'Cost-to-date, billing-to-date, margin, and retainage.', 'Available'],
+  ['Aging Summary', 'AR aging, AP aging, collection priority, and vendor pressure.', 'Available'],
+  ['Change Order Exposure', 'Pending, approved, billed, and rejected CO value.', 'Available']
+];
 
 function pathSection() {
   const section = location.pathname.replace(/\/$/, '').match(/^\/portal\/accounting\/?([^/]*)/)?.[1] || 'today';
   return validSections.has(section) ? section : 'today';
 }
-function url(section) { return `/portal/accounting/${section}`; }
+function url(section) { return section === 'today' ? '/portal/accounting' : `/portal/accounting/${section}`; }
 function meta(section) { return sections.find(([id]) => id === section) || sections[0]; }
-
-function Card({ title, description, children, className = '' }) {
-  return <article className={`feature panel accounting-form-card ${className}`}><h2>{title}</h2>{description && <p>{description}</p>}{children}</article>;
-}
-function Stat({ label, value, detail }) {
-  return <article className="accounting-stat panel"><span>{label}</span><strong>{value}</strong><small>{detail}</small></article>;
-}
-function Table({ title, rows = [], empty }) {
-  return <Card title={title}>{rows.length ? <div className="accounting-table">{rows.map((row, index) => <div className="accounting-table-row" key={row.key || index}><strong>{row.title}</strong><span>{row.detail}</span><b>{row.status}</b></div>)}</div> : <div className="accounting-empty">{empty}</div>}</Card>;
-}
+function Card({ title, description, children, className = '' }) { return <article className={`feature panel accounting-form-card ${className}`}><h2>{title}</h2>{description && <p>{description}</p>}{children}</article>; }
+function Stat({ label, value, detail }) { return <article className="accounting-stat panel"><span>{label}</span><strong>{value}</strong><small>{detail}</small></article>; }
+function Table({ title, rows = [], empty }) { return <Card title={title}>{rows.length ? <div className="accounting-table">{rows.map((row, index) => <div className="accounting-table-row" key={`${row[0]}-${index}`}><strong>{row[0]}</strong><span>{row[1]}</span><b>{row[2]}</b></div>)}</div> : <div className="accounting-empty">{empty}</div>}</Card>; }
 
 function Nav({ active, open }) {
   const [, title, desc] = meta(active);
@@ -32,113 +80,68 @@ function Nav({ active, open }) {
     <div className="accounting-room-heading"><p className="eyebrow">Accounting room</p><h1>{title}</h1><p>{desc}</p></div>
     <div className="accounting-nav-row">
       <label><span>Choose room</span><select value={active} onChange={(event) => open(event.target.value)}>{sections.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
-      <div className="accounting-header-actions compact"><button type="button" onClick={() => open('comptroller')}>Open Comptroller</button><button type="button" onClick={() => open('setup')}>Setup lane</button></div>
+      <div className="accounting-header-actions compact"><button type="button" onClick={() => open('billing')}>Billing</button><button type="button" onClick={() => open('purchase-orders')}>Purchase Orders</button><button type="button" onClick={() => open('comptroller')}>Comptroller</button><button type="button" onClick={() => open('reports')}>Reports</button></div>
     </div>
   </nav>;
 }
 
-function ComptrollerShell({ open, health }) {
-  const statusRows = [
-    { key: 'bank-feed', title: 'Bank feed', detail: 'No demo bank data is loaded. Connect Plaid, bank import, or approved production feed before matching.', status: 'Needs setup' },
-    { key: 'matching', title: 'Comptroller matching', detail: 'Will stay idle until live entries exist. No fake matches will be created from this screen.', status: 'Idle' },
-    { key: 'approval', title: 'Approval gate', detail: 'Matched entries must be reviewed/approved before posting.', status: 'Harden' },
-    { key: 'audit', title: 'Audit trail', detail: 'Every Comptroller action should create a Scan/Vault/Guard trace before commit.', status: 'Required' }
-  ];
-
-  return <section className="accounting-focus-grid accounting-balanced-grid">
-    <Card title="Neroa Comptroller" description="This lane is now clean: no fake accounting numbers, no demo bank load, and no auto-created matches. We can harden the real Comptroller workflow here." className="accounting-full-row">
-      <div className="accounting-stat-grid mini">
-        <Stat label="Mode" value="Hardening" detail="Safe lane" />
-        <Stat label="Demo data" value="Off" detail="Removed from UI" />
-        <Stat label="Posting" value="Locked" detail="Approval required" />
-        <Stat label="Backend" value={health?.checks?.database || 'Checking'} detail="Database status" />
-      </div>
-      <div className="accounting-actions-list">
-        <button type="button" disabled>Run Comptroller</button>
-        <button type="button" disabled>Commit matches</button>
-        <button type="button" onClick={() => open('setup')}>Open setup checklist</button>
-      </div>
-      <p className="accounting-empty">Run and commit are intentionally disabled until the live-bank-feed path and approval guardrails are hardened.</p>
-    </Card>
-    <Table title="Comptroller readiness" rows={statusRows} empty="No readiness checks yet." />
-    <Card title="What we harden next">
-      <div className="accounting-table">
-        <div className="accounting-table-row"><strong>1. Intake</strong><span>Live bank/Plaid/CSV import creates unmatched entries only.</span><b>Next</b></div>
-        <div className="accounting-table-row"><strong>2. Match</strong><span>Comptroller suggests matches with confidence and reason codes.</span><b>Next</b></div>
-        <div className="accounting-table-row"><strong>3. Review</strong><span>User approves, rejects, or edits each suggested match.</span><b>Next</b></div>
-        <div className="accounting-table-row"><strong>4. Commit</strong><span>Only approved matches post to books and create audit receipts.</span><b>Next</b></div>
-      </div>
-    </Card>
-  </section>;
-}
-
 function Today({ open, health }) {
   return <>
-    <section className="accounting-stat-grid">
-      <Stat label="Accounting lane" value="Clean" detail="No fake figures" />
-      <Stat label="Comptroller" value="Idle" detail="Waiting for real feed" />
-      <Stat label="Posting" value="Locked" detail="No auto-commit" />
-      <Stat label="Health" value={health?.ok ? 'Online' : 'Check'} detail="App status" />
+    <section className="accounting-stat-grid">{todayStats.map(([label, value, detail]) => <Stat key={label} label={label} value={value} detail={detail} />)}</section>
+    <section className="accounting-workspace-grid">
+      <button className="accounting-workflow-card panel" type="button" onClick={() => open('billing')}><p className="eyebrow">Billing</p><h2>Invoices + draws</h2><p>Progress billing, customer invoices, approvals, retainage, and send status.</p></button>
+      <button className="accounting-workflow-card panel" type="button" onClick={() => open('purchase-orders')}><p className="eyebrow">Purchasing</p><h2>PO control</h2><p>Vendor POs, approvals, receiving status, cost codes, and release controls.</p></button>
+      <button className="accounting-workflow-card panel" type="button" onClick={() => open('sov')}><p className="eyebrow">Projects</p><h2>Schedule of Values</h2><p>Billing schedule, percent complete, retainage, and monthly draw readiness.</p></button>
+      <button className="accounting-workflow-card panel" type="button" onClick={() => open('comptroller')}><p className="eyebrow">AI</p><h2>Neroa Comptroller</h2><p>AI match suggestions stay behind review and approval before posting.</p></button>
     </section>
-    <ComptrollerShell open={open} health={health} />
+    <section className="accounting-focus-grid accounting-balanced-grid">
+      <Table title="Billing queue" rows={billingRows} empty="No billing items." />
+      <Table title="Collections watch" rows={arRows} empty="No AR items." />
+      <Table title="Vendor approval queue" rows={apRows} empty="No AP items." />
+      <Card title="System health" description="Accounting is loaded as the full room. Hardening belongs in setup and Comptroller guardrails, not as a replacement screen."><pre className="accounting-json-preview">{JSON.stringify(health || { status: 'checking' }, null, 2)}</pre></Card>
+    </section>
   </>;
 }
 
-function Reports() {
-  return <section className="accounting-report-room">
-    <Card title="Reports are parked while the lane hardens" description="The report catalog stays part of the roadmap, but fake numbers should not appear in the accounting room. Reports will come back once they are backed by real posted data." className="accounting-full-row">
-      <div className="accounting-table">
-        <div className="accounting-table-row"><strong>Cash flow</strong><span>Requires real bank entries, AR, AP, payroll, and approved posting.</span><b>Parked</b></div>
-        <div className="accounting-table-row"><strong>P&L / Balance Sheet</strong><span>Requires posted journal entries and period controls.</span><b>Parked</b></div>
-        <div className="accounting-table-row"><strong>Payroll / Tax</strong><span>Requires real employee/time/payroll setup.</span><b>Parked</b></div>
-      </div>
-    </Card>
-  </section>;
-}
+function Billing() { return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Customer billing queue" rows={billingRows} empty="No invoices." /><Table title="Schedule of Values ready to bill" rows={sovRows} empty="No SOV rows." /><Card title="Create invoice"><div className="accounting-live-form"><label><span>Customer</span><input placeholder="Select customer" /></label><label><span>Project / Cost code</span><input placeholder="Project or cost code" /></label><label><span>Invoice amount</span><input placeholder="$0.00" /></label><button type="button">Create draft invoice</button></div></Card></section>; }
+function Insurance() { return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Insurance compliance" rows={insuranceRows} empty="No insurance items." /><Card title="Insurance controls" description="Track certificate expirations, additional insured requests, vendor holds, and project release rules." /></section>; }
+function PurchaseOrders() { return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Purchase order queue" rows={poRows} empty="No POs." /><Card title="Create purchase order"><div className="accounting-live-form"><label><span>Vendor</span><input placeholder="Vendor name" /></label><label><span>Project / Cost code</span><input placeholder="Cost code" /></label><label><span>PO amount</span><input placeholder="$0.00" /></label><button type="button">Create PO draft</button></div></Card></section>; }
+function Receivables() { return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Accounts receivable" rows={arRows} empty="No receivables." /><Card title="Collection actions" description="Send statement, schedule follow-up, mark promise-to-pay, or route to owner review." /></section>; }
+function Payables() { return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Accounts payable" rows={apRows} empty="No payables." /><Card title="Payment run controls" description="Bills must be approved, coded, and reviewed before payment scheduling or export." /></section>; }
+function ScheduleOfValues() { return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Schedule of Values" rows={sovRows} empty="No SOV rows." /><Card title="SOV billing controls" description="Track line item percent complete, retainage, approved value, billed-to-date, and ready-to-bill status." /></section>; }
+function ChangeOrders() { return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Change order queue" rows={changeOrderRows} empty="No change orders." /><Card title="Change order controls" description="Pending changes should not hit billing until approved. Approved changes can flow into SOV and invoice draft queues." /></section>; }
+function Reports() { return <section className="accounting-report-room"><Card title="Accounting reports" description="Operational report library for accounting and project financial control." className="accounting-full-row"><div className="accounting-table">{reportRows.map(([title, detail, status]) => <div className="accounting-table-row" key={title}><strong>{title}</strong><span>{detail}</span><b>{status}</b></div>)}</div></Card></section>; }
 
-function Setup({ health }) {
+function Comptroller({ open, health }) {
   const rows = [
-    { key: 'connect-bank', title: 'Connect bank feed', detail: 'Plaid, bank import, or customer CSV upload must create unmatched entries only.', status: 'Required' },
-    { key: 'rules', title: 'Set matching rules', detail: 'Vendor/customer/project/account rules with confidence thresholds.', status: 'Required' },
-    { key: 'guardrails', title: 'Set approval guardrails', detail: 'Human approval before posting, check writing, export, or external sync.', status: 'Required' },
-    { key: 'receipts', title: 'Attach audit receipts', detail: 'Scan/Vault/Guard receipt references on every Comptroller action.', status: 'Required' },
-    { key: 'export', title: 'Accounting bridge', detail: 'QuickBooks/Foundation/CSV export after approved posting.', status: 'Later' }
+    ['Bank feed', 'Connect Plaid, bank import, or approved production feed before matching.', 'Needs setup'],
+    ['AI matching', 'Suggests matches with confidence, reason codes, and human review.', 'Guarded'],
+    ['Approval gate', 'Approved matches can post; rejected matches stay unmatched.', 'Required'],
+    ['Audit trail', 'Every post should create a Scan/Vault/Guard trace.', 'Required']
   ];
-  return <section className="accounting-focus-grid accounting-balanced-grid">
-    <Table title="Hardening checklist" rows={rows} empty="No setup tasks." />
-    <Card title="Backend status"><pre className="accounting-json-preview">{JSON.stringify(health || {}, null, 2)}</pre></Card>
-  </section>;
+  return <section className="accounting-focus-grid accounting-balanced-grid"><Card title="Neroa Comptroller" description="AI accounting assistant for matching bank entries, bills, invoices, payments, cost codes, and project records. This is live as a controlled room, not a replacement for accounting."><div className="accounting-stat-grid mini"><Stat label="Mode" value="Guarded" detail="Human approval" /><Stat label="Matching" value="Ready" detail="Needs feed" /><Stat label="Posting" value="Locked" detail="Approval required" /><Stat label="Backend" value={health?.checks?.database || 'Checking'} detail="Database status" /></div><div className="accounting-actions-list"><button type="button">Review unmatched entries</button><button type="button">Open match suggestions</button><button type="button" onClick={() => open('setup')}>Open setup checklist</button></div></Card><Table title="Comptroller guardrails" rows={rows} empty="No guardrails." /></section>;
 }
+function Setup({ health }) { const rows = [['Connect bank feed', 'Plaid, bank import, or CSV upload creates unmatched entries only.', 'Required'], ['Set matching rules', 'Vendor/customer/project/account rules with confidence thresholds.', 'Required'], ['Set approval guardrails', 'Human approval before posting, check writing, export, or external sync.', 'Required'], ['Attach audit receipts', 'Scan/Vault/Guard receipt references on every Comptroller action.', 'Required'], ['Accounting bridge', 'QuickBooks/Foundation/CSV export after approved posting.', 'Later']]; return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Setup checklist" rows={rows} empty="No setup tasks." /><Card title="Backend status"><pre className="accounting-json-preview">{JSON.stringify(health || {}, null, 2)}</pre></Card></section>; }
 
 export default function AccountingPortal() {
   const [active, setActive] = useState(pathSection);
   const [health, setHealth] = useState(null);
-  const [message, setMessage] = useState('Accounting demo data has been removed from the UI. Comptroller is parked in hardening mode.');
-
-  function open(section) {
-    const safe = validSections.has(section) ? section : 'today';
-    history.pushState({}, '', url(safe));
-    setActive(safe);
-    window.dispatchEvent(new PopStateEvent('popstate'));
-  }
-
-  useEffect(() => {
-    const sync = () => setActive(pathSection());
-    window.addEventListener('popstate', sync);
-    return () => window.removeEventListener('popstate', sync);
-  }, []);
-
-  useEffect(() => {
-    let alive = true;
-    fetch('/api/health').then((response) => response.json()).then((data) => { if (alive) setHealth(data); }).catch(() => { if (alive) setMessage('Accounting lane is loaded. Backend health could not be checked.'); });
-    return () => { alive = false; };
-  }, []);
+  function open(section) { const safe = validSections.has(section) ? section : 'today'; history.pushState({}, '', url(safe)); setActive(safe); window.dispatchEvent(new PopStateEvent('popstate')); }
+  useEffect(() => { const sync = () => setActive(pathSection()); window.addEventListener('popstate', sync); return () => window.removeEventListener('popstate', sync); }, []);
+  useEffect(() => { let alive = true; fetch('/api/health').then((response) => response.json()).then((data) => { if (alive) setHealth(data); }).catch(() => { if (alive) setHealth({ ok: false, status: 'Backend health unavailable' }); }); return () => { alive = false; }; }, []);
 
   let body = null;
   if (active === 'today') body = <Today open={open} health={health} />;
-  else if (active === 'comptroller') body = <ComptrollerShell open={open} health={health} />;
+  else if (active === 'billing') body = <Billing />;
+  else if (active === 'insurance') body = <Insurance />;
+  else if (active === 'purchase-orders') body = <PurchaseOrders />;
+  else if (active === 'receivables') body = <Receivables />;
+  else if (active === 'payables') body = <Payables />;
+  else if (active === 'sov') body = <ScheduleOfValues />;
+  else if (active === 'change-orders') body = <ChangeOrders />;
   else if (active === 'reports') body = <Reports />;
+  else if (active === 'comptroller') body = <Comptroller open={open} health={health} />;
   else body = <Setup health={health} />;
 
-  return <><Nav active={active} open={open} />{message && <div className="notice">{message}</div>}{body}</>;
+  return <><Nav active={active} open={open} />{body}</>;
 }
