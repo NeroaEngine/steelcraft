@@ -34,8 +34,8 @@
 /* Final Accounting spacing override. This file loads after accountingHardLock.css. */
 .workspace:has(.accounting-section-nav),
 .workspace:has(.accounting-subroom-header) {
-  padding-top: 0 !important;
-  gap: 0 !important;
+  padding-top: 12px !important;
+  gap: 10px !important;
 }
 
 .dashboard:has(.accounting-section-nav) .accounting-section-nav {
@@ -44,7 +44,7 @@
 
 .dashboard:has(.accounting-section-nav) .accounting-focus-grid,
 .dashboard:has(.accounting-section-nav) .accounting-report-room {
-  margin-top: -128px !important;
+  margin-top: 10px !important;
 }
 
 .dashboard:has(.accounting-section-nav) .accounting-focus-grid > .feature:first-child,
