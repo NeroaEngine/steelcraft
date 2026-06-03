@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import './accountingLayout.css';
 
 const sections = [
@@ -76,11 +76,11 @@ function Table({ title, rows = [], empty, className = '' }) { return <Card title
 
 function Nav({ active, open }) {
   const [, title, desc] = meta(active);
-  return <nav className="accounting-section-nav panel accounting-compact-nav">
+  return <nav className="accounting-section-nav accounting-compact-nav">
     <div className="accounting-room-heading"><p className="eyebrow">Accounting room</p><h1>{title}</h1><p>{desc}</p></div>
     <div className="accounting-nav-row">
       <label><span>Choose room</span><select value={active} onChange={(event) => open(event.target.value)}>{sections.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
-      <div className="accounting-header-actions compact"><button type="button" onClick={() => open('billing')}>Billing</button><button type="button" onClick={() => open('purchase-orders')}>Purchase Orders</button><button type="button" onClick={() => open('payables')}>Payment Run</button><button type="button" onClick={() => open('comptroller')}>Comptroller</button><button type="button" onClick={() => open('reports')}>Reports</button></div>
+      <div className="accounting-header-actions compact"><button type="button" onClick={() => open('billing')}>Billing</button><button type="button" onClick={() => open('purchase-orders')}>Purchase Orders</button><button type="button" onClick={() => open('payables')}>Payment Run</button><button type="button" onClick={() => open('receivables')}>Customers</button><button type="button" onClick={() => open('comptroller')}>Comptroller</button><button type="button" onClick={() => open('reports')}>Reports</button></div>
     </div>
   </nav>;
 }
@@ -104,8 +104,28 @@ function Today({ open }) {
 
 function Billing() { return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Customer billing queue" rows={billingRows} empty="No invoices." /><Table title="Schedule of Values ready to bill" rows={sovRows} empty="No SOV rows." /><Card title="Create invoice"><div className="accounting-live-form"><label><span>Customer</span><input placeholder="Select customer" /></label><label><span>Project / Cost code</span><input placeholder="Project or cost code" /></label><label><span>Invoice amount</span><input placeholder="$0.00" /></label><button type="button">Create draft invoice</button></div></Card></section>; }
 function Insurance() { return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Insurance compliance" rows={insuranceRows} empty="No insurance items." /><Card title="Insurance controls" description="Track certificate expirations, additional insured requests, vendor holds, and project release rules." /></section>; }
-function PurchaseOrders() { return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Purchase order queue" rows={poRows} empty="No POs." /><Card title="Create purchase order"><div className="accounting-live-form"><label><span>Vendor</span><input placeholder="Vendor name" /></label><label><span>Project / Cost code</span><input placeholder="Cost code" /></label><label><span>PO amount</span><input placeholder="$0.00" /></label><button type="button">Create PO draft</button></div></Card></section>; }
-function Receivables() { return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Accounts receivable" rows={arRows} empty="No receivables." /><Card title="Collection actions" description="Send statement, schedule follow-up, mark promise-to-pay, or route to owner review." /></section>; }
+function PurchaseOrders() {
+  const [showCreate, setShowCreate] = useState(false);
+  return <section className="accounting-focus-grid accounting-balanced-grid">
+    <Card title="Purchase order queue" description="Review vendor POs, approval status, receiving status, cost codes, and release controls." className="accounting-full-row accounting-expanded-payables">
+      <div className="accounting-card-toolbar"><button type="button" onClick={() => setShowCreate((value) => !value)}>{showCreate ? 'Close purchase order draft' : 'Create Purchase Order'}</button></div>
+      <div className="accounting-table">{poRows.map((row, index) => <div className="accounting-table-row" key={`${row[0]}-${index}`}><strong>{row[0]}</strong><span>{row[1]}</span><b>{row[2]}</b></div>)}</div>
+    </Card>
+    {showCreate && <Card title="Create purchase order" description="Create a full purchase order draft with vendor, project, cost code, amount, approval owner, receiving controls, and notes." className="accounting-full-row accounting-wide-form"><div className="accounting-live-form accounting-wide-live-form"><label><span>Vendor</span><input placeholder="Vendor name" /></label><label><span>Project / Cost code</span><input placeholder="Project or cost code" /></label><label><span>PO amount</span><input placeholder="$0.00" /></label><label><span>Approval owner</span><input placeholder="Project manager or accounting owner" /></label><label><span>Receiving status</span><select defaultValue="pending"><option value="pending">Pending receiving</option><option value="partial">Partially received</option><option value="complete">Received complete</option></select></label><label><span>Release control</span><select defaultValue="approval"><option value="approval">Needs approval</option><option value="ready">Ready to release</option><option value="hold">Hold</option></select></label><label className="accounting-form-wide"><span>Notes</span><textarea rows="4" placeholder="PO scope, vendor instructions, receiving notes, or internal accounting notes." /></label><button type="button">Create PO draft</button></div></Card>}
+  </section>;
+}
+function Receivables() {
+  const [search, setSearch] = useState('');
+  const filteredRows = useMemo(() => {
+    const clean = search.trim().toLowerCase();
+    if (!clean) return arRows;
+    return arRows.filter((row) => row.join(' ').toLowerCase().includes(clean));
+  }, [search]);
+  return <section className="accounting-focus-grid accounting-balanced-grid">
+    <Card title="Accounts receivable filters" description="Search and filter customer balances, dates, aging, status, and collection priority." className="accounting-full-row accounting-filter-card"><div className="accounting-filter-grid"><label><span>Search customer</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Customer name, invoice, status" /></label><label><span>From date</span><input type="date" /></label><label><span>To date</span><input type="date" /></label><label><span>Status</span><select defaultValue="all"><option value="all">All statuses</option><option value="due">Due</option><option value="watch">Watch</option><option value="open">Open</option><option value="paid">Paid</option></select></label><label><span>Aging</span><select defaultValue="all"><option value="all">All aging</option><option value="0-30">0-30 days</option><option value="31-60">31-60 days</option><option value="61-90">61-90 days</option><option value="90-plus">90+ days</option></select></label><label><span>Customer owner</span><input placeholder="Sales / PM / accounting owner" /></label></div></Card>
+    <Table title="Accounts receivable" rows={filteredRows} empty="No receivables match the filters." className="accounting-full-row accounting-expanded-payables" />
+  </section>;
+}
 function Payables() { return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Accounts payable" rows={apRows} empty="No payables." className="accounting-full-row accounting-expanded-payables" /></section>; }
 function ScheduleOfValues() { return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Schedule of Values" rows={sovRows} empty="No SOV rows." /><Card title="SOV billing controls" description="Track line item percent complete, retainage, approved value, billed-to-date, and ready-to-bill status." /></section>; }
 function ChangeOrders() { return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Change order queue" rows={changeOrderRows} empty="No change orders." /><Card title="Change order controls" description="Pending changes should not hit billing until approved. Approved changes can flow into SOV and invoice draft queues." /></section>; }
