@@ -63,6 +63,44 @@
   margin-top: 0 !important;
 }
 
+/* Keep the accounting room selector/dropdown pill readable. */
+.accounting-section-nav,
+.accounting-room-tabs,
+.accounting-room-nav,
+.accounting-tab-list {
+  align-items: center !important;
+}
+
+.accounting-section-nav button,
+.accounting-section-nav .button,
+.accounting-section-nav .pill,
+.accounting-section-nav [role="button"],
+.accounting-room-tabs button,
+.accounting-room-nav button,
+.accounting-tab-list button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 42px !important;
+  height: auto !important;
+  padding-top: 10px !important;
+  padding-bottom: 10px !important;
+  line-height: 1.2 !important;
+  overflow: visible !important;
+  white-space: nowrap !important;
+}
+
+.accounting-section-nav button *,
+.accounting-section-nav .button *,
+.accounting-section-nav .pill *,
+.accounting-section-nav [role="button"] *,
+.accounting-room-tabs button *,
+.accounting-room-nav button *,
+.accounting-tab-list button * {
+  line-height: 1.2 !important;
+  overflow: visible !important;
+}
+
 @media (max-width: 720px) {
   .accounting-stat-grid.mini {
     grid-template-columns: 1fr !important;
