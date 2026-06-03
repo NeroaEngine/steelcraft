@@ -30,3 +30,14 @@
   content: none !important;
   display: none !important;
 }
+
+/* Final Accounting spacing override. This file loads after accountingHardLock.css. */
+.workspace:has(.accounting-section-nav),
+.workspace:has(.accounting-subroom-header) {
+  padding-top: 22px !important;
+}
+
+.dashboard:has(.accounting-section-nav) .accounting-focus-grid,
+.dashboard:has(.accounting-section-nav) .accounting-report-room {
+  margin-top: 0 !important;
+}
