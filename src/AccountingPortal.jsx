@@ -58,10 +58,46 @@ const changeOrderRows = [
   ['CO-120', 'Acme Steel Supply - expedited delivery request.', 'Price review']
 ];
 const reportRows = [
-  ['Cash Position', 'Cash, AR, AP, and short-term exposure snapshot.', 'Available'],
-  ['Project Profitability', 'Cost-to-date, billing-to-date, margin, and retainage.', 'Available'],
-  ['Aging Summary', 'AR aging, AP aging, collection priority, and vendor pressure.', 'Available'],
-  ['Change Order Exposure', 'Pending, approved, billed, and rejected CO value.', 'Available']
+  ['Cash Position', 'Cash, AR, AP, deposits, and short-term exposure snapshot.', 'Available'],
+  ['AR Aging Summary', 'Customer balances by current, 30, 60, 90, and 90+ days.', 'Available'],
+  ['AP Aging Summary', 'Vendor bills by due date, aging, hold, and scheduled payment.', 'Available'],
+  ['Collections Priority', 'Customers requiring follow-up, promise-to-pay, or escalation.', 'Available'],
+  ['Payment Run Preview', 'Bills approved, scheduled, held, or missing review.', 'Available'],
+  ['Customer Statements', 'Statement-ready balances and customer communication status.', 'Available'],
+  ['Vendor Balance Summary', 'Open vendor exposure, credits, holds, and disputes.', 'Available'],
+  ['Invoice Register', 'Draft, sent, approved, paid, voided, and overdue invoices.', 'Available'],
+  ['Bill Register', 'Vendor bills by vendor, project, cost code, and approval status.', 'Available'],
+  ['Purchase Order Register', 'Open, approved, received, closed, and over-budget POs.', 'Available'],
+  ['PO Receiving Exceptions', 'POs with partial receiving, missing receipts, or mismatches.', 'Available'],
+  ['Schedule of Values Billing', 'Percent complete, retainage, billed-to-date, and ready-to-bill.', 'Available'],
+  ['Retainage Report', 'Retainage held, released, outstanding, and project aging.', 'Available'],
+  ['Change Order Exposure', 'Pending, approved, billed, rejected, and unpriced CO value.', 'Available'],
+  ['Project Profitability', 'Cost-to-date, billing-to-date, gross margin, and forecast.', 'Available'],
+  ['Job Cost by Cost Code', 'Labor, material, subcontract, equipment, and overhead by code.', 'Available'],
+  ['Committed Cost Report', 'POs, subcontract commitments, pending bills, and exposure.', 'Available'],
+  ['Unbilled Work in Progress', 'Earned value not yet billed or awaiting approval.', 'Available'],
+  ['Underbilling / Overbilling', 'Billing position by project and SOV line.', 'Available'],
+  ['Revenue Forecast', 'Expected billing, cash timing, and project draw forecast.', 'Available'],
+  ['Expense Forecast', 'Upcoming bills, POs, renewals, and payment pressure.', 'Available'],
+  ['Gross Margin Review', 'Margin by customer, project, service line, and month.', 'Available'],
+  ['Bank Reconciliation Exceptions', 'Unmatched deposits, withdrawals, transfers, and fees.', 'Available'],
+  ['Unmatched Transactions', 'Bank feed items requiring coding or AI match review.', 'Available'],
+  ['AI Match Suggestions', 'Comptroller match candidates with confidence and reason codes.', 'Available'],
+  ['Posting Approval Report', 'Items approved, rejected, edited, exported, or pending.', 'Available'],
+  ['Sales Tax Summary', 'Taxable sales, exempt customers, and filing support.', 'Available'],
+  ['1099 Vendor Review', 'Vendors requiring W-9, 1099 review, or year-end cleanup.', 'Available'],
+  ['Insurance Hold Report', 'Vendors or customers blocked by missing/expired documents.', 'Available'],
+  ['Lien Waiver Tracker', 'Required, received, missing, and project-linked waivers.', 'Available'],
+  ['Customer Deposit Report', 'Deposits received, applied, unapplied, and pending.', 'Available'],
+  ['Credit Memo Register', 'Issued credits, unapplied credits, and customer disputes.', 'Available'],
+  ['Refund Register', 'Refund requests, approvals, paid refunds, and proof.', 'Available'],
+  ['Audit Trail', 'Accounting edits, approvals, posting, exports, and user actions.', 'Available'],
+  ['Vault Evidence Report', 'Invoices, bills, POs, approvals, signed packets, and receipts.', 'Available'],
+  ['Monthly Close Checklist', 'Close tasks, blockers, approvals, and completion proof.', 'Available'],
+  ['Executive Accounting Snapshot', 'Cash, AR, AP, WIP, margin, exposure, and exceptions.', 'Available'],
+  ['Accounting Exceptions', 'Missing approvals, uncoded items, duplicates, holds, and risk flags.', 'Available'],
+  ['Customer Profitability', 'Revenue, cost, margin, AR risk, and communication status.', 'Available'],
+  ['Vendor Performance', 'Spend, disputes, late paperwork, holds, and delivery issues.', 'Available']
 ];
 
 function pathSection() {
@@ -72,75 +108,39 @@ function url(section) { return section === 'today' ? '/portal/accounting' : `/po
 function meta(section) { return sections.find(([id]) => id === section) || sections[0]; }
 function Card({ title, description, children, className = '' }) { return <article className={`feature panel accounting-form-card ${className}`}><h2>{title}</h2>{description && <p>{description}</p>}{children}</article>; }
 function Stat({ label, value, detail }) { return <article className="accounting-stat panel"><span>{label}</span><strong>{value}</strong><small>{detail}</small></article>; }
-function Table({ title, rows = [], empty, className = '' }) { return <Card title={title} className={className}>{rows.length ? <div className="accounting-table">{rows.map((row, index) => <div className="accounting-table-row" key={`${row[0]}-${index}`}><strong>{row[0]}</strong><span>{row[1]}</span><b>{row[2]}</b></div>)}</div> : <div className="accounting-empty">{empty}</div>}</Card>; }
+function Table({ title, rows = [], empty, className = '' }) { return <Card title={title} className={`accounting-full-row accounting-expanded-payables ${className}`}>{rows.length ? <div className="accounting-table">{rows.map((row, index) => <div className="accounting-table-row" key={`${row[0]}-${index}`}><strong>{row[0]}</strong><span>{row[1]}</span><b>{row[2]}</b></div>)}</div> : <div className="accounting-empty">{empty}</div>}</Card>; }
 
 function Nav({ active, open }) {
-  const [, title, desc] = meta(active);
   return <nav className="accounting-section-nav accounting-compact-nav">
-    <div className="accounting-room-heading"><p className="eyebrow">Accounting room</p><h1>{title}</h1><p>{desc}</p></div>
     <div className="accounting-nav-row">
-      <label><span>Choose room</span><select value={active} onChange={(event) => open(event.target.value)}>{sections.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
-      <div className="accounting-header-actions compact"><button type="button" onClick={() => open('billing')}>Billing</button><button type="button" onClick={() => open('purchase-orders')}>Purchase Orders</button><button type="button" onClick={() => open('payables')}>Payment Run</button><button type="button" onClick={() => open('receivables')}>Customers</button><button type="button" onClick={() => open('comptroller')}>Comptroller</button><button type="button" onClick={() => open('reports')}>Reports</button></div>
+      <label><span>Room</span><select value={active} onChange={(event) => open(event.target.value)}>{sections.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
+      <div className="accounting-header-actions compact"><button type="button" onClick={() => open('billing')}>Billing</button><button type="button" onClick={() => open('purchase-orders')}>Purchase Orders</button><button type="button" onClick={() => open('payables')}>Payment Run</button><button type="button" onClick={() => open('receivables')}>Customers</button><button type="button" onClick={() => open('comptroller')}>Comptroller</button><button type="button" onClick={() => open('reports')}>Reports</button><button type="button" onClick={() => open('setup')}>Setup</button></div>
     </div>
   </nav>;
 }
 
-function Today({ open }) {
-  return <>
-    <section className="accounting-stat-grid">{todayStats.map(([label, value, detail]) => <Stat key={label} label={label} value={value} detail={detail} />)}</section>
-    <section className="accounting-workspace-grid">
-      <button className="accounting-workflow-card panel" type="button" onClick={() => open('billing')}><p className="eyebrow">Billing</p><h2>Invoices + draws</h2><p>Progress billing, customer invoices, approvals, retainage, and send status.</p></button>
-      <button className="accounting-workflow-card panel" type="button" onClick={() => open('purchase-orders')}><p className="eyebrow">Purchasing</p><h2>PO control</h2><p>Vendor POs, approvals, receiving status, cost codes, and release controls.</p></button>
-      <button className="accounting-workflow-card panel" type="button" onClick={() => open('sov')}><p className="eyebrow">Projects</p><h2>Schedule of Values</h2><p>Billing schedule, percent complete, retainage, and monthly draw readiness.</p></button>
-      <button className="accounting-workflow-card panel" type="button" onClick={() => open('comptroller')}><p className="eyebrow">AI</p><h2>Neroa Comptroller</h2><p>AI match suggestions move through normal review before posting.</p></button>
-    </section>
-    <section className="accounting-focus-grid accounting-balanced-grid">
-      <Table title="Billing queue" rows={billingRows} empty="No billing items." />
-      <Table title="Collections watch" rows={arRows} empty="No AR items." />
-      <Table title="Vendor approval queue" rows={apRows} empty="No AP items." />
-    </section>
-  </>;
-}
+function Today({ open }) { return <><section className="accounting-stat-grid">{todayStats.map(([label, value, detail]) => <Stat key={label} label={label} value={value} detail={detail} />)}</section><section className="accounting-focus-grid accounting-balanced-grid"><Table title="Billing queue" rows={billingRows} empty="No billing items." /><Table title="Collections watch" rows={arRows} empty="No AR items." /><Table title="Vendor approval queue" rows={apRows} empty="No AP items." /></section></>; }
 
-function Billing() { return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Customer billing queue" rows={billingRows} empty="No invoices." /><Table title="Schedule of Values ready to bill" rows={sovRows} empty="No SOV rows." /><Card title="Create invoice"><div className="accounting-live-form"><label><span>Customer</span><input placeholder="Select customer" /></label><label><span>Project / Cost code</span><input placeholder="Project or cost code" /></label><label><span>Invoice amount</span><input placeholder="$0.00" /></label><button type="button">Create draft invoice</button></div></Card></section>; }
-function Insurance() { return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Insurance compliance" rows={insuranceRows} empty="No insurance items." /><Card title="Insurance controls" description="Track certificate expirations, additional insured requests, vendor holds, and project release rules." /></section>; }
+function Billing() {
+  const [showCreate, setShowCreate] = useState(false);
+  return <section className="accounting-focus-grid accounting-balanced-grid"><Card title="Customer billing queue" description="Progress billing, customer invoices, approvals, retainage, and send status." className="accounting-full-row accounting-expanded-payables"><div className="accounting-card-toolbar"><button type="button" onClick={() => setShowCreate((value) => !value)}>{showCreate ? 'Close invoice draft' : 'Create Invoice'}</button></div><div className="accounting-table">{billingRows.map((row, index) => <div className="accounting-table-row" key={`${row[0]}-${index}`}><strong>{row[0]}</strong><span>{row[1]}</span><b>{row[2]}</b></div>)}</div></Card>{showCreate && <Card title="Create invoice" description="Create a full invoice draft with customer, project, cost code, amount, retainage, send controls, and notes." className="accounting-full-row accounting-wide-form"><div className="accounting-live-form accounting-wide-live-form"><label><span>Customer</span><input placeholder="Select customer" /></label><label><span>Project / Cost code</span><input placeholder="Project or cost code" /></label><label><span>Invoice amount</span><input placeholder="$0.00" /></label><label><span>Billing type</span><select defaultValue="progress"><option value="progress">Progress billing</option><option value="standard">Standard invoice</option><option value="retainage">Retainage release</option></select></label><label><span>Approval owner</span><input placeholder="Accounting owner" /></label><label><span>Send status</span><select defaultValue="draft"><option value="draft">Draft</option><option value="ready">Ready to send</option><option value="hold">Hold</option></select></label><label className="accounting-form-wide"><span>Notes</span><textarea rows="4" placeholder="Invoice notes, customer instructions, retainage notes, or approval detail." /></label><button type="button">Create draft invoice</button></div></Card>}</section>;
+}
+function Insurance() { return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Insurance compliance" rows={insuranceRows} empty="No insurance items." /></section>; }
 function PurchaseOrders() {
   const [showCreate, setShowCreate] = useState(false);
-  return <section className="accounting-focus-grid accounting-balanced-grid">
-    <Card title="Purchase order queue" description="Review vendor POs, approval status, receiving status, cost codes, and release controls." className="accounting-full-row accounting-expanded-payables">
-      <div className="accounting-card-toolbar"><button type="button" onClick={() => setShowCreate((value) => !value)}>{showCreate ? 'Close purchase order draft' : 'Create Purchase Order'}</button></div>
-      <div className="accounting-table">{poRows.map((row, index) => <div className="accounting-table-row" key={`${row[0]}-${index}`}><strong>{row[0]}</strong><span>{row[1]}</span><b>{row[2]}</b></div>)}</div>
-    </Card>
-    {showCreate && <Card title="Create purchase order" description="Create a full purchase order draft with vendor, project, cost code, amount, approval owner, receiving controls, and notes." className="accounting-full-row accounting-wide-form"><div className="accounting-live-form accounting-wide-live-form"><label><span>Vendor</span><input placeholder="Vendor name" /></label><label><span>Project / Cost code</span><input placeholder="Project or cost code" /></label><label><span>PO amount</span><input placeholder="$0.00" /></label><label><span>Approval owner</span><input placeholder="Project manager or accounting owner" /></label><label><span>Receiving status</span><select defaultValue="pending"><option value="pending">Pending receiving</option><option value="partial">Partially received</option><option value="complete">Received complete</option></select></label><label><span>Release control</span><select defaultValue="approval"><option value="approval">Needs approval</option><option value="ready">Ready to release</option><option value="hold">Hold</option></select></label><label className="accounting-form-wide"><span>Notes</span><textarea rows="4" placeholder="PO scope, vendor instructions, receiving notes, or internal accounting notes." /></label><button type="button">Create PO draft</button></div></Card>}
-  </section>;
+  return <section className="accounting-focus-grid accounting-balanced-grid"><Card title="Purchase order queue" description="Review vendor POs, approval status, receiving status, cost codes, and release controls." className="accounting-full-row accounting-expanded-payables"><div className="accounting-card-toolbar"><button type="button" onClick={() => setShowCreate((value) => !value)}>{showCreate ? 'Close purchase order draft' : 'Create Purchase Order'}</button></div><div className="accounting-table">{poRows.map((row, index) => <div className="accounting-table-row" key={`${row[0]}-${index}`}><strong>{row[0]}</strong><span>{row[1]}</span><b>{row[2]}</b></div>)}</div></Card>{showCreate && <Card title="Create purchase order" description="Create a full purchase order draft with vendor, project, cost code, amount, approval owner, receiving controls, and notes." className="accounting-full-row accounting-wide-form"><div className="accounting-live-form accounting-wide-live-form"><label><span>Vendor</span><input placeholder="Vendor name" /></label><label><span>Project / Cost code</span><input placeholder="Project or cost code" /></label><label><span>PO amount</span><input placeholder="$0.00" /></label><label><span>Approval owner</span><input placeholder="Project manager or accounting owner" /></label><label><span>Receiving status</span><select defaultValue="pending"><option value="pending">Pending receiving</option><option value="partial">Partially received</option><option value="complete">Received complete</option></select></label><label><span>Release control</span><select defaultValue="approval"><option value="approval">Needs approval</option><option value="ready">Ready to release</option><option value="hold">Hold</option></select></label><label className="accounting-form-wide"><span>Notes</span><textarea rows="4" placeholder="PO scope, vendor instructions, receiving notes, or internal accounting notes." /></label><button type="button">Create PO draft</button></div></Card>}</section>;
 }
 function Receivables() {
   const [search, setSearch] = useState('');
-  const filteredRows = useMemo(() => {
-    const clean = search.trim().toLowerCase();
-    if (!clean) return arRows;
-    return arRows.filter((row) => row.join(' ').toLowerCase().includes(clean));
-  }, [search]);
-  return <section className="accounting-focus-grid accounting-balanced-grid">
-    <Card title="Accounts receivable filters" description="Search and filter customer balances, dates, aging, status, and collection priority." className="accounting-full-row accounting-filter-card"><div className="accounting-filter-grid"><label><span>Search customer</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Customer name, invoice, status" /></label><label><span>From date</span><input type="date" /></label><label><span>To date</span><input type="date" /></label><label><span>Status</span><select defaultValue="all"><option value="all">All statuses</option><option value="due">Due</option><option value="watch">Watch</option><option value="open">Open</option><option value="paid">Paid</option></select></label><label><span>Aging</span><select defaultValue="all"><option value="all">All aging</option><option value="0-30">0-30 days</option><option value="31-60">31-60 days</option><option value="61-90">61-90 days</option><option value="90-plus">90+ days</option></select></label><label><span>Customer owner</span><input placeholder="Sales / PM / accounting owner" /></label></div></Card>
-    <Table title="Accounts receivable" rows={filteredRows} empty="No receivables match the filters." className="accounting-full-row accounting-expanded-payables" />
-  </section>;
+  const filteredRows = useMemo(() => { const clean = search.trim().toLowerCase(); if (!clean) return arRows; return arRows.filter((row) => row.join(' ').toLowerCase().includes(clean)); }, [search]);
+  return <section className="accounting-focus-grid accounting-balanced-grid"><Card title="Accounts receivable filters" description="Search and filter customer balances, invoice dates, aging, status, and collection priority." className="accounting-full-row accounting-filter-card"><div className="accounting-filter-grid"><label><span>Search customer</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Customer name, invoice, status" /></label><label><span>From date</span><input type="date" /></label><label><span>To date</span><input type="date" /></label><label><span>Status</span><select defaultValue="all"><option value="all">All statuses</option><option value="due">Due</option><option value="watch">Watch</option><option value="open">Open</option><option value="paid">Paid</option></select></label><label><span>Aging</span><select defaultValue="all"><option value="all">All aging</option><option value="0-30">0-30 days</option><option value="31-60">31-60 days</option><option value="61-90">61-90 days</option><option value="90-plus">90+ days</option></select></label><label><span>Customer owner</span><input placeholder="Sales / PM / accounting owner" /></label></div></Card><Table title="Accounts receivable" rows={filteredRows} empty="No receivables match the filters." /></section>;
 }
-function Payables() { return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Accounts payable" rows={apRows} empty="No payables." className="accounting-full-row accounting-expanded-payables" /></section>; }
-function ScheduleOfValues() { return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Schedule of Values" rows={sovRows} empty="No SOV rows." /><Card title="SOV billing controls" description="Track line item percent complete, retainage, approved value, billed-to-date, and ready-to-bill status." /></section>; }
-function ChangeOrders() { return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Change order queue" rows={changeOrderRows} empty="No change orders." /><Card title="Change order controls" description="Pending changes should not hit billing until approved. Approved changes can flow into SOV and invoice draft queues." /></section>; }
-function Reports() { return <section className="accounting-report-room"><Card title="Accounting reports" description="Operational report library for accounting and project financial control." className="accounting-full-row"><div className="accounting-table">{reportRows.map(([title, detail, status]) => <div className="accounting-table-row" key={title}><strong>{title}</strong><span>{detail}</span><b>{status}</b></div>)}</div></Card></section>; }
-
-function Comptroller({ open, health }) {
-  const rows = [
-    ['Bank feed', 'Connect Plaid, bank import, or approved accounting feed before matching.', 'Needs setup'],
-    ['AI matching', 'Suggests matches with confidence and clear reason codes.', 'Ready'],
-    ['Review workflow', 'User reviews, edits, approves, or rejects each suggested match.', 'Available'],
-    ['Posting controls', 'Approved matches can post to books or export to the accounting system.', 'Ready']
-  ];
-  return <section className="accounting-focus-grid accounting-balanced-grid"><Card title="Neroa Comptroller" description="AI accounting assistant for matching bank entries, bills, invoices, payments, cost codes, and project records."><div className="accounting-stat-grid mini"><Stat label="Mode" value="Review" detail="User controlled" /><Stat label="Matching" value="Ready" detail="Needs feed" /><Stat label="Posting" value="Approval" detail="User confirms" /><Stat label="Backend" value={health?.checks?.database || 'Checking'} detail="Database status" /></div><div className="accounting-actions-list"><button type="button">Review unmatched entries</button><button type="button">Open match suggestions</button><button type="button" onClick={() => open('setup')}>Open setup</button></div></Card><Table title="Comptroller workflow" rows={rows} empty="No workflow items." /></section>;
-}
-function Setup({ health }) { const rows = [['Connect bank feed', 'Plaid, bank import, or CSV upload creates accounting entries for review.', 'Required'], ['Set matching rules', 'Vendor, customer, project, and account rules with confidence thresholds.', 'Required'], ['Set approval preferences', 'Choose who can approve posting, payments, exports, and syncs.', 'Required'], ['Set posting workflow', 'Choose whether entries post internally, export to QuickBooks/Foundation, or both.', 'Required'], ['Accounting bridge', 'QuickBooks/Foundation/CSV export after user-approved posting.', 'Later']]; return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Accounting setup" rows={rows} empty="No setup tasks." /><Card title="Backend status"><pre className="accounting-json-preview">{JSON.stringify(health || {}, null, 2)}</pre></Card></section>; }
+function Payables() { return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Accounts payable" rows={apRows} empty="No payables." /></section>; }
+function ScheduleOfValues() { return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Schedule of Values" rows={sovRows} empty="No SOV rows." /></section>; }
+function ChangeOrders() { return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Change order queue" rows={changeOrderRows} empty="No change orders." /></section>; }
+function Reports() { return <section className="accounting-report-room"><Card title="Accounting reports" description="Operational report library for accounting, billing, cash, project financial control, compliance evidence, and close management." className="accounting-full-row accounting-expanded-payables"><div className="accounting-table accounting-report-list">{reportRows.map(([title, detail, status]) => <div className="accounting-table-row" key={title}><strong>{title}</strong><span>{detail}</span><b>{status}</b></div>)}</div></Card></section>; }
+function Comptroller({ open }) { const rows = [['Bank feed', 'Connect Plaid, bank import, or approved accounting feed before matching.', 'Needs setup'], ['AI matching', 'Suggests matches with confidence and clear reason codes.', 'Ready'], ['Review workflow', 'User reviews, edits, approves, or rejects each suggested match.', 'Available'], ['Posting controls', 'Approved matches can post to books or export to the accounting system.', 'Ready']]; return <section className="accounting-focus-grid accounting-balanced-grid"><Card title="Neroa Comptroller" description="AI accounting assistant for matching bank entries, bills, invoices, payments, cost codes, and project records." className="accounting-full-row accounting-expanded-payables"><div className="accounting-card-toolbar"><button type="button">Review unmatched entries</button><button type="button">Open match suggestions</button><button type="button" onClick={() => open('setup')}>Open setup</button></div><div className="accounting-table">{rows.map((row, index) => <div className="accounting-table-row" key={`${row[0]}-${index}`}><strong>{row[0]}</strong><span>{row[1]}</span><b>{row[2]}</b></div>)}</div></Card></section>; }
+function Setup() { const rows = [['Connect bank feed', 'Plaid, bank import, or CSV upload creates accounting entries for review.', 'Required'], ['Set matching rules', 'Vendor, customer, project, and account rules with confidence thresholds.', 'Required'], ['Set approval preferences', 'Choose who can approve posting, payments, exports, and syncs.', 'Required'], ['Set posting workflow', 'Choose whether entries post internally, export to QuickBooks/Foundation, or both.', 'Required'], ['Accounting bridge', 'QuickBooks/Foundation/CSV export after user-approved posting.', 'Later']]; return <section className="accounting-focus-grid accounting-balanced-grid"><Table title="Accounting setup" rows={rows} empty="No setup tasks." /></section>; }
 
 export default function AccountingPortal() {
   const [active, setActive] = useState(pathSection);
