@@ -9,17 +9,20 @@
 }
 
 .accounting-section-nav {
-  width: min(100%, 1120px);
+  width: min(100%, 1180px);
   margin-inline: auto;
-  border-radius: 22px;
-  padding: 14px 16px;
+  margin-top: -142px;
+  margin-bottom: 22px;
+  border-radius: 0;
+  padding: 0 18px;
   display: grid;
-  gap: 12px;
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--brand-accent) 18%, var(--line));
-  background:
-    radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--brand-accent) 12%, transparent), transparent 32%),
-    color-mix(in srgb, var(--surface) 92%, #000 8%);
+  gap: 10px;
+  overflow: visible;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  position: relative;
+  z-index: 4;
 }
 
 .accounting-room-title,
@@ -31,6 +34,7 @@
 .accounting-room-heading {
   display: grid;
   gap: 4px;
+  max-width: 520px;
 }
 
 .accounting-room-heading h1 {
@@ -71,6 +75,8 @@
   min-height: 46px;
   border-radius: 999px;
   font-weight: 900;
+  background: color-mix(in srgb, var(--surface-alt) 88%, #000 12%);
+  border: 1px solid color-mix(in srgb, var(--line) 75%, var(--brand-accent) 25%);
 }
 
 .accounting-header-actions.compact {
@@ -125,9 +131,22 @@
 }
 
 .accounting-full-row,
+.accounting-balanced-grid > .accounting-full-row,
+.accounting-focus-grid > .accounting-full-row,
 .accounting-reports-grid > .accounting-full-row,
 .accounting-report-room > .accounting-full-row {
   grid-column: 1 / -1 !important;
+}
+
+.accounting-expanded-payables {
+  max-width: 1120px;
+  margin-inline: auto;
+}
+
+.accounting-expanded-payables .accounting-table-row {
+  grid-template-columns: minmax(180px, 0.7fr) minmax(360px, 1.6fr) auto;
+  min-height: 64px;
+  padding-inline: 18px;
 }
 
 .accounting-workspace-grid {
@@ -260,7 +279,6 @@
   color: var(--brand-accent);
 }
 
-/* Accounting readability hardening: these cards are buttons, so prevent global button text styles from turning content black. */
 .accounting-workflow-card,
 .accounting-workflow-card:visited,
 .accounting-workflow-card:hover,
@@ -305,6 +323,11 @@
 }
 
 @media (max-width: 980px) {
+  .accounting-section-nav {
+    margin-top: 0;
+    padding: 14px 16px;
+  }
+
   .accounting-nav-row,
   .accounting-report-picker {
     grid-template-columns: 1fr;
