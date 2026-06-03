@@ -6,30 +6,32 @@
 .dashboard:has(.accounting-section-nav) {
   gap: 0 !important;
   padding: 6px 10px 16px !important;
+  position: relative !important;
 }
 
 .dashboard:has(.accounting-section-nav) .dock-trigger {
   position: absolute !important;
   top: 22px !important;
   left: 22px !important;
-  z-index: 60 !important;
+  z-index: 80 !important;
 }
 
 .dashboard:has(.accounting-section-nav) .erp-topbar {
-  min-height: 142px !important;
-  height: 142px !important;
-  padding: 14px 18px 62px 82px !important;
-  align-items: center !important;
+  min-height: 156px !important;
+  height: 156px !important;
+  padding: 14px 18px 54px 96px !important;
+  align-items: flex-start !important;
   border-radius: 22px !important;
   position: relative !important;
   top: 0 !important;
+  overflow: visible !important;
 }
 
 .dashboard:has(.accounting-section-nav) .brand,
 .dashboard:has(.accounting-section-nav) .topbar-meta,
 .dashboard:has(.accounting-section-nav) .current-portal,
 .dashboard:has(.accounting-section-nav) .sign-out {
-  transform: translateY(-18px) !important;
+  transform: none !important;
 }
 
 .dashboard:has(.accounting-section-nav) .brand {
@@ -42,7 +44,7 @@
   max-width: 1280px !important;
   margin-inline: auto !important;
   gap: 18px !important;
-  padding-top: 0 !important;
+  padding-top: 96px !important;
 }
 
 .accounting-tabs,
@@ -61,30 +63,35 @@
 }
 
 .accounting-section-nav {
-  width: min(calc(100vw - 140px), 1080px) !important;
-  max-width: 1080px !important;
-  margin-inline: auto !important;
-  margin-top: -58px !important;
-  margin-bottom: 38px !important;
+  position: absolute !important;
+  top: 104px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: min(calc(100vw - 230px), 1120px) !important;
+  max-width: 1120px !important;
+  margin: 0 !important;
   padding: 0 !important;
   border: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
-  display: grid !important;
+  display: block !important;
   overflow: visible !important;
-  position: relative !important;
-  z-index: 50 !important;
+  z-index: 70 !important;
 }
 
 .accounting-nav-row {
-  display: grid !important;
-  grid-template-columns: minmax(220px, 320px) 1fr !important;
-  gap: 16px !important;
+  display: flex !important;
   align-items: center !important;
+  justify-content: center !important;
+  gap: 12px !important;
+  flex-wrap: nowrap !important;
+  width: 100% !important;
 }
 
 .accounting-nav-row label {
   margin: 0 !important;
+  flex: 0 0 300px !important;
+  max-width: 300px !important;
 }
 
 .accounting-nav-row label > span {
@@ -92,6 +99,7 @@
 }
 
 .accounting-nav-row select {
+  width: 100% !important;
   min-height: 42px !important;
   height: 42px !important;
   border-radius: 999px !important;
@@ -103,10 +111,11 @@
 .accounting-header-actions.compact,
 .accounting-header-actions {
   display: flex !important;
-  justify-content: flex-end !important;
+  justify-content: center !important;
   align-items: center !important;
-  gap: 10px !important;
-  flex-wrap: wrap !important;
+  gap: 8px !important;
+  flex-wrap: nowrap !important;
+  min-width: 0 !important;
 }
 
 .accounting-header-actions button,
@@ -115,8 +124,14 @@
 .accounting-live-form > button,
 .accounting-form-card button {
   min-height: 42px !important;
-  padding: 9px 16px !important;
+  padding: 9px 14px !important;
   border-radius: 999px !important;
+  white-space: nowrap !important;
+}
+
+.accounting-header-actions.compact button,
+.accounting-header-actions button {
+  flex: 0 0 auto !important;
 }
 
 .accounting-focus-grid,
@@ -264,6 +279,23 @@
   gap: 14px !important;
 }
 
+@media (max-width: 1240px) {
+  .accounting-section-nav {
+    width: min(calc(100vw - 170px), 1040px) !important;
+  }
+
+  .accounting-header-actions button,
+  .accounting-header-actions.compact button {
+    padding: 8px 11px !important;
+    font-size: 0.84rem !important;
+  }
+
+  .accounting-nav-row label {
+    flex-basis: 260px !important;
+    max-width: 260px !important;
+  }
+}
+
 @media (max-width: 980px) {
   .dashboard:has(.accounting-section-nav) .erp-topbar {
     height: auto !important;
@@ -271,32 +303,39 @@
     padding: 14px 14px 18px 70px !important;
   }
 
-  .dashboard:has(.accounting-section-nav) .brand,
-  .dashboard:has(.accounting-section-nav) .topbar-meta,
-  .dashboard:has(.accounting-section-nav) .current-portal,
-  .dashboard:has(.accounting-section-nav) .sign-out {
-    transform: none !important;
+  .workspace:has(.accounting-section-nav),
+  .workspace:has(.accounting-subroom-header) {
+    padding-top: 0 !important;
   }
 
   .accounting-section-nav {
-    margin-top: 12px !important;
+    position: static !important;
+    transform: none !important;
     width: 100% !important;
+    margin: 12px 0 18px !important;
   }
 
   .accounting-nav-row,
   .accounting-wide-live-form,
   .accounting-filter-grid {
+    display: grid !important;
     grid-template-columns: 1fr !important;
+  }
+
+  .accounting-nav-row label {
+    max-width: none !important;
+    flex: none !important;
+  }
+
+  .accounting-header-actions.compact,
+  .accounting-header-actions {
+    justify-content: flex-start !important;
+    flex-wrap: wrap !important;
   }
 
   .accounting-table-row,
   .accounting-expanded-payables .accounting-table-row,
   .accounting-report-list .accounting-table-row {
     grid-template-columns: 1fr !important;
-  }
-
-  .accounting-header-actions.compact,
-  .accounting-header-actions {
-    justify-content: flex-start !important;
   }
 }
