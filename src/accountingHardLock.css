@@ -1,19 +1,44 @@
 /*
   Accounting Hard Lock
-  Brand controls may change color tokens, but they must not change Accounting's structure.
-  This file must load last. It intentionally overrides the old global ERP accounting rules.
+  This file loads last and controls Accounting's final structure.
 */
+
+.dashboard:has(.accounting-section-nav) {
+  gap: 0 !important;
+  padding: 6px 10px 16px !important;
+}
+
+.dashboard:has(.accounting-section-nav) .erp-topbar {
+  min-height: 116px !important;
+  height: 116px !important;
+  padding: 12px 18px !important;
+  align-items: center !important;
+  border-radius: 22px !important;
+  position: relative !important;
+  top: 0 !important;
+}
+
+.dashboard:has(.accounting-section-nav) .brand,
+.dashboard:has(.accounting-section-nav) .topbar-meta,
+.dashboard:has(.accounting-section-nav) .current-portal,
+.dashboard:has(.accounting-section-nav) .sign-out {
+  transform: translateY(-22px) !important;
+}
 
 .workspace:has(.accounting-section-nav),
 .workspace:has(.accounting-subroom-header) {
   width: min(100%, 1280px) !important;
   max-width: 1280px !important;
   margin-inline: auto !important;
-  gap: 12px !important;
+  gap: 18px !important;
+  padding-top: 0 !important;
 }
 
 .accounting-tabs,
-.accounting-tabs button {
+.accounting-tabs button,
+.accounting-room-title,
+.accounting-room-heading,
+.accounting-subroom-header {
   display: none !important;
   visibility: hidden !important;
   height: 0 !important;
@@ -25,22 +50,26 @@
 }
 
 .accounting-section-nav {
-  border-radius: 22px !important;
-  padding: 12px 16px !important;
+  width: min(100%, 1180px) !important;
+  max-width: 1180px !important;
+  margin-inline: auto !important;
+  margin-top: -56px !important;
+  margin-bottom: 28px !important;
+  padding: 0 8px !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
   display: grid !important;
-  gap: 10px !important;
-  overflow: hidden !important;
-}
-
-.accounting-room-title {
-  display: none !important;
+  overflow: visible !important;
+  position: relative !important;
+  z-index: 35 !important;
 }
 
 .accounting-nav-row {
   display: grid !important;
-  grid-template-columns: minmax(240px, 360px) 1fr !important;
-  gap: 14px !important;
-  align-items: end !important;
+  grid-template-columns: minmax(260px, 360px) 1fr !important;
+  gap: 18px !important;
+  align-items: center !important;
 }
 
 .accounting-nav-row label {
@@ -48,18 +77,15 @@
 }
 
 .accounting-nav-row label > span {
-  display: block !important;
-  margin: 0 0 6px !important;
-  color: var(--brand-accent) !important;
-  font-size: 0.68rem !important;
-  font-weight: 900 !important;
-  letter-spacing: 0.18em !important;
-  text-transform: uppercase !important;
+  display: none !important;
 }
 
 .accounting-nav-row select {
   min-height: 44px !important;
   border-radius: 999px !important;
+  font-weight: 900 !important;
+  background: color-mix(in srgb, var(--surface-alt) 88%, #000 12%) !important;
+  border: 1px solid color-mix(in srgb, var(--line) 75%, var(--brand-accent) 25%) !important;
 }
 
 .accounting-header-actions.compact,
@@ -76,84 +102,52 @@
 .accounting-actions-list button,
 .accounting-live-form > button,
 .accounting-form-card button {
-  min-height: 40px !important;
-  padding: 9px 15px !important;
+  min-height: 42px !important;
+  padding: 9px 16px !important;
   border-radius: 999px !important;
-}
-
-.accounting-subroom-header {
-  min-height: 0 !important;
-  padding: 18px 24px !important;
-  display: grid !important;
-  grid-template-columns: 1fr auto !important;
-  align-items: center !important;
-  gap: 18px !important;
-}
-
-.accounting-subroom-header h1 {
-  font-size: clamp(32px, 3.2vw, 48px) !important;
-  margin: 4px 0 6px !important;
-}
-
-.accounting-subroom-header p {
-  margin: 0 !important;
-  max-width: 620px !important;
-}
-
-.accounting-subroom-header .live-badge {
-  font-size: 12px !important;
-  max-width: 240px !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
 }
 
 .accounting-focus-grid,
 .accounting-workspace-grid,
 .accounting-data-grid,
 .accounting-stat-grid,
-.accounting-page-format {
+.accounting-page-format,
+.accounting-report-room {
   width: 100% !important;
-  max-width: 1120px !important;
+  max-width: 1180px !important;
   margin-inline: auto !important;
 }
 
-.accounting-page-format {
-  display: grid !important;
-  grid-template-columns: minmax(0, 0.94fr) minmax(320px, 0.56fr) !important;
-  gap: 16px !important;
-  align-items: start !important;
-}
-
-.accounting-page-format > .accounting-primary-card {
-  grid-column: 1 !important;
-}
-
-.accounting-page-format > .accounting-side-stack {
-  grid-column: 2 !important;
-  display: grid !important;
-  gap: 16px !important;
-}
-
-.accounting-focus-grid {
+.accounting-focus-grid,
+.accounting-report-room {
   display: grid !important;
   grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
-  gap: 16px !important;
+  gap: 18px !important;
   align-items: start !important;
 }
 
-.accounting-focus-grid > .feature {
-  grid-column: span 6 !important;
+.accounting-focus-grid > .feature,
+.accounting-focus-grid > .feature:first-child,
+.accounting-focus-grid > .feature:first-child:has(.accounting-actions-list),
+.accounting-focus-grid > .feature:first-child:not(:has(form)):not(:has(.accounting-table)):not(:has(.accounting-stat-grid)),
+.accounting-balanced-grid > .feature:first-child,
+.accounting-report-room > .feature,
+.accounting-full-row,
+.accounting-focus-grid > .accounting-full-row,
+.accounting-balanced-grid > .accounting-full-row {
+  display: block !important;
+  grid-column: 1 / -1 !important;
   width: 100% !important;
   min-height: 0 !important;
 }
 
-/* Kill the old full-width intro cards that made Money In / Money Out look like a long ERP feed. */
-.accounting-focus-grid > .feature:first-child:has(.accounting-actions-list),
-.accounting-focus-grid > .feature:first-child:not(:has(form)):not(:has(.accounting-table)):not(:has(.accounting-stat-grid)) {
-  display: none !important;
+.accounting-workspace-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 16px !important;
 }
 
-.accounting-workspace-grid {
+.accounting-stat-grid {
   display: grid !important;
   grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   gap: 16px !important;
@@ -165,12 +159,6 @@
   gap: 16px !important;
 }
 
-.accounting-stat-grid {
-  display: grid !important;
-  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-  gap: 16px !important;
-}
-
 .accounting-form-card,
 .accounting-stat,
 .accounting-workflow-card {
@@ -178,19 +166,84 @@
 }
 
 .accounting-form-card {
-  padding: 22px !important;
+  padding: 28px !important;
+}
+
+.accounting-expanded-payables,
+.accounting-wide-form,
+.accounting-filter-card {
+  max-width: 1180px !important;
+  margin-inline: auto !important;
 }
 
 .accounting-form-card h2,
 .accounting-workflow-card h2,
 .accounting-focus-grid .feature h2 {
-  font-size: clamp(24px, 2.1vw, 34px) !important;
-  margin: 0 0 10px !important;
+  font-size: clamp(30px, 2.6vw, 42px) !important;
+  margin: 0 0 12px !important;
 }
 
 .accounting-form-card p {
-  max-width: 620px !important;
+  max-width: 920px !important;
   margin-top: 0 !important;
+}
+
+.accounting-table {
+  display: grid !important;
+  gap: 10px !important;
+}
+
+.accounting-table-row,
+.accounting-expanded-payables .accounting-table-row,
+.accounting-report-list .accounting-table-row {
+  display: grid !important;
+  grid-template-columns: minmax(220px, 0.72fr) minmax(520px, 1.9fr) auto !important;
+  gap: 18px !important;
+  min-height: 66px !important;
+  align-items: center !important;
+  padding: 14px 18px !important;
+}
+
+.accounting-card-toolbar {
+  display: flex !important;
+  justify-content: flex-end !important;
+  gap: 10px !important;
+  margin: -4px 0 16px !important;
+}
+
+.accounting-wide-form {
+  padding: 32px !important;
+}
+
+.accounting-wide-live-form,
+.accounting-filter-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 16px !important;
+}
+
+.accounting-wide-live-form label,
+.accounting-filter-grid label {
+  margin: 0 !important;
+}
+
+.accounting-form-wide,
+.accounting-wide-live-form .accounting-form-wide {
+  grid-column: 1 / -1 !important;
+}
+
+.accounting-wide-live-form > button {
+  grid-column: 1 / -1 !important;
+  min-height: 50px !important;
+  justify-self: stretch !important;
+}
+
+.accounting-filter-grid input,
+.accounting-filter-grid select,
+.accounting-wide-live-form input,
+.accounting-wide-live-form select,
+.accounting-wide-live-form textarea {
+  width: 100% !important;
 }
 
 .accounting-live-form,
@@ -199,114 +252,37 @@
   gap: 14px !important;
 }
 
-.accounting-card-section {
-  padding: 14px !important;
-  margin: 0 !important;
-  border: 1px solid color-mix(in srgb, var(--line) 72%, transparent) !important;
-  border-radius: 18px !important;
-  background: color-mix(in srgb, var(--surface-alt) 55%, transparent) !important;
-}
+@media (max-width: 980px) {
+  .dashboard:has(.accounting-section-nav) .erp-topbar {
+    height: auto !important;
+    min-height: 88px !important;
+  }
 
-.accounting-card-section + .accounting-card-section {
-  margin-top: 0 !important;
-}
+  .dashboard:has(.accounting-section-nav) .brand,
+  .dashboard:has(.accounting-section-nav) .topbar-meta,
+  .dashboard:has(.accounting-section-nav) .current-portal,
+  .dashboard:has(.accounting-section-nav) .sign-out {
+    transform: none !important;
+  }
 
-.accounting-card-section h3 {
-  margin: 0 0 12px !important;
-  color: var(--brand-accent) !important;
-  font-size: 0.82rem !important;
-  letter-spacing: 0.16em !important;
-  text-transform: uppercase !important;
-}
+  .accounting-section-nav {
+    margin-top: 12px !important;
+  }
 
-.accounting-card-grid {
-  display: grid !important;
-  grid-template-columns: repeat(2, minmax(180px, 1fr)) !important;
-  gap: 12px !important;
-}
-
-.accounting-card-grid label,
-.accounting-live-form label,
-.accounting-form-card form label {
-  margin: 0 !important;
-}
-
-.accounting-card-grid input,
-.accounting-card-grid select,
-.accounting-card-grid textarea,
-.accounting-live-form input,
-.accounting-live-form select,
-.accounting-live-form textarea,
-.accounting-form-card form input,
-.accounting-form-card form select,
-.accounting-form-card form textarea {
-  min-height: 42px !important;
-}
-
-.accounting-card-grid textarea,
-.accounting-live-form textarea,
-.accounting-form-card form textarea {
-  min-height: 76px !important;
-}
-
-.accounting-side-stack .accounting-card-grid {
-  grid-template-columns: 1fr !important;
-}
-
-.accounting-table {
-  display: grid !important;
-  gap: 8px !important;
-}
-
-.accounting-table-row {
-  display: grid !important;
-  grid-template-columns: minmax(160px, 0.75fr) minmax(160px, 1fr) auto !important;
-  align-items: center !important;
-  gap: 10px !important;
-  min-height: 52px !important;
-  padding: 10px 12px !important;
-  border-radius: 14px !important;
-}
-
-.accounting-table-row b {
-  justify-self: end !important;
-}
-
-@media (max-width: 1180px) {
   .accounting-nav-row,
-  .accounting-page-format {
+  .accounting-wide-live-form,
+  .accounting-filter-grid {
     grid-template-columns: 1fr !important;
   }
 
-  .accounting-page-format > .accounting-primary-card,
-  .accounting-page-format > .accounting-side-stack {
-    grid-column: auto !important;
-  }
-
-  .accounting-focus-grid,
-  .accounting-workspace-grid,
-  .accounting-data-grid,
-  .accounting-stat-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  }
-}
-
-@media (max-width: 720px) {
-  .accounting-subroom-header,
-  .accounting-focus-grid,
-  .accounting-workspace-grid,
-  .accounting-data-grid,
-  .accounting-stat-grid,
-  .accounting-card-grid,
-  .accounting-table-row {
+  .accounting-table-row,
+  .accounting-expanded-payables .accounting-table-row,
+  .accounting-report-list .accounting-table-row {
     grid-template-columns: 1fr !important;
   }
 
-  .accounting-subroom-header {
-    padding: 18px !important;
-  }
-
-  .accounting-table-row b {
-    justify-self: start !important;
+  .accounting-header-actions.compact,
+  .accounting-header-actions {
+    justify-content: flex-start !important;
   }
 }
