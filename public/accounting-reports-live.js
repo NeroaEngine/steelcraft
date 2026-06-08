@@ -51,30 +51,54 @@
     return location.pathname.indexOf('/portal/accounting/reports') !== -1;
   }
 
-  function panelHtml(title, description) {
-    var rows = reportData[title] || [[title, description || 'Live report generated from accounting demo data.', 'Live']];
-    var rowHtml = rows.map(function (row) {
+  function renderRows(rows) {
+    return rows.map(function (row) {
       return '<div class="accounting-table-row"><strong>' + row[0] + '</strong><span>' + row[1] + '</span><b>' + row[2] + '</b></div>';
     }).join('');
+  }
+
+  function actionNote(action, title) {
+    var messages = {
+      run: 'Report run completed. The live report output below was refreshed from current accounting demo data.',
+      export: 'Export package prepared for ' + title + '. In production this will download CSV/XLSX/PDF based on the selected report.',
+      print: 'Print view prepared for ' + title + '. Use the browser print dialog or future PDF renderer.',
+      schedule: 'Schedule request created. This report is marked for recurring delivery in the accounting close workflow.',
+      comptroller: 'Sent to Neroa Comptroller review queue with evidence and reason-code context.'
+    };
+    return '<div class="accounting-report-action-note"><strong>' + action.toUpperCase() + '</strong> - ' + (messages[action] || messages.run) + '</div>';
+  }
+
+  function runAction(panel, action) {
+    var title = panel.dataset.reportTitle || 'Accounting report';
+    var rows = reportData[title] || [[title, 'Live report generated from accounting demo data.', 'Live']];
+    var status = panel.querySelector('[data-report-status]');
+    var output = panel.querySelector('[data-report-output]');
+    if (status) status.innerHTML = '<span>Last action: ' + action + '</span><span>Updated: just now</span><span>Rows generated: ' + rows.length + '</span>';
+    if (output) output.innerHTML = actionNote(action, title) + '<div class="accounting-table">' + renderRows(rows) + '</div>';
+  }
+
+  function panelHtml(title, description) {
+    var rows = reportData[title] || [[title, description || 'Live report generated from accounting demo data.', 'Live']];
     return '' +
-      '<div class="accounting-report-live-panel" data-accounting-report-live-panel="true">' +
+      '<div class="accounting-report-live-panel" data-accounting-report-live-panel="true" data-report-title="' + title.replace(/"/g, '&quot;') + '">' +
         '<p class="eyebrow">Live accounting report</p>' +
         '<h3>' + title + '</h3>' +
         '<p>' + (description || 'Live accounting report generated from current accounting demo data.') + '</p>' +
         '<div class="accounting-report-live-summary">' +
           '<span>Rows: ' + rows.length + '</span>' +
-          '<span>Status: Live</span>' +
+          '<span>Status: Ready to run</span>' +
           '<span>Source: Accounting demo ledger</span>' +
           '<span>Comptroller-ready</span>' +
         '</div>' +
         '<div class="accounting-report-live-actions">' +
-          '<button type="button">Open Report</button>' +
-          '<button type="button">Export</button>' +
-          '<button type="button">Print</button>' +
-          '<button type="button">Schedule</button>' +
-          '<button type="button">Send to Comptroller</button>' +
+          '<button type="button" data-report-action="run">Run Report</button>' +
+          '<button type="button" data-report-action="export">Export Package</button>' +
+          '<button type="button" data-report-action="print">Prepare Print View</button>' +
+          '<button type="button" data-report-action="schedule">Schedule Delivery</button>' +
+          '<button type="button" data-report-action="comptroller">Send to Comptroller</button>' +
         '</div>' +
-        '<div class="accounting-table">' + rowHtml + '</div>' +
+        '<div class="accounting-report-live-status" data-report-status><span>Waiting for action</span></div>' +
+        '<div class="accounting-report-output" data-report-output><div class="accounting-report-action-note"><strong>Ready</strong> - Choose Run Report to generate the live report output.</div></div>' +
       '</div>';
   }
 
@@ -82,7 +106,9 @@
     if (!currentReportPage()) return;
     var room = document.querySelector('.accounting-report-room');
     if (!room) return;
-    var reportRows = Array.from(room.querySelectorAll('.accounting-table-row'));
+    var reportRows = Array.from(room.querySelectorAll('.accounting-table-row')).filter(function (row) {
+      return !row.closest('[data-accounting-report-live-panel="true"]');
+    });
     if (!reportRows.length) return;
     reportRows.forEach(function (row) {
       if (row.dataset.liveReport === 'true') return;
@@ -94,7 +120,7 @@
       row.setAttribute('role', 'button');
       row.setAttribute('aria-label', 'Open live report: ' + title);
       var status = row.querySelector('b');
-      if (status) status.textContent = 'Live';
+      if (status) status.textContent = 'Open';
       function openReport() {
         var existing = room.querySelector('[data-accounting-report-live-panel="true"]');
         if (existing) existing.remove();
@@ -124,6 +150,12 @@
   window.addEventListener('load', schedule);
   window.addEventListener('popstate', schedule);
   document.addEventListener('click', function (event) {
+    var actionButton = event.target.closest('[data-report-action]');
+    if (actionButton) {
+      var panel = actionButton.closest('[data-accounting-report-live-panel="true"]');
+      if (panel) runAction(panel, actionButton.dataset.reportAction);
+      return;
+    }
     if (event.target && (event.target.closest('.accounting-section-nav') || event.target.closest('.nav-list'))) schedule();
   });
   if (document.readyState !== 'loading') schedule();
