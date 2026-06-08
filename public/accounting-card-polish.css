@@ -63,7 +63,7 @@
   margin-top: 0 !important;
 }
 
-/* Keep the accounting room selector/dropdown pill readable. */
+/* Keep the accounting room selector/dropdown pill readable and separated from action bubbles. */
 .accounting-section-nav,
 .accounting-room-tabs,
 .accounting-room-nav,
@@ -72,7 +72,20 @@
 }
 
 .accounting-nav-row {
+  display: grid !important;
+  grid-template-columns: minmax(180px, 230px) minmax(0, 1fr) !important;
+  column-gap: 28px !important;
+  row-gap: 12px !important;
   align-items: center !important;
+}
+
+.accounting-header-actions.compact {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+  gap: 10px !important;
+  min-width: 0 !important;
 }
 
 .accounting-nav-row label {
@@ -80,6 +93,8 @@
   align-items: center !important;
   min-height: 44px !important;
   margin: 0 !important;
+  min-width: 0 !important;
+  max-width: 230px !important;
 }
 
 .accounting-nav-row > label > span {
@@ -92,6 +107,7 @@
   box-sizing: border-box !important;
   display: block !important;
   width: 100% !important;
+  max-width: 230px !important;
   min-height: 44px !important;
   height: 44px !important;
   padding: 0 46px 0 18px !important;
@@ -136,6 +152,59 @@
 .accounting-tab-list button * {
   line-height: 1.2 !important;
   overflow: visible !important;
+}
+
+.accounting-report-live-panel {
+  grid-column: 1 / -1 !important;
+  display: grid;
+  gap: 14px;
+  border: 1px solid color-mix(in srgb, var(--brand-accent, #9f3d42) 32%, var(--line, #343036));
+  border-radius: var(--radius, 22px);
+  background: radial-gradient(circle at 8% 0%, color-mix(in srgb, var(--brand-accent, #9f3d42) 14%, transparent), transparent 34%), color-mix(in srgb, var(--surface, #141418) 94%, #000 6%);
+  padding: 22px;
+  margin: 0 0 16px;
+}
+
+.accounting-report-live-panel h3 {
+  margin: 0;
+  font-size: clamp(26px, 2vw, 36px);
+  letter-spacing: -0.05em;
+}
+
+.accounting-report-live-summary,
+.accounting-report-live-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.accounting-report-live-summary span {
+  border: 1px solid color-mix(in srgb, var(--line, #343036) 76%, transparent);
+  border-radius: 999px;
+  padding: 9px 12px;
+  color: var(--muted, #b7aaa3);
+  background: color-mix(in srgb, var(--surface-alt, #1e1e24) 62%, transparent);
+}
+
+.accounting-report-live-panel button,
+.accounting-table-row[data-live-report="true"] {
+  cursor: pointer;
+}
+
+.accounting-table-row[data-live-report="true"]:hover {
+  border-color: color-mix(in srgb, var(--brand-accent, #9f3d42) 54%, var(--line, #343036));
+  background: color-mix(in srgb, var(--surface-alt, #1e1e24) 76%, transparent);
+}
+
+@media (max-width: 980px) {
+  .accounting-nav-row {
+    grid-template-columns: 1fr !important;
+  }
+
+  .accounting-nav-row label,
+  .accounting-nav-row select {
+    max-width: none !important;
+  }
 }
 
 @media (max-width: 720px) {
