@@ -172,13 +172,15 @@
 }
 
 .accounting-report-live-summary,
-.accounting-report-live-actions {
+.accounting-report-live-actions,
+.accounting-report-live-status {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
 }
 
-.accounting-report-live-summary span {
+.accounting-report-live-summary span,
+.accounting-report-live-status span {
   border: 1px solid color-mix(in srgb, var(--line, #343036) 76%, transparent);
   border-radius: 999px;
   padding: 9px 12px;
@@ -186,7 +188,49 @@
   background: color-mix(in srgb, var(--surface-alt, #1e1e24) 62%, transparent);
 }
 
-.accounting-report-live-panel button,
+.accounting-report-live-actions button {
+  appearance: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 38px !important;
+  border-radius: 14px !important;
+  border: 1px solid color-mix(in srgb, var(--line, #343036) 82%, var(--brand-accent, #9f3d42) 18%) !important;
+  background: color-mix(in srgb, var(--surface-alt, #1e1e24) 78%, #000 22%) !important;
+  color: var(--text, #f6f0ea) !important;
+  padding: 9px 13px !important;
+  font-weight: 900 !important;
+  line-height: 1.1 !important;
+  cursor: pointer;
+}
+
+.accounting-report-live-actions button:hover {
+  border-color: color-mix(in srgb, var(--brand-accent, #9f3d42) 62%, var(--line, #343036));
+  background: color-mix(in srgb, var(--brand-accent, #9f3d42) 18%, var(--surface-alt, #1e1e24));
+}
+
+.accounting-report-live-actions button[data-report-action="run"] {
+  border-color: color-mix(in srgb, var(--brand-accent, #9f3d42) 78%, white 10%) !important;
+  background: color-mix(in srgb, var(--brand-accent, #9f3d42) 72%, #000 28%) !important;
+}
+
+.accounting-report-output {
+  display: grid;
+  gap: 10px;
+}
+
+.accounting-report-action-note {
+  border: 1px solid color-mix(in srgb, var(--brand-accent, #9f3d42) 28%, var(--line, #343036));
+  border-radius: 16px;
+  padding: 12px 14px;
+  color: var(--muted, #b7aaa3);
+  background: color-mix(in srgb, var(--surface-alt, #1e1e24) 66%, transparent);
+}
+
+.accounting-report-action-note strong {
+  color: var(--text, #f6f0ea);
+}
+
 .accounting-table-row[data-live-report="true"] {
   cursor: pointer;
 }
