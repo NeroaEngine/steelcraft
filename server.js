@@ -21,6 +21,10 @@ const pool = new Pool({
   ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
 });
 
+const mondayAccountsBoardId = process.env.MONDAY_ACCOUNTS_BOARD_ID || '1781805791';
+const mondayContactsBoardId = process.env.MONDAY_CONTACTS_BOARD_ID || '1781806557';
+const mondayCrmBoardId = process.env.MONDAY_CRM_BOARD_ID || '7281109774';
+
 function toCamel(row) {
   if (!row) return row;
   const out = {};
@@ -46,6 +50,14 @@ async function runStatements(sql) {
   }
 }
 
+function normalizeName(value = '') {
+  return String(value).trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function cleanText(value = '') {
+  return String(value || '').trim();
+}
+
 function canExecuteWebsiteOptimizations(access = {}) {
   return Boolean(
     access.githubRepoConnected ||
@@ -53,6 +65,78 @@ function canExecuteWebsiteOptimizations(access = {}) {
     access.uploadedSiteFiles ||
     access.domainOwnershipVerified
   );
+}
+
+function mondayToken() {
+  return process.env.MONDAY_API_KEY || process.env.MONDAY_TOKEN || process.env.MONDAY_API_TOKEN || '';
+}
+
+function requireMondayToken() {
+  const token = mondayToken();
+  if (!token) throw new Error('Monday API token is not configured. Set MONDAY_API_KEY in the deployment environment.');
+  return token;
+}
+
+function mondayColumnMap(item = {}) {
+  const map = {};
+  for (const columnValue of item.column_values || []) {
+    const title = columnValue?.column?.title || columnValue?.title || columnValue?.id || '';
+    map[title] = cleanText(columnValue.text);
+    map[title.toLowerCase()] = cleanText(columnValue.text);
+  }
+  return map;
+}
+
+function col(map, ...names) {
+  for (const name of names) {
+    if (map[name] !== undefined && map[name] !== '') return map[name];
+    const lower = String(name).toLowerCase();
+    if (map[lower] !== undefined && map[lower] !== '') return map[lower];
+  }
+  return '';
+}
+
+async function mondayGraphql(queryText, variables = {}) {
+  const token = requireMondayToken();
+  const response = await fetch('https://api.monday.com/v2', {
+    method: 'POST',
+    headers: {
+      Authorization: token,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ query: queryText, variables }),
+  });
+
+  const payload = await response.json();
+  if (!response.ok || payload.errors) {
+    const message = payload.errors?.map((error) => error.message).join('; ') || response.statusText;
+    throw new Error(`Monday API error: ${message}`);
+  }
+  return payload.data;
+}
+
+async function fetchMondayBoard(boardId) {
+  const data = await mondayGraphql(
+    `query FetchBoard($boardIds: [ID!]) {
+      boards(ids: $boardIds) {
+        id
+        name
+        items_page(limit: 500) {
+          cursor
+          items {
+            id
+            name
+            group { id title }
+            column_values { id text value type column { title } }
+            subitems { id name column_values { id text value type column { title } } }
+            updates { id body created_at creator { name } }
+          }
+        }
+      }
+    }`,
+    { boardIds: [String(boardId)] }
+  );
+  return data.boards?.[0] || null;
 }
 
 async function initHrSchema() {
@@ -202,6 +286,75 @@ async function initCrmWebsiteSchema() {
   `);
 }
 
+async function initCrmAccountsContactsSchema() {
+  await runStatements(`
+    CREATE TABLE IF NOT EXISTS crm_accounts (
+      id SERIAL PRIMARY KEY,
+      account_name TEXT NOT NULL,
+      account_type TEXT NOT NULL DEFAULT '',
+      domain TEXT NOT NULL DEFAULT '',
+      industry TEXT NOT NULL DEFAULT '',
+      description TEXT NOT NULL DEFAULT '',
+      employee_count TEXT NOT NULL DEFAULT '',
+      headquarters_location TEXT NOT NULL DEFAULT '',
+      sales_estimating_link TEXT NOT NULL DEFAULT '',
+      source_board_id TEXT NOT NULL DEFAULT '',
+      source_board_name TEXT NOT NULL DEFAULT '',
+      monday_item_id TEXT NOT NULL UNIQUE,
+      monday_group TEXT NOT NULL DEFAULT '',
+      raw_monday JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS crm_contacts (
+      id SERIAL PRIMARY KEY,
+      account_id INTEGER REFERENCES crm_accounts(id) ON DELETE SET NULL,
+      full_name TEXT NOT NULL,
+      first_name TEXT NOT NULL DEFAULT '',
+      last_name TEXT NOT NULL DEFAULT '',
+      contact_type TEXT NOT NULL DEFAULT '',
+      title TEXT NOT NULL DEFAULT '',
+      phone TEXT NOT NULL DEFAULT '',
+      email TEXT NOT NULL DEFAULT '',
+      linked_account_text TEXT NOT NULL DEFAULT '',
+      company_text TEXT NOT NULL DEFAULT '',
+      sales_estimating_link TEXT NOT NULL DEFAULT '',
+      source_board_id TEXT NOT NULL DEFAULT '',
+      source_board_name TEXT NOT NULL DEFAULT '',
+      monday_item_id TEXT NOT NULL UNIQUE,
+      monday_group TEXT NOT NULL DEFAULT '',
+      raw_monday JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS crm_contact_notes (
+      id SERIAL PRIMARY KEY,
+      contact_id INTEGER NOT NULL REFERENCES crm_contacts(id) ON DELETE CASCADE,
+      note_type TEXT NOT NULL DEFAULT 'note',
+      body TEXT NOT NULL DEFAULT '',
+      monday_update_id TEXT NOT NULL DEFAULT '',
+      author_name TEXT NOT NULL DEFAULT '',
+      source TEXT NOT NULL DEFAULT 'monday',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS crm_monday_sync_runs (
+      id SERIAL PRIMARY KEY,
+      sync_type TEXT NOT NULL DEFAULT 'crm',
+      status TEXT NOT NULL DEFAULT 'started',
+      accounts_imported INTEGER NOT NULL DEFAULT 0,
+      contacts_imported INTEGER NOT NULL DEFAULT 0,
+      contacts_matched INTEGER NOT NULL DEFAULT 0,
+      contacts_unmatched INTEGER NOT NULL DEFAULT 0,
+      error_message TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      finished_at TIMESTAMPTZ
+    );
+  `);
+}
+
 async function seedHrData() {
   const employeeCount = await query('SELECT COUNT(*)::int AS count FROM employees');
   if (employeeCount.rows[0].count === 0) {
@@ -299,13 +452,7 @@ async function hrPayload() {
     assignedTo: assignmentRows.filter((assignment) => assignment.courseId === course.id).map((assignment) => assignment.employeeId),
     completedBy: assignmentRows.filter((assignment) => assignment.courseId === course.id && assignment.completedAt).map((assignment) => assignment.employeeId),
   }));
-  return {
-    employees,
-    ptoRequests,
-    supportRequests,
-    handbook: handbookRow ? { ...handbookRow, acknowledgedBy: acknowledged } : null,
-    training,
-  };
+  return { employees, ptoRequests, supportRequests, handbook: handbookRow ? { ...handbookRow, acknowledgedBy: acknowledged } : null, training };
 }
 
 async function crmWebsitePayload() {
@@ -335,19 +482,186 @@ async function crmWebsiteProfileWithAccess(profileId) {
   const profile = toCamel((await query('SELECT * FROM crm_website_profiles WHERE id = $1', [profileId])).rows[0]);
   if (!profile) return null;
   const sourceAccess = toCamel((await query('SELECT * FROM crm_website_optimizer_access WHERE website_profile_id = $1', [profileId])).rows[0]) || {};
-  return {
-    ...profile,
-    sourceAccess,
-    canExecuteOptimizations: canExecuteWebsiteOptimizations(sourceAccess),
-  };
+  return { ...profile, sourceAccess, canExecuteOptimizations: canExecuteWebsiteOptimizations(sourceAccess) };
+}
+
+async function upsertMondayAccount(board, item) {
+  const map = mondayColumnMap(item);
+  const accountName = cleanText(item.name);
+  const result = await query(
+    `INSERT INTO crm_accounts (account_name, account_type, domain, industry, description, employee_count, headquarters_location, sales_estimating_link, source_board_id, source_board_name, monday_item_id, monday_group, raw_monday, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW())
+     ON CONFLICT (monday_item_id) DO UPDATE SET
+       account_name = EXCLUDED.account_name,
+       account_type = EXCLUDED.account_type,
+       domain = EXCLUDED.domain,
+       industry = EXCLUDED.industry,
+       description = EXCLUDED.description,
+       employee_count = EXCLUDED.employee_count,
+       headquarters_location = EXCLUDED.headquarters_location,
+       sales_estimating_link = EXCLUDED.sales_estimating_link,
+       source_board_id = EXCLUDED.source_board_id,
+       source_board_name = EXCLUDED.source_board_name,
+       monday_group = EXCLUDED.monday_group,
+       raw_monday = EXCLUDED.raw_monday,
+       updated_at = NOW()
+     RETURNING *`,
+    [
+      accountName,
+      col(map, 'Account Type'),
+      col(map, 'Domain'),
+      col(map, 'Industry'),
+      col(map, 'Description'),
+      col(map, 'No. of employees'),
+      col(map, 'Headquarters location'),
+      col(map, '*Sales & Estimating', 'Sales & Estimating'),
+      board.id,
+      board.name,
+      String(item.id),
+      item.group?.title || '',
+      JSON.stringify(item),
+    ]
+  );
+  return toCamel(result.rows[0]);
+}
+
+async function upsertMondayContact(board, item, accountsByName) {
+  const map = mondayColumnMap(item);
+  const fullName = cleanText(item.name);
+  const linkedAccountText = col(map, 'Linked Account (Company)', 'Linked Account', 'Account', 'Company');
+  const companyText = col(map, '*Company', 'Company');
+  const matchKey = normalizeName(linkedAccountText || companyText);
+  const account = accountsByName.get(matchKey) || null;
+
+  const result = await query(
+    `INSERT INTO crm_contacts (account_id, full_name, first_name, last_name, contact_type, title, phone, email, linked_account_text, company_text, sales_estimating_link, source_board_id, source_board_name, monday_item_id, monday_group, raw_monday, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,NOW())
+     ON CONFLICT (monday_item_id) DO UPDATE SET
+       account_id = EXCLUDED.account_id,
+       full_name = EXCLUDED.full_name,
+       first_name = EXCLUDED.first_name,
+       last_name = EXCLUDED.last_name,
+       contact_type = EXCLUDED.contact_type,
+       title = EXCLUDED.title,
+       phone = EXCLUDED.phone,
+       email = EXCLUDED.email,
+       linked_account_text = EXCLUDED.linked_account_text,
+       company_text = EXCLUDED.company_text,
+       sales_estimating_link = EXCLUDED.sales_estimating_link,
+       source_board_id = EXCLUDED.source_board_id,
+       source_board_name = EXCLUDED.source_board_name,
+       monday_group = EXCLUDED.monday_group,
+       raw_monday = EXCLUDED.raw_monday,
+       updated_at = NOW()
+     RETURNING *`,
+    [
+      account?.id || null,
+      fullName,
+      col(map, 'First Name'),
+      col(map, 'Last Name'),
+      col(map, 'Type'),
+      col(map, 'Title'),
+      col(map, 'Phone'),
+      col(map, 'Email'),
+      linkedAccountText,
+      companyText,
+      col(map, '*Sales & Estimating', 'Sales & Estimating'),
+      board.id,
+      board.name,
+      String(item.id),
+      item.group?.title || '',
+      JSON.stringify(item),
+    ]
+  );
+
+  const contact = toCamel(result.rows[0]);
+  await query('DELETE FROM crm_contact_notes WHERE contact_id = $1 AND source = $2', [contact.id, 'monday']);
+
+  const comments = col(map, 'Comments', 'Notes');
+  if (comments) {
+    await query('INSERT INTO crm_contact_notes (contact_id, note_type, body, source) VALUES ($1,$2,$3,$4)', [contact.id, 'comments_column', comments, 'monday']);
+  }
+
+  for (const update of item.updates || []) {
+    const body = cleanText(update.body).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    if (body) {
+      await query(
+        'INSERT INTO crm_contact_notes (contact_id, note_type, body, monday_update_id, author_name, source, created_at) VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7::timestamptz,NOW()))',
+        [contact.id, 'monday_update', body, String(update.id || ''), update.creator?.name || '', 'monday', update.created_at || null]
+      );
+    }
+  }
+
+  for (const subitem of item.subitems || []) {
+    const subMap = mondayColumnMap(subitem);
+    const detail = Object.entries(subMap)
+      .filter(([key, value]) => key === key.toLowerCase() && value)
+      .map(([key, value]) => `${key}: ${value}`)
+      .join('; ');
+    const body = [subitem.name, detail].filter(Boolean).join(' - ');
+    if (body) {
+      await query('INSERT INTO crm_contact_notes (contact_id, note_type, body, monday_update_id, source) VALUES ($1,$2,$3,$4,$5)', [contact.id, 'subitem', body, String(subitem.id || ''), 'monday']);
+    }
+  }
+
+  return { contact, matched: Boolean(account) };
+}
+
+async function syncMondayCrm() {
+  await initCrmAccountsContactsSchema();
+  const run = await query('INSERT INTO crm_monday_sync_runs (sync_type, status) VALUES ($1,$2) RETURNING id', ['crm_accounts_contacts', 'started']);
+  const runId = run.rows[0].id;
+
+  try {
+    const accountsBoard = await fetchMondayBoard(mondayAccountsBoardId);
+    const contactsBoard = await fetchMondayBoard(mondayContactsBoardId);
+    if (!accountsBoard) throw new Error(`Accounts board not found: ${mondayAccountsBoardId}`);
+    if (!contactsBoard) throw new Error(`Contacts board not found: ${mondayContactsBoardId}`);
+
+    const accounts = [];
+    for (const item of accountsBoard.items_page?.items || []) {
+      accounts.push(await upsertMondayAccount(accountsBoard, item));
+    }
+
+    const accountRows = rows(await query('SELECT * FROM crm_accounts ORDER BY account_name'));
+    const accountsByName = new Map(accountRows.map((account) => [normalizeName(account.accountName), account]));
+
+    let contactsImported = 0;
+    let contactsMatched = 0;
+    let contactsUnmatched = 0;
+    for (const item of contactsBoard.items_page?.items || []) {
+      const result = await upsertMondayContact(contactsBoard, item, accountsByName);
+      contactsImported += 1;
+      if (result.matched) contactsMatched += 1;
+      else contactsUnmatched += 1;
+    }
+
+    await query(
+      'UPDATE crm_monday_sync_runs SET status=$1, accounts_imported=$2, contacts_imported=$3, contacts_matched=$4, contacts_unmatched=$5, finished_at=NOW() WHERE id=$6',
+      ['finished', accounts.length, contactsImported, contactsMatched, contactsUnmatched, runId]
+    );
+
+    return {
+      ok: true,
+      runId,
+      boards: { accounts: { id: accountsBoard.id, name: accountsBoard.name }, contacts: { id: contactsBoard.id, name: contactsBoard.name } },
+      accountsImported: accounts.length,
+      contactsImported,
+      contactsMatched,
+      contactsUnmatched,
+    };
+  } catch (error) {
+    await query('UPDATE crm_monday_sync_runs SET status=$1, error_message=$2, finished_at=NOW() WHERE id=$3', ['failed', error.message, runId]);
+    throw error;
+  }
 }
 
 app.get('/api/health', async (_req, res) => {
   try {
     await query('SELECT 1');
-    res.json({ ok: true, checks: { app: 'ok', database: 'connected' } });
+    res.json({ ok: true, checks: { app: 'ok', database: 'connected', monday: mondayToken() ? 'configured' : 'not_configured' } });
   } catch (error) {
-    res.status(500).json({ ok: false, checks: { app: 'ok', database: 'error' }, error: error.message });
+    res.status(500).json({ ok: false, checks: { app: 'ok', database: 'error', monday: mondayToken() ? 'configured' : 'not_configured' }, error: error.message });
   }
 });
 
@@ -355,12 +669,95 @@ app.post('/api/setup/schema', async (_req, res) => {
   try {
     await initHrSchema();
     await initCrmWebsiteSchema();
+    await initCrmAccountsContactsSchema();
     await seedHrData();
     await seedCrmWebsiteData();
-    res.json({ ok: true, message: 'HR and CRM Website Intelligence schemas initialized and seeded' });
+    res.json({ ok: true, message: 'HR, CRM Website Intelligence, and CRM Accounts/Contacts schemas initialized and seeded' });
   } catch (error) {
     res.status(500).json({ ok: false, error: error.message });
   }
+});
+
+app.get('/api/monday/status', (_req, res) => {
+  res.json({
+    ok: true,
+    configured: Boolean(mondayToken()),
+    boards: {
+      crm: mondayCrmBoardId,
+      accounts: mondayAccountsBoardId,
+      contacts: mondayContactsBoardId,
+    },
+  });
+});
+
+app.get('/api/monday/boards', async (req, res) => {
+  try {
+    const ids = String(req.query.ids || `${mondayCrmBoardId},${mondayAccountsBoardId},${mondayContactsBoardId}`).split(',').map((id) => id.trim()).filter(Boolean);
+    const data = await mondayGraphql(
+      `query Boards($boardIds: [ID!]) { boards(ids: $boardIds) { id name description state board_kind workspace { id name } groups { id title } columns { id title type } } }`,
+      { boardIds: ids }
+    );
+    res.json({ ok: true, boards: data.boards || [] });
+  } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
+});
+
+app.get('/api/monday/accounts', async (_req, res) => {
+  try { res.json({ ok: true, board: await fetchMondayBoard(mondayAccountsBoardId) }); } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
+});
+
+app.get('/api/monday/contacts', async (_req, res) => {
+  try { res.json({ ok: true, board: await fetchMondayBoard(mondayContactsBoardId) }); } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
+});
+
+app.post('/api/monday/sync-crm', async (_req, res) => {
+  try { res.json(await syncMondayCrm()); } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
+});
+
+app.get('/api/crm/accounts/schema/status', async (_req, res) => {
+  try {
+    await initCrmAccountsContactsSchema();
+    const result = await query(`
+      SELECT table_name FROM information_schema.tables
+      WHERE table_schema = 'public'
+      AND table_name IN ('crm_accounts','crm_contacts','crm_contact_notes','crm_monday_sync_runs')
+      ORDER BY table_name
+    `);
+    res.json({ ok: true, tables: result.rows.map((row) => row.table_name) });
+  } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
+});
+
+app.get('/api/crm/accounts', async (_req, res) => {
+  try { await initCrmAccountsContactsSchema(); res.json(rows(await query('SELECT * FROM crm_accounts ORDER BY account_name'))); } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
+});
+
+app.get('/api/crm/contacts', async (_req, res) => {
+  try {
+    await initCrmAccountsContactsSchema();
+    res.json(rows(await query(`
+      SELECT c.*, a.account_name, a.account_type
+      FROM crm_contacts c
+      LEFT JOIN crm_accounts a ON a.id = c.account_id
+      ORDER BY c.full_name
+    `)));
+  } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
+});
+
+app.get('/api/crm/accounts/:id/contacts', async (req, res) => {
+  try {
+    await initCrmAccountsContactsSchema();
+    res.json(rows(await query('SELECT * FROM crm_contacts WHERE account_id = $1 ORDER BY full_name', [req.params.id])));
+  } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
+});
+
+app.get('/api/crm/contacts/:id/notes', async (req, res) => {
+  try {
+    await initCrmAccountsContactsSchema();
+    res.json(rows(await query('SELECT * FROM crm_contact_notes WHERE contact_id = $1 ORDER BY created_at DESC, id DESC', [req.params.id])));
+  } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
+});
+
+app.get('/api/crm/monday-sync-runs', async (_req, res) => {
+  try { await initCrmAccountsContactsSchema(); res.json(rows(await query('SELECT * FROM crm_monday_sync_runs ORDER BY created_at DESC, id DESC LIMIT 25'))); } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
 });
 
 app.get('/api/hr/schema/status', async (_req, res) => {
@@ -372,9 +769,7 @@ app.get('/api/hr/schema/status', async (_req, res) => {
       ORDER BY table_name
     `);
     res.json({ ok: true, tables: result.rows.map((row) => row.table_name) });
-  } catch (error) {
-    res.status(500).json({ ok: false, error: error.message });
-  }
+  } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
 });
 
 app.get('/api/crm/website-intelligence/schema/status', async (_req, res) => {
@@ -386,19 +781,11 @@ app.get('/api/crm/website-intelligence/schema/status', async (_req, res) => {
       ORDER BY table_name
     `);
     res.json({ ok: true, tables: result.rows.map((row) => row.table_name) });
-  } catch (error) {
-    res.status(500).json({ ok: false, error: error.message });
-  }
+  } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
 });
 
 app.get('/api/hr', async (_req, res) => {
-  try {
-    await initHrSchema();
-    await seedHrData();
-    res.json(await hrPayload());
-  } catch (error) {
-    res.status(500).json({ ok: false, error: error.message });
-  }
+  try { await initHrSchema(); await seedHrData(); res.json(await hrPayload()); } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
 });
 
 app.get('/api/hr/employees', async (_req, res) => {
@@ -458,10 +845,7 @@ app.patch('/api/hr/concerns/:id', async (req, res) => {
 });
 
 app.get('/api/hr/handbook', async (_req, res) => {
-  try {
-    const payload = await hrPayload();
-    res.json(payload.handbook);
-  } catch (error) { res.status(500).json({ error: error.message }); }
+  try { const payload = await hrPayload(); res.json(payload.handbook); } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
 app.post('/api/hr/handbook/acknowledge', async (req, res) => {
@@ -490,16 +874,11 @@ app.post('/api/hr/training/modules', async (req, res) => {
 });
 
 app.patch('/api/hr/training/assignments/:courseId/complete', async (req, res) => {
-  try {
-    await query('UPDATE employee_training_assignments SET completed_at = NOW() WHERE course_id = $1 AND employee_id = $2', [req.params.courseId, req.body.employeeId]);
-    res.json({ ok: true });
-  } catch (error) { res.status(500).json({ error: error.message }); }
+  try { await query('UPDATE employee_training_assignments SET completed_at = NOW() WHERE course_id = $1 AND employee_id = $2', [req.params.courseId, req.body.employeeId]); res.json({ ok: true }); } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
 app.get('/api/crm/website-intelligence', async (_req, res) => {
-  try {
-    res.json(await crmWebsitePayload());
-  } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
+  try { res.json(await crmWebsitePayload()); } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
 });
 
 app.post('/api/crm/website-intelligence/crawl', async (req, res) => {
@@ -524,13 +903,7 @@ app.patch('/api/crm/website-intelligence/:id/access', async (req, res) => {
   try {
     await initCrmWebsiteSchema();
     const profileId = req.params.id;
-    const {
-      githubRepoConnected = false,
-      cmsConnected = false,
-      uploadedSiteFiles = false,
-      domainOwnershipVerified = false,
-      verifiedByUserId = null,
-    } = req.body;
+    const { githubRepoConnected = false, cmsConnected = false, uploadedSiteFiles = false, domainOwnershipVerified = false, verifiedByUserId = null } = req.body;
 
     const result = await query(
       `INSERT INTO crm_website_optimizer_access (website_profile_id, github_repo_connected, cms_connected, uploaded_site_files, domain_ownership_verified, verified_by_user_id, verified_at)
