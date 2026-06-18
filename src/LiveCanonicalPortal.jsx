@@ -8,188 +8,104 @@ const genericModules = {
   employee: { title: 'Employee Self-Service', intro: 'Employee profile, PTO requests, handbook acknowledgements, training assignments, documents, and HR help.', metrics: [['Training', '4 due', 'Assignments'], ['PTO', '2', 'Pending'], ['Docs', '12', 'Files'], ['Help', 'Live', 'Support']] }
 };
 
-const customers = [
-  { id: 1, company: 'Acme Steel Supply', contact: 'Jordan Miles', type: 'Customer', phone: '(555) 014-1188', email: 'jordan@acmesteel.com', status: 'Active', owner: 'Sales Team', activity: 'Quote updated today', value: '$84,200', location: 'Pittsburgh, PA', notes: 'Structural steel supply and fabrication support for commercial projects.' },
-  { id: 2, company: 'North Ridge Builders', contact: 'Taylor Grant', type: 'General Contractor', phone: '(555) 018-4472', email: 'taylor@northridgebuilders.com', status: 'Active', owner: 'Estimating', activity: 'Bid approved', value: '$142,000', location: 'Cleveland, OH', notes: 'Commercial construction projects and subcontractor coordination.' },
-  { id: 3, company: 'Summit Industrial', contact: 'Morgan Lee', type: 'Industrial Client', phone: '(555) 016-9090', email: 'morgan@summitindustrial.com', status: 'Active', owner: 'Operations', activity: 'Maintenance scope reviewed', value: '$63,500', location: 'Columbus, OH', notes: 'Plant maintenance, platforms, rails, and miscellaneous metals.' },
-  { id: 4, company: 'Keystone Fabrication Group', contact: 'Riley Carter', type: 'Partner', phone: '(555) 011-5528', email: 'riley@keystonefab.com', status: 'On Hold', owner: 'Admin', activity: 'Insurance document pending', value: '$0', location: 'Youngstown, OH', notes: 'Partner record requires paperwork review before new work is assigned.' }
+const accountTypeLabels = ['GC/Developers/Owners', 'General Contractors', 'Architect / Engineering Firms', 'Engineers', 'Material Suppliers / Fabricators / Vendors', 'Erectors', 'Testing & Inspection Agencies', 'Insurance / Surety', 'Financial Institutions', 'Logistics / Freight', 'Owner'];
+const contactTypeLabels = ['General Contractors', 'Financial', 'Project Owner', 'Suppliers', 'Architect/Engineer', 'No Label', 'Erectors', "Sub-Contractor PM's", 'Inspection & Testing'];
+
+const accounts = [
+  { id: 'acc-accutech', name: 'Accu-Tech Construction, Inc.', type: 'General Contractors', domain: 'accutech1.com', industry: 'Construction', description: 'General contractor account from Monday CRM. Contacts include Andy Wilkin and related bid/project contacts.', employees: '', headquarters: '', contacts: ['Andy Wilkin', 'Rachel Angeline', 'Jason Frazier'], salesEstimating: '-', itemId: '1781805791-accutech' },
+  { id: 'acc-hammond', name: 'Hammond Contracting, LLC', type: 'General Contractors', domain: '', industry: 'Construction', description: 'General contractor account. Account label is not a contact label.', employees: '', headquarters: '', contacts: ['Justin R. Hammond'], salesEstimating: '-', itemId: '1781805791-hammond' },
+  { id: 'acc-rbd', name: 'RBD Design', type: 'Architect / Engineering Firms', domain: '', industry: 'Architecture / Engineering', description: 'Architect / engineering firm account from the CRM accounts board.', employees: '', headquarters: '', contacts: ['Rob Blount'], salesEstimating: '-', itemId: '1781805791-rbd' },
+  { id: 'acc-supplier', name: 'Example Material Supplier', type: 'Material Suppliers / Fabricators / Vendors', domain: '', industry: 'Materials', description: 'Supplier/vendor account category shown separately from contact type.', employees: '', headquarters: '', contacts: ['Supplier Contact'], salesEstimating: '-', itemId: '1781805791-supplier' }
 ];
 
-const prospects = [
-  { id: 101, name: 'Casey Monroe', company: 'Monroe Warehouse Expansion', source: 'Facebook Ad', sourceDetail: 'Clicked steel building ad and requested pricing for a warehouse expansion.', phone: '(555) 019-2241', email: 'casey@monroewarehouse.com', status: 'New Prospect', owner: 'Unassigned', action: 'Start text follow-up sequence', ai: 'Prospect asked for budget pricing, delivery timing, and next available consultation.', received: '12 min ago' },
-  { id: 102, name: 'Dana Brooks', company: 'Brooks Equipment Storage', source: 'Google Ads', sourceDetail: 'Searched metal building contractor near me and submitted a quote form.', phone: '(555) 015-7760', email: 'dana@brooksequipment.com', status: 'Needs Follow Up', owner: 'Sales Team', action: 'Send quote intake email', ai: 'Prospect has site location and rough dimensions but needs scope details confirmed.', received: '48 min ago' },
-  { id: 103, name: 'Pat Riley', company: 'Riley Farm Buildings', source: 'Website Form', sourceDetail: 'Submitted contact form from the company website.', phone: '(555) 012-9005', email: 'pat@rileyfarm.com', status: 'Ready to Contact', owner: 'Estimating', action: 'Notify owner and schedule call', ai: 'Prospect needs a small agricultural storage building and wants a callback this week.', received: 'Today' }
+const contacts = [
+  { id: 'con-andy', name: 'Andy Wilkin', firstName: 'Andy', lastName: 'Wilkin', type: 'General Contractors', accountId: 'acc-accutech', linkedAccount: 'Accu-Tech Construction, Inc.', title: '', phone: '', email: 'andy@accutech1.com', comments: '', company: '', salesEstimating: '-', itemId: '1781806557-andy', updates: [
+    { kind: 'Email', date: 'Jan 5, 2026, 5:21 PM', from: 'deb.moore@accutech1.com', to: 'alex@steelcraftbuilders.com', subject: 'Re: [EXTERNAL]Re: [EXTERNAL]Tomoka Landfill PEMB RFI', body: 'In association with the estimate provided for the above-referenced project, subcontractors must complete, sign, and return the attached documents for inclusion in Accutech bid submittal.', attachments: ['Volusia Cert Aff Local Business.pdf', 'Volusia Certification Reg Debar.pdf', 'inline images'] },
+    { kind: 'Email', date: 'Dec 2, 2025, 3:55 PM', from: 'andy@accutech1.com', to: 'alex@steelcraftbuilders.com', subject: 'Project follow-up', body: 'Email thread attached to this contact record from the Monday activity timeline.', attachments: [] }
+  ] },
+  { id: 'con-justin', name: 'Justin R. Hammond', firstName: 'Justin', lastName: 'Hammond', type: 'General Contractors', accountId: 'acc-hammond', linkedAccount: 'Hammond Contracting, LLC', title: '', phone: '', email: '', comments: '', company: '', salesEstimating: '-', itemId: '1781806557-justin', updates: [{ kind: 'Note', date: 'Saved', from: 'CRM', to: 'Steel Craft', subject: 'Account relationship', body: 'Contact belongs under Hammond Contracting, LLC.', attachments: [] }] },
+  { id: 'con-rob', name: 'Rob Blount', firstName: 'Rob', lastName: 'Blount', type: 'Architect/Engineer', accountId: 'acc-rbd', linkedAccount: 'RBD Design', title: '', phone: '', email: '', comments: '', company: '', salesEstimating: '-', itemId: '1781806557-rob', updates: [{ kind: 'Note', date: 'Saved', from: 'CRM', to: 'Steel Craft', subject: 'Design contact', body: 'Architect / engineering contact record.', attachments: [] }] },
+  { id: 'con-supplier', name: 'Supplier Contact', firstName: 'Supplier', lastName: 'Contact', type: 'Suppliers', accountId: 'acc-supplier', linkedAccount: 'Example Material Supplier', title: '', phone: '', email: '', comments: '', company: '', salesEstimating: '-', itemId: '1781806557-supplier', updates: [{ kind: 'Note', date: 'Saved', from: 'CRM', to: 'Steel Craft', subject: 'Supplier contact', body: 'Supplier contact attached to material supplier account.', attachments: [] }] }
 ];
 
-const customerActivities = {
-  1: [['Email', 'Quote revision sent and stored on customer record.', 'Today'], ['Neroa Meeting', 'Video meeting summary saved with Vault link.', 'Vault'], ['Call', 'Reviewed lead time and material release schedule.', 'Yesterday'], ['Note', 'Prefers email for formal quotes and approvals.', 'Saved']],
-  2: [['Email', 'Bid approval email stored under customer file.', 'Today'], ['Meeting', 'Zoom / Google Meet style meeting record saved to Vault.', 'Vault'], ['Text', 'Reminder text queued for project scope confirmation.', 'Scheduled']],
-  3: [['Call', 'Maintenance scope reviewed with operations contact.', 'May 28'], ['Email', 'Platform detail questions sent to customer.', 'May 27'], ['Vault', 'Meeting notes, transcript, and next action linked.', 'Stored']],
-  4: [['Email', 'Insurance document request sent.', 'Pending'], ['Note', 'Hold new work until paperwork is current.', 'Saved'], ['Follow-up', 'Schedule reminder to check COI status.', 'Next week']]
+const colors = {
+  'GC/Developers/Owners': '#f6a637',
+  'General Contractors': '#4f8ff0',
+  'Architect / Engineering Firms': '#5bc3e6',
+  'Architect/Engineer': '#5bc3e6',
+  Engineers: '#62c6ee',
+  'Material Suppliers / Fabricators / Vendors': '#0a7ca4',
+  Suppliers: '#9a4ed6',
+  Erectors: '#dd79b8',
+  'Testing & Inspection Agencies': '#5b8df5',
+  'Inspection & Testing': '#5755db',
+  'Insurance / Surety': '#c7aa2f',
+  Financial: '#9bd717',
+  'Financial Institutions': '#ff5a35',
+  'Logistics / Freight': '#9656d8',
+  Owner: '#f90078',
+  'Project Owner': '#06834b',
+  'Sub-Contractor PM\'s': '#22508c',
+  'No Label': '#bbb'
 };
 
-const prospectActivities = {
-  101: [['Inbound', 'Facebook Ad captured the request and created a prospect record.', '12 min ago'], ['AI summary', 'AI detected pricing, timeline, and consultation questions.', '10 min ago'], ['Scheduled', 'First response text sequence is ready to send.', 'Next']],
-  102: [['Inbound', 'Google Ads form submitted with building dimensions.', '48 min ago'], ['Email', 'Quote intake checklist is drafted but not sent.', 'Pending'], ['Meeting link', 'Neroa Connect calendar link can be sent and saved to Vault.', 'Ready']],
-  103: [['Inbound', 'Website form submitted with preferred callback window.', 'Today'], ['Owner alert', 'Estimating should be notified before end of day.', 'Ready'], ['Call', 'Schedule a call and save the result to the record.', 'Next']]
-};
-
-const customerIntelligence = {
-  1: [['Need', 'Faster quote turnaround and reliable material release timing.', 'High'], ['Risk', 'Lead-time promises need confirmation before committing.', 'Watch'], ['Next best action', 'Send revised quote and schedule a Neroa Connect review meeting.', 'Today'], ['Opportunity', 'Upsell secure upload room and automated approval workflow.', 'Good fit']],
-  2: [['Need', 'Bid support and clean estimate history for warehouse work.', 'Active'], ['Risk', 'Scope can drift without clear intake checklist.', 'Medium'], ['Next best action', 'Send intake checklist and schedule estimator meeting.', 'Next'], ['Opportunity', 'Market progress billing, proof approvals, and customer room.', 'Strong']],
-  3: [['Need', 'Documentation-heavy maintenance work with phased approvals.', 'Active'], ['Risk', 'Drawings and approvals must stay organized.', 'Watch'], ['Next best action', 'Create follow-up task after maintenance review.', 'Today'], ['Opportunity', 'Upsell Vault-backed meeting records and project communication history.', 'Strong']],
-  4: [['Need', 'Paperwork current before new work can release.', 'Blocked'], ['Risk', 'Expired insurance blocks vendor/customer workflow.', 'High'], ['Next best action', 'Request updated COI and schedule reminder.', 'Next week'], ['Opportunity', 'Automate document expiration reminders.', 'Good fit']]
-};
-
-const prospectIntelligence = {
-  101: [['Need', 'Budget pricing, delivery timing, and consultation availability.', 'New'], ['Source', 'Facebook Ad clicked from steel building campaign.', 'Tracked'], ['Next best action', 'Start day-one text and meeting booking sequence.', 'Now'], ['Opportunity', 'Market speed, consultative quote process, and secure file intake.', 'Strong']],
-  102: [['Need', 'Quote intake checklist and scope details confirmed.', 'Open'], ['Source', 'Google Ads search intent.', 'High intent'], ['Next best action', 'Send email checklist, then call after open/read.', 'Today'], ['Opportunity', 'Market project planning and quote package clarity.', 'Strong']],
-  103: [['Need', 'Callback for agricultural storage building.', 'Ready'], ['Source', 'Website form.', 'Inbound'], ['Next best action', 'Notify estimating and send calendar link.', 'Today'], ['Opportunity', 'Market simple meeting booking and fast follow-up.', 'Good fit']]
-};
-
-const strategyRows = {
-  customer: [['Segment', 'Active account with project/history context.', 'CRM'], ['Marketing angle', 'Secure file handling, faster approvals, organized customer room.', 'Campaign'], ['Upsell path', 'Vault-backed meetings, automated follow-ups, proof approvals.', 'Sales'], ['Do not lose', 'Every email, text, call, meeting, file, and signature must remain on timeline.', 'Rule']],
-  prospect: [['Segment', 'Inbound prospect before customer conversion.', 'CRM'], ['Marketing angle', 'Respond fast, remove friction, book meeting, collect missing info.', 'Campaign'], ['Upsell path', 'Neroa Connect sequence, calendar booking, customer room after conversion.', 'Sales'], ['Do not lose', 'Lead source and all pre-customer communication must carry into customer record.', 'Rule']]
-};
-
-const workflowCopy = {
-  inbox: { title: 'Lead Inbox', text: 'All new prospect requests land here first. Facebook, Google Ads, website forms, email leads, referrals, and call-ins are normalized into prospect records before they become customers.', rows: [['Facebook Ad', '1 new prospect', 'Auto-routed'], ['Google Ads', '1 follow-up needed', 'Sales Team'], ['Website Form', '1 ready to contact', 'Estimating']] },
-  timeline: { title: 'Timeline', text: 'Shows the prospect journey: source captured, AI summary created, owner notified, text/email sent, reply received, meeting booked, vault entry created, and converted to customer.', rows: [['12 min ago', 'Facebook lead captured', 'New'], ['10 min ago', 'AI summarized request', 'Complete'], ['Next', 'Start sequence and book meeting', 'Recommended']] },
-  inbound: { title: 'Inbound Leads', text: 'Inbound lead routing identifies where the prospect came from and what information was submitted so the team knows what to do next.', rows: [['Source', 'Facebook, Google, website, email, referral, phone', 'Tracked'], ['Routing', 'Assign owner by source, service, and region', 'Ready'], ['Customer status', 'Stays prospect until converted', 'Clean CRM']] },
-  ai: { title: 'AI Communication', text: 'AI drafts the first response, detects urgency, recommends the channel, and can hand the prospect to Neroa Connect for text, call, email, video meeting, or calendar follow-up.', rows: [['Suggested text', 'Hi, this is Steel Craft. We received your request and can help.', 'Draft'], ['Suggested email', 'Quote intake checklist and next-step questions.', 'Draft'], ['Suggested meeting', 'Neroa video, Zoom, or Google Meet link saved back to Vault.', 'Ready']] },
-  automate: { title: 'Automate Follow-up', text: 'Build the prospect follow-up sequence here. Neroa Connect can manage text, email, AI calls, video meetings, calendar links, and Vault records.', rows: [['Day 1', 'Send first text and owner notification', 'Text'], ['Day 2', 'Send email with intake questions and booking link', 'Email'], ['Days 3-5', 'Daily text follow-up if no reply', 'Sequence'], ['Every 5 days', 'Long-term nurture until closed or converted', 'Nurture'], ['Meeting booked', 'Save provider, recording/transcript link, summary, and next action to Vault', 'Vault']] },
-  activity: { title: 'Activity + Scheduled Follow-up', text: 'Track every contact attempt and schedule the next touch. Phone calls, texts, emails, notes, owner updates, meetings, and Vault links should all write back to the record.', rows: [['Log contact', 'Record a call, text, email, note, or meeting.', 'Manual'], ['Schedule email', 'Pick a date/time and save the email draft.', 'Scheduled'], ['Schedule meeting', 'Use Neroa video, Zoom, Google Meet, or calendar link.', 'Connect'], ['Vault link', 'Store recording, transcript, summary, and next action.', 'Vault'], ['Next touch', 'Set the next follow-up date and assigned owner.', 'Required']] }
-};
-
-const actionCopy = {
-  addCustomer: ['Add Customer', 'Create a new customer record. Save company, contact, email, phone, owner, notes, and initial activity history.'],
-  addProspect: ['Add Prospect', 'Create a new prospect manually or from an inbound source before converting it to a customer.'],
-  connect: ['Set up Neroa Connect', 'Connect Neroa video meetings, Twilio, email, calling, calendar, Zoom, Google Meet, and Vault storage so every interaction writes back to the customer file.'],
-  textSequence: ['Build Text Sequence', 'Choose first text, follow-up cadence, stop conditions, reply handling, owner notification, and Vault activity logging.'],
-  scheduleEmail: ['Schedule Email', 'Draft an email, choose the send date, connect it to this record, and store the sent email in communication history.'],
-  scheduleCall: ['Schedule Call', 'Create a call task or AI call, assign an owner, choose a date/time, and log the result back to the record.'],
-  calendar: ['Send Calendar / Meeting Link', 'Choose availability, provider, meeting length, booking window, and host, then push the booking page to Neroa Connect Calendar. When the meeting happens, the provider, attendees, recording/transcript link, summary, and next action save back to Vault.'],
-  aiCall: ['AI Call Step', 'Configure an AI call attempt, call script, handoff rule, meeting-booking path, and Vault summary.'],
-  log: ['Log Activity', 'Add a manual email, call, text, meeting, owner update, Vault link, or note to this record.'],
-  save: ['Save Record', 'Save changes to the customer or prospect record and update the activity history.'],
-  edit: ['Edit Record', 'Unlock the record fields so a user can update contact details, owner, status, notes, and contact preferences.'],
-  convert: ['Convert to Customer', 'Move this prospect into the Customer List while keeping the original source, communication history, automation record, meeting history, intelligence summary, marketing strategy, and Vault links.'],
-  sendText: ['Send Text', 'Open the text composer, send through Twilio/Neroa Connect, and store the message under this record.'],
-  sendEmail: ['Send Email', 'Open the email composer, send through connected email, and store the email under this record.'],
-  owner: ['Notify Owner', 'Send an internal notification to the assigned owner with the prospect summary and next action.']
-};
-
-const saasButton = { border: '0', borderRadius: 14, padding: '12px 16px', background: 'linear-gradient(135deg, var(--brand-accent), #c95d63)', color: 'white', fontWeight: 900, boxShadow: '0 12px 28px rgba(0,0,0,.28)' };
-const ghostButton = { border: '1px solid var(--line)', borderRadius: 14, padding: '12px 16px', background: 'rgba(255,255,255,.06)', color: 'var(--text)', fontWeight: 900 };
-const tabButton = (active) => ({ border: '1px solid var(--line)', borderRadius: 999, padding: '12px 18px', background: active ? 'var(--brand-accent)' : 'rgba(255,255,255,.05)', color: 'white', fontWeight: 950, boxShadow: active ? '0 12px 28px rgba(0,0,0,.24)' : 'none' });
-
-const crmStyles = {
-  shell: { width: 'min(1320px, 100%)', margin: '0 auto', display: 'grid', gap: 18, justifyItems: 'center' },
-  listCard: { width: 'min(1180px, calc(100vw - 90px))', padding: 30, margin: '0 auto' },
-  tabs: { display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 18 },
-  listHeader: { display: 'grid', gridTemplateColumns: '1fr auto', gap: 18, alignItems: 'start', marginBottom: 20 },
-  title: { fontSize: 'clamp(34px, 4vw, 54px)', lineHeight: .95, margin: '8px 0', letterSpacing: '-0.05em' },
-  subText: { color: 'var(--muted)', margin: 0, lineHeight: 1.55 },
-  headerRight: { display: 'grid', gap: 12, justifyItems: 'end' },
-  chips: { display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 10 },
-  chip: { border: '1px solid var(--line)', borderRadius: 18, padding: '10px 14px', background: 'rgba(255,255,255,.04)', minWidth: 96 },
-  chipLabel: { display: 'block', color: 'var(--muted)', fontSize: 11, letterSpacing: '.08em', textTransform: 'uppercase', fontWeight: 900 },
-  chipValue: { display: 'block', fontSize: 26, fontWeight: 950, marginTop: 4 },
-  actions: { display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap' },
-  search: { width: 330, maxWidth: '100%' },
-  tools: { display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-start', margin: '4px 0 18px' },
-  panel: { border: '1px solid var(--line)', borderRadius: 22, background: 'rgba(255,255,255,.04)', padding: 18, marginBottom: 18 },
-  panelGrid: { display: 'grid', gap: 10, marginTop: 14 },
-  panelRow: { display: 'grid', gridTemplateColumns: '1fr 1.6fr auto', gap: 12, alignItems: 'center', padding: 12, border: '1px solid var(--line)', borderRadius: 14, background: 'rgba(0,0,0,.12)' },
-  table: { display: 'grid', gap: 10, overflowX: 'auto' },
-  row: { minWidth: 1040, display: 'grid', gridTemplateColumns: '1.4fr 1fr .9fr .8fr .9fr 1.1fr .8fr .45fr', gap: 14, alignItems: 'center', textAlign: 'left' },
-  prospectRow: { minWidth: 1040, display: 'grid', gridTemplateColumns: '1.2fr 1fr .9fr 1fr .9fr 1.2fr .8fr', gap: 14, alignItems: 'center', textAlign: 'left' },
-  head: { color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.08em', fontSize: 12, fontWeight: 900, padding: '0 14px' },
-  dataRow: { width: '100%', border: '1px solid var(--line)', borderRadius: 18, background: 'var(--surface-alt)', color: 'var(--text)', padding: 18, boxShadow: '0 14px 34px rgba(0,0,0,.16)' },
-  overlay: { position: 'fixed', inset: 0, zIndex: 40, display: 'grid', placeItems: 'start center', padding: '80px 24px 40px', background: 'rgba(0,0,0,.54)', backdropFilter: 'blur(6px)', overflowY: 'auto' },
-  record: { width: 'min(1180px, calc(100vw - 80px))', padding: 34, borderRadius: 28, boxShadow: '0 28px 90px rgba(0,0,0,.55)' },
-  recordHeader: { display: 'flex', justifyContent: 'space-between', gap: 18, alignItems: 'start', marginBottom: 20 },
-  recordTitle: { fontSize: 'clamp(30px, 4vw, 48px)', lineHeight: 1, margin: '8px 0', letterSpacing: '-0.05em' },
-  form: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 },
-  full: { gridColumn: '1 / -1' },
-  recordActions: { display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, flexWrap: 'wrap' },
-  recordGrid: { display: 'grid', gridTemplateColumns: 'minmax(0, .85fr) minmax(420px, .85fr)', gap: 18, alignItems: 'start', marginTop: 18 },
-  miniCard: { border: '1px solid var(--line)', borderRadius: 18, padding: 16, background: 'rgba(255,255,255,.04)' },
-  textarea: { minHeight: 96 }
+const styles = {
+  shell: { width: 'min(1440px, 100%)', margin: '0 auto', display: 'grid', gap: 18 },
+  card: { border: '1px solid var(--line)', borderRadius: 24, background: 'var(--card)', padding: 24, boxShadow: '0 18px 48px rgba(0,0,0,.2)' },
+  top: { display: 'grid', gridTemplateColumns: '1fr auto', gap: 18, alignItems: 'start' },
+  tabs: { display: 'flex', gap: 10, flexWrap: 'wrap' },
+  button: { border: '1px solid var(--line)', borderRadius: 14, padding: '11px 16px', background: 'rgba(255,255,255,.06)', color: 'var(--text)', fontWeight: 900 },
+  activeButton: { border: '0', borderRadius: 14, padding: '11px 16px', background: 'var(--brand-accent)', color: '#fff', fontWeight: 950 },
+  search: { minWidth: 320 },
+  table: { display: 'grid', gap: 8, overflowX: 'auto' },
+  accountRow: { minWidth: 1120, display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr 1fr .8fr .45fr', gap: 12, alignItems: 'center' },
+  contactRow: { minWidth: 1120, display: 'grid', gridTemplateColumns: '1.1fr .9fr 1.2fr .8fr .8fr 1.2fr .45fr', gap: 12, alignItems: 'center' },
+  head: { color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.08em', fontSize: 12, fontWeight: 900, padding: '0 12px' },
+  dataRow: { width: '100%', border: '1px solid var(--line)', borderRadius: 16, background: 'var(--surface-alt)', color: 'var(--text)', padding: 14, textAlign: 'left' },
+  label: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, padding: '8px 12px', color: '#fff', fontWeight: 900, whiteSpace: 'nowrap' },
+  overlay: { position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(0,0,0,.55)', backdropFilter: 'blur(5px)', display: 'grid', placeItems: 'start center', padding: '55px 24px', overflowY: 'auto' },
+  modal: { width: 'min(1500px, calc(100vw - 50px))', borderRadius: 24, border: '1px solid var(--line)', background: 'var(--card)', color: 'var(--text)', boxShadow: '0 30px 90px rgba(0,0,0,.55)', overflow: 'hidden' },
+  modalHeader: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'start', padding: '22px 26px', borderBottom: '1px solid var(--line)' },
+  modalBody: { display: 'grid', gridTemplateColumns: 'minmax(520px, 1fr) 420px', gap: 0, minHeight: 620 },
+  timeline: { padding: 24, background: 'rgba(255,255,255,.025)', borderRight: '1px solid var(--line)' },
+  side: { padding: 24, display: 'grid', gap: 12, alignContent: 'start' },
+  field: { display: 'grid', gap: 6 },
+  fieldBox: { border: '1px solid var(--line)', borderRadius: 12, padding: '12px 14px', background: 'rgba(255,255,255,.05)', minHeight: 42 },
+  update: { border: '1px solid var(--line)', borderRadius: 18, background: 'var(--surface-alt)', padding: 18, display: 'grid', gap: 10, marginBottom: 16 },
+  pills: { display: 'flex', gap: 8, flexWrap: 'wrap' },
+  pill: { border: '1px solid var(--line)', borderRadius: 999, padding: '7px 10px', background: 'rgba(255,255,255,.06)', fontSize: 12 }
 };
 
 function Metric({ row }) { return <div className="live-module-metric"><strong>{row[0]}</strong><b>{row[1]}</b><span>{row[2]}</span></div>; }
 function SimpleGrid({ title, rows }) { return <div className="live-module-grid crm-wide-grid"><article className="live-module-card crm-wide-card"><h3>{title}</h3><div className="live-module-list">{rows.map((row) => <div className="live-module-row" key={row[0]}><div><strong>{row[0]}</strong><span>{row[1]}</span></div><b>{row[2]}</b></div>)}</div></article></div>; }
-function Field({ label, children, full = false }) { return <label style={full ? crmStyles.full : undefined}><span>{label}</span>{children}</label>; }
-function MiniRows({ rows = [], onAction }) { return <div style={crmStyles.panelGrid}>{rows.map((row) => <button type="button" style={{ ...crmStyles.panelRow, color: 'var(--text)', textAlign: 'left' }} key={`${row[0]}-${row[2]}`} onClick={() => onAction ? onAction(row[2] === 'Vault' || row[2] === 'Stored' ? 'calendar' : 'log') : null}><strong>{row[0]}</strong><span>{row[1]}</span><b>{row[2]}</b></button>)}</div>; }
+function Label({ value }) { return <span style={{ ...styles.label, background: colors[value] || '#666' }}>{value || 'No Label'}</span>; }
+function FieldView({ label, value }) { return <label style={styles.field}><span>{label}</span><div style={styles.fieldBox}>{value || '-'}</div></label>; }
 
-function CalendarBookingFields() {
-  return <>
-    <Field label="Push to"><input value="Neroa Connect Calendar" readOnly /></Field>
-    <Field label="Meeting type"><select defaultValue="discovery"><option value="discovery">Discovery call</option><option value="quote-review">Quote review</option><option value="project-review">Project review</option><option value="follow-up">Follow-up</option></select></Field>
-    <Field label="Available days"><select defaultValue="weekdays"><option value="weekdays">Monday - Friday</option><option value="mon-wed-fri">Monday / Wednesday / Friday</option><option value="tue-thu">Tuesday / Thursday</option><option value="custom">Custom availability</option></select></Field>
-    <Field label="Meeting length"><select defaultValue="30"><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="45">45 minutes</option><option value="60">60 minutes</option></select></Field>
-    <Field label="Start time"><input type="time" defaultValue="09:00" /></Field>
-    <Field label="End time"><input type="time" defaultValue="17:00" /></Field>
-    <Field label="Timezone"><select defaultValue="America/New_York"><option value="America/New_York">Eastern Time</option><option value="America/Chicago">Central Time</option><option value="America/Denver">Mountain Time</option><option value="America/Los_Angeles">Pacific Time</option></select></Field>
-    <Field label="Booking window"><select defaultValue="14"><option value="7">Next 7 days</option><option value="14">Next 14 days</option><option value="30">Next 30 days</option><option value="60">Next 60 days</option></select></Field>
-    <Field label="Assigned host"><input placeholder="Sales Team / Owner" /></Field>
-    <Field label="After booking"><select defaultValue="vault"><option value="vault">Create Vault meeting record</option><option value="notify">Notify owner only</option><option value="sequence">Start follow-up sequence</option></select></Field>
-  </>;
+function ContactModal({ contact, close }) {
+  const tabs = ['Overview', 'Updates', 'Files', 'Quotes & Invoices', 'Build Vibe view', 'More'];
+  return <div style={styles.overlay} onClick={close}><section style={styles.modal} onClick={(event) => event.stopPropagation()}><header style={styles.modalHeader}><div><p className="eyebrow">Contact record</p><h1 style={{ margin: '4px 0', fontSize: 38 }}>{contact.name}</h1><div style={styles.pills}>{tabs.map((tab) => <span style={styles.pill} key={tab}>{tab}</span>)}</div></div><button type="button" style={styles.button} onClick={close}>Close</button></header><div style={styles.modalBody}><main style={styles.timeline}><div style={{ ...styles.tabs, marginBottom: 18 }}><button style={styles.activeButton}>New email</button><button style={styles.button}>Add activity</button><button style={styles.button}>Summarize</button><button style={styles.button}>Filters</button><input style={{ marginLeft: 'auto', maxWidth: 260 }} placeholder="Search" readOnly /></div>{contact.updates.map((update, index) => <article style={styles.update} key={`${update.subject}-${index}`}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><div><strong>{update.kind}</strong><p style={{ margin: '6px 0 0', color: 'var(--muted)' }}>{update.from} → {update.to}</p></div><span>{update.date}</span></div><h3 style={{ margin: '6px 0' }}>{update.subject}</h3><p style={{ margin: 0, lineHeight: 1.55 }}>{update.body}</p>{update.attachments?.length ? <div style={styles.pills}>{update.attachments.map((file) => <span style={styles.pill} key={file}>📎 {file}</span>)}</div> : null}</article>)}</main><aside style={styles.side}><FieldView label="Name" value={contact.name} /><label style={styles.field}><span>Type</span><Label value={contact.type} /></label><FieldView label="Linked Account (Company)" value={contact.linkedAccount} /><FieldView label="Title" value={contact.title} /><FieldView label="Phone" value={contact.phone} /><FieldView label="Email" value={contact.email} /><FieldView label="Comments" value={contact.comments} /><FieldView label="*Company" value={contact.company} /><FieldView label="*Sales & Estimating" value={contact.salesEstimating} /><FieldView label="First Name" value={contact.firstName} /><FieldView label="Last Name" value={contact.lastName} /></aside></div></section></div>;
 }
 
-function ActionPanel({ action, close }) {
-  if (!action) return null;
-  const [title, text] = actionCopy[action] || ['CRM Action', 'This action opens the matching CRM workflow.'];
-  const isCalendar = action === 'calendar';
-  return <div style={crmStyles.overlay} onClick={close}><aside className="live-module-card" style={{ ...crmStyles.record, width: isCalendar ? 'min(920px, calc(100vw - 80px))' : 'min(760px, calc(100vw - 80px))' }} onClick={(event) => event.stopPropagation()}><div style={crmStyles.recordHeader}><div><p className="eyebrow">CRM Action</p><h3 style={crmStyles.recordTitle}>{title}</h3><p>{text}</p></div><button type="button" style={ghostButton} onClick={close}>Close</button></div><div style={crmStyles.form}><Field label="Action status"><input value="Ready to configure" readOnly /></Field><Field label="Destination"><input value={isCalendar ? 'Neroa Connect Calendar / CRM history / Vault' : 'Neroa Connect / CRM history / Vault'} readOnly /></Field><Field label="Provider"><select defaultValue="neroa"><option value="neroa">Neroa video</option><option value="zoom">Zoom</option><option value="google-meet">Google Meet</option><option value="twilio">Twilio</option><option value="email">Connected email</option></select></Field><Field label="Vault record"><input value="Create or attach Vault link" readOnly /></Field>{isCalendar && <CalendarBookingFields />}<Field label="Notes" full><textarea style={crmStyles.textarea} placeholder={isCalendar ? 'Add booking page notes, meeting instructions, reminders, or customer-facing details.' : 'Configure this action, add notes, attach meeting links, or connect the required service.'} /></Field></div><div style={crmStyles.recordActions}><button type="button" style={ghostButton} onClick={close}>Cancel</button>{isCalendar && <button type="button" style={ghostButton} onClick={close}>Preview booking link</button>}<button type="button" style={saasButton} onClick={close}>{isCalendar ? 'Push to Neroa Connect Calendar' : 'Save action'}</button></div></aside></div>;
-}
-
-function ActivityPanel({ rows = [], onAction }) { return <section style={crmStyles.miniCard}><p className="eyebrow">Customer Timeline</p><h3>Emails, texts, calls, meetings, Vault</h3><p style={crmStyles.subText}>Every email, text, call, meeting, file, signature, quote, invoice, note, and Vault record lands on this timeline.</p><MiniRows rows={rows} onAction={onAction} /></section>; }
-function IntelligencePanel({ rows = [], prospect = false }) { return <section style={crmStyles.miniCard}><p className="eyebrow">AI {prospect ? 'Prospect' : 'Customer'} Summary</p><h3>Needs, risks, next action</h3><p style={crmStyles.subText}>The base CRM should show what to know before contacting this record: needs, problems, risks, opportunities, and recommended next action.</p><MiniRows rows={rows} /></section>; }
-function StrategyPanel({ prospect = false }) { return <section style={crmStyles.miniCard}><p className="eyebrow">Marketing + Upsell Plan</p><h3>How to sell more intelligently</h3><p style={crmStyles.subText}>The CRM keeps the customer strategy here; full AI content marketing stays in its own platform and feeds leads back into CRM.</p><MiniRows rows={strategyRows[prospect ? 'prospect' : 'customer']} /></section>; }
-function VaultRecordPanel() { return <section style={crmStyles.miniCard}><p className="eyebrow">Vault-backed Records</p><h3>Files stay in Vault</h3><p style={crmStyles.subText}>CRM displays the record. Vault owns recordings, transcripts, signed documents, file transfers, proof receipts, access history, and retention.</p><MiniRows rows={[['Meeting record', 'Recording, transcript, AI summary, attendees, and next action.', 'Vault'], ['Signed packet', 'Guard Sign packet and proof receipt linked from Vault.', 'Vault'], ['Customer files', 'Contracts, quotes, uploads, invoices, and approvals.', 'Vault']]} /></section>; }
-
-function FollowUpPanel({ prospect = false, onAction }) {
-  return <section style={crmStyles.miniCard}><p className="eyebrow">Smart Follow-up</p><h3>Log or schedule contact</h3><div style={crmStyles.form}><Field label="Contact type"><select defaultValue="meeting"><option value="call">Phone call</option><option value="text">Text message</option><option value="email">Email</option><option value="note">Note</option><option value="meeting">Meeting</option><option value="ai-call">AI call</option></select></Field><Field label="Date / time"><input placeholder="Tomorrow at 9:00 AM" /></Field><Field label="Assigned owner"><input placeholder="Sales Team" /></Field><Field label="Status"><select defaultValue="scheduled"><option value="logged">Logged</option><option value="scheduled">Scheduled</option><option value="sent">Sent</option><option value="completed">Completed</option></select></Field><Field label="Notes" full><textarea style={crmStyles.textarea} placeholder="What happened, or what should be sent next?" /></Field></div><div style={crmStyles.recordActions}><button type="button" style={ghostButton} onClick={() => onAction('log')}>Log activity</button><button type="button" style={ghostButton} onClick={() => onAction('scheduleEmail')}>Schedule email</button><button type="button" style={ghostButton} onClick={() => onAction('scheduleCall')}>Schedule call</button><button type="button" style={ghostButton} onClick={() => onAction('calendar')}>Schedule meeting</button>{prospect && <button type="button" style={saasButton} onClick={() => onAction('textSequence')}>Start automation</button>}</div></section>;
-}
-
-function WorkflowPanel({ mode, onAction }) {
-  const data = workflowCopy[mode];
-  if (!data) return null;
-  return <section style={crmStyles.panel}><p className="eyebrow">Prospect workflow</p><h3>{data.title}</h3><p style={crmStyles.subText}>{data.text}</p><div style={crmStyles.panelGrid}>{data.rows.map((row) => <button type="button" style={{ ...crmStyles.panelRow, color: 'var(--text)', textAlign: 'left' }} key={row[0]} onClick={() => onAction(mode === 'automate' ? 'textSequence' : mode === 'ai' ? 'aiCall' : mode === 'activity' ? 'log' : 'owner')}><strong>{row[0]}</strong><span>{row[1]}</span><b>{row[2]}</b></button>)}</div>{(mode === 'automate' || mode === 'activity') && <div style={crmStyles.recordActions}><button type="button" style={saasButton} onClick={() => onAction('connect')}>Set up Neroa Connect</button><button type="button" style={ghostButton} onClick={() => onAction('textSequence')}>Build text sequence</button><button type="button" style={ghostButton} onClick={() => onAction('scheduleEmail')}>Schedule email</button><button type="button" style={ghostButton} onClick={() => onAction('calendar')}>Meeting link / Vault</button><button type="button" style={ghostButton} onClick={() => onAction('aiCall')}>Create AI call step</button></div>}</section>;
+function AccountModal({ account, close }) {
+  const linked = contacts.filter((contact) => contact.accountId === account.id);
+  return <div style={styles.overlay} onClick={close}><section style={styles.modal} onClick={(event) => event.stopPropagation()}><header style={styles.modalHeader}><div><p className="eyebrow">Account record</p><h1 style={{ margin: '4px 0', fontSize: 38 }}>{account.name}</h1><Label value={account.type} /></div><button type="button" style={styles.button} onClick={close}>Close</button></header><div style={styles.modalBody}><main style={styles.timeline}><h2>Linked contacts</h2>{linked.map((contact) => <article style={styles.update} key={contact.id}><h3>{contact.name}</h3><p>{contact.title || 'Contact'} · {contact.email || 'No email loaded'}</p><Label value={contact.type} /></article>)}</main><aside style={styles.side}><FieldView label="Name" value={account.name} /><label style={styles.field}><span>Account Type</span><Label value={account.type} /></label><FieldView label="Domain" value={account.domain} /><FieldView label="Industry" value={account.industry} /><FieldView label="Description" value={account.description} /><FieldView label="No. of employees" value={account.employees} /><FieldView label="Headquarters location" value={account.headquarters} /><FieldView label="*Sales & Estimating" value={account.salesEstimating} /><FieldView label="Item ID" value={account.itemId} /></aside></div></section></div>;
 }
 
 function ContactsCrm({ Header, id }) {
-  const [tab, setTab] = useState('customers');
-  const [activeCustomerId, setActiveCustomerId] = useState(null);
-  const [activeProspectId, setActiveProspectId] = useState(null);
+  const [tab, setTab] = useState('accounts');
   const [query, setQuery] = useState('');
-  const [workflow, setWorkflow] = useState('activity');
-  const [action, setAction] = useState(null);
-  const activeCustomer = customers.find((customer) => customer.id === activeCustomerId) || null;
-  const activeProspect = prospects.find((prospect) => prospect.id === activeProspectId) || null;
-  const rows = tab === 'customers' ? customers : prospects;
+  const [activeAccount, setActiveAccount] = useState(null);
+  const [activeContact, setActiveContact] = useState(null);
+  const data = tab === 'accounts' ? accounts : contacts;
   const filtered = useMemo(() => {
-    const clean = query.trim().toLowerCase();
-    if (!clean) return rows;
-    return rows.filter((row) => Object.values(row).some((value) => String(value).toLowerCase().includes(clean)));
-  }, [query, rows]);
+    const q = query.trim().toLowerCase();
+    if (!q) return data;
+    return data.filter((row) => Object.values(row).some((value) => String(Array.isArray(value) ? value.join(' ') : value).toLowerCase().includes(q)));
+  }, [query, data]);
 
   return <>
     {Header ? <Header id={id} /> : null}
-    <section className="live-module-shell canonical-force-live" style={crmStyles.shell}><article className="live-module-card" style={crmStyles.listCard}>
-      <div style={crmStyles.tabs}><button type="button" style={tabButton(tab === 'customers')} onClick={() => { setTab('customers'); setQuery(''); }}>Customer List</button><button type="button" style={tabButton(tab === 'prospects')} onClick={() => { setTab('prospects'); setQuery(''); setWorkflow('activity'); }}>Prospect Customers</button></div>
-      <div style={crmStyles.listHeader}><div><p className="eyebrow">CRM</p><h2 style={crmStyles.title}>{tab === 'customers' ? 'Customer List' : 'Prospect Customers'}</h2><p style={crmStyles.subText}>{tab === 'customers' ? 'Search, open, and manage customer records from one clean customer database.' : 'Inbound leads from Facebook, Google, website, email, referral, and calls land here before they become customers.'}</p></div><div style={crmStyles.headerRight}><div style={crmStyles.chips}><div style={crmStyles.chip}><span style={crmStyles.chipLabel}>{tab === 'customers' ? 'Total customers' : 'Open prospects'}</span><strong style={crmStyles.chipValue}>{tab === 'customers' ? '280' : prospects.length}</strong></div><div style={crmStyles.chip}><span style={crmStyles.chipLabel}>Needs review</span><strong style={crmStyles.chipValue}>1</strong></div></div><div style={crmStyles.actions}><input style={crmStyles.search} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={tab === 'customers' ? 'Search customers...' : 'Search prospects...'} aria-label="Search CRM" /><button type="button" style={saasButton} onClick={() => setAction(tab === 'customers' ? 'addCustomer' : 'addProspect')}>{tab === 'customers' ? 'Add Customer' : 'Add Prospect'}</button></div></div></div>
-      {tab === 'prospects' && <><div style={crmStyles.tools}><button type="button" style={tabButton(workflow === 'activity')} onClick={() => setWorkflow('activity')}>Activity</button><button type="button" style={tabButton(workflow === 'automate')} onClick={() => setWorkflow('automate')}>Automate</button><button type="button" style={tabButton(workflow === 'inbox')} onClick={() => setWorkflow('inbox')}>Lead Inbox</button><button type="button" style={tabButton(workflow === 'timeline')} onClick={() => setWorkflow('timeline')}>Timeline</button><button type="button" style={tabButton(workflow === 'inbound')} onClick={() => setWorkflow('inbound')}>Inbound Leads</button><button type="button" style={tabButton(workflow === 'ai')} onClick={() => setWorkflow('ai')}>AI Communication</button></div><WorkflowPanel mode={workflow} onAction={setAction} /></>}
-      {tab === 'customers' ? <div style={crmStyles.table}><div style={{ ...crmStyles.row, ...crmStyles.head }}><span>Company</span><span>Contact</span><span>Type</span><span>Status</span><span>Owner</span><span>Last Activity</span><span>Value</span><span></span></div>{filtered.map((customer) => <button type="button" key={customer.id} onClick={() => setActiveCustomerId(customer.id)} style={crmStyles.dataRow}><div style={crmStyles.row}><strong>{customer.company}</strong><span>{customer.contact}</span><span>{customer.type}</span><b>{customer.status}</b><span>{customer.owner}</span><span>{customer.activity}</span><strong>{customer.value}</strong><b>Open</b></div></button>)}</div> : <div style={crmStyles.table}><div style={{ ...crmStyles.prospectRow, ...crmStyles.head }}><span>Prospect</span><span>Source</span><span>Status</span><span>Owner</span><span>Received</span><span>AI next action</span><span></span></div>{filtered.map((prospect) => <button type="button" key={prospect.id} onClick={() => setActiveProspectId(prospect.id)} style={crmStyles.dataRow}><div style={crmStyles.prospectRow}><strong>{prospect.company}</strong><span>{prospect.source}</span><b>{prospect.status}</b><span>{prospect.owner}</span><span>{prospect.received}</span><span>{prospect.action}</span><b>Open</b></div></button>)}</div>}
-    </article></section>
-
-    {activeCustomer && <div style={crmStyles.overlay} onClick={() => setActiveCustomerId(null)}><aside className="live-module-card" style={crmStyles.record} onClick={(event) => event.stopPropagation()}><div style={crmStyles.recordHeader}><div><p className="eyebrow">Customer Record</p><h3 style={crmStyles.recordTitle}>{activeCustomer.company}</h3><p>{activeCustomer.notes}</p></div><button type="button" style={ghostButton} onClick={() => setActiveCustomerId(null)}>Close</button></div><div style={crmStyles.recordGrid}><div><div style={crmStyles.form}><Field label="Company"><input value={activeCustomer.company} readOnly /></Field><Field label="Primary Contact"><input value={activeCustomer.contact} readOnly /></Field><Field label="Customer Type"><input value={activeCustomer.type} readOnly /></Field><Field label="Owner"><input value={activeCustomer.owner} readOnly /></Field><Field label="Phone"><input value={activeCustomer.phone} readOnly /></Field><Field label="Email"><input value={activeCustomer.email} readOnly /></Field><Field label="Location"><input value={activeCustomer.location} readOnly /></Field><Field label="Open Value"><input value={activeCustomer.value} readOnly /></Field><Field label="Notes" full><textarea rows="4" value={activeCustomer.notes} readOnly /></Field></div><div style={crmStyles.recordActions}><button type="button" style={ghostButton} onClick={() => setAction('edit')}>Edit Record</button><button type="button" style={saasButton} onClick={() => setAction('save')}>Save</button></div><div style={{ display: 'grid', gap: 16, marginTop: 16 }}><IntelligencePanel rows={customerIntelligence[activeCustomer.id]} /><StrategyPanel /><VaultRecordPanel /></div></div><div style={{ display: 'grid', gap: 16 }}><ActivityPanel rows={customerActivities[activeCustomer.id]} onAction={setAction} /><FollowUpPanel onAction={setAction} /></div></div></aside></div>}
-
-    {activeProspect && <div style={crmStyles.overlay} onClick={() => setActiveProspectId(null)}><aside className="live-module-card" style={crmStyles.record} onClick={(event) => event.stopPropagation()}><div style={crmStyles.recordHeader}><div><p className="eyebrow">Prospect Customer</p><h3 style={crmStyles.recordTitle}>{activeProspect.company}</h3><p>{activeProspect.sourceDetail}</p></div><button type="button" style={ghostButton} onClick={() => setActiveProspectId(null)}>Close</button></div><div style={crmStyles.recordGrid}><div><div style={crmStyles.form}><Field label="Prospect Name"><input value={activeProspect.name} readOnly /></Field><Field label="Lead Source"><input value={activeProspect.source} readOnly /></Field><Field label="Phone"><input value={activeProspect.phone} readOnly /></Field><Field label="Email"><input value={activeProspect.email} readOnly /></Field><Field label="Status"><input value={activeProspect.status} readOnly /></Field><Field label="Owner"><input value={activeProspect.owner} readOnly /></Field><Field label="AI Summary" full><textarea rows="4" value={activeProspect.ai} readOnly /></Field></div><div style={crmStyles.recordActions}><button type="button" style={saasButton} onClick={() => setAction('textSequence')}>Automate Follow-up</button><button type="button" style={ghostButton} onClick={() => setAction('sendText')}>Send Text</button><button type="button" style={ghostButton} onClick={() => setAction('sendEmail')}>Send Email</button><button type="button" style={ghostButton} onClick={() => setAction('aiCall')}>AI Call</button><button type="button" style={ghostButton} onClick={() => setAction('calendar')}>Send Calendar Link</button><button type="button" style={saasButton} onClick={() => setAction('convert')}>Convert to Customer</button></div><p style={crmStyles.subText}>Automations run through Neroa Connect: native video, Twilio text/calls, email, Zoom/Google Meet style meeting links, calendar booking, and Vault records.</p><div style={{ display: 'grid', gap: 16, marginTop: 16 }}><IntelligencePanel rows={prospectIntelligence[activeProspect.id]} prospect /><StrategyPanel prospect /><VaultRecordPanel /></div></div><div style={{ display: 'grid', gap: 16 }}><ActivityPanel rows={prospectActivities[activeProspect.id]} onAction={setAction} /><FollowUpPanel prospect onAction={setAction} /></div></div></aside></div>}
-    <ActionPanel action={action} close={() => setAction(null)} />
-  </>;
+    <section className="live-module-shell canonical-force-live" style={styles.shell}><article className="live-module-card" style={styles.card}><div style={styles.top}><div><p className="eyebrow">Steel Craft CRM</p><h2 style={{ fontSize: 46, margin: '6px 0' }}>{tab === 'accounts' ? 'Accounts Board' : 'Contacts Board'}</h2><p>Rebuilt from the Monday flow: accounts are companies, contacts are people, and every contact opens into a Monday-style detail view with updates on the left and fields on the right.</p></div><div style={{ display: 'grid', gap: 12, justifyItems: 'end' }}><div style={styles.tabs}><button type="button" style={tab === 'accounts' ? styles.activeButton : styles.button} onClick={() => setTab('accounts')}>Accounts</button><button type="button" style={tab === 'contacts' ? styles.activeButton : styles.button} onClick={() => setTab('contacts')}>Contacts</button></div><input style={styles.search} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search CRM board..." /></div></div><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '18px 0' }}>{(tab === 'accounts' ? accountTypeLabels : contactTypeLabels).map((label) => <Label key={label} value={label} />)}</div>{tab === 'accounts' ? <div style={styles.table}><div style={{ ...styles.accountRow, ...styles.head }}><span>Account</span><span>Account Type</span><span>Domain</span><span>Industry</span><span>Linked Contacts</span><span>Item ID</span><span></span></div>{filtered.map((account) => <button type="button" key={account.id} style={styles.dataRow} onClick={() => setActiveAccount(account)}><div style={styles.accountRow}><strong>{account.name}</strong><Label value={account.type} /><span>{account.domain || '-'}</span><span>{account.industry || '-'}</span><span>{account.contacts.join(', ') || '-'}</span><span>{account.itemId}</span><b>Open</b></div></button>)}</div> : <div style={styles.table}><div style={{ ...styles.contactRow, ...styles.head }}><span>Contact</span><span>Type</span><span>Linked Account</span><span>Title</span><span>Phone</span><span>Email</span><span></span></div>{filtered.map((contact) => <button type="button" key={contact.id} style={styles.dataRow} onClick={() => setActiveContact(contact)}><div style={styles.contactRow}><strong>{contact.name}</strong><Label value={contact.type} /><span>{contact.linkedAccount}</span><span>{contact.title || '-'}</span><span>{contact.phone || '-'}</span><span>{contact.email || '-'}</span><b>Open</b></div></button>)}</div>}</article></section>{activeAccount && <AccountModal account={activeAccount} close={() => setActiveAccount(null)} />}{activeContact && <ContactModal contact={activeContact} close={() => setActiveContact(null)} />}</>;
 }
 
 export function isLiveCanonicalPortal(id) { return id === 'contacts' || Boolean(genericModules[id]); }
