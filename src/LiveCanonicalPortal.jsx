@@ -102,8 +102,8 @@ const seedContacts = [
   })
 ];
 
-const crmKey = 'steelcraft_crm_records_v9';
-const oldCrmKeys = ['steelcraft_crm_records_v8', 'steelcraft_crm_records_v7', 'steelcraft_crm_records_v6', 'steelcraft_crm_records_v5', 'steelcraft_live_crm_records_v3'];
+const crmKey = 'steelcraft_crm_records_v10';
+const oldCrmKeys = ['steelcraft_crm_records_v9', 'steelcraft_crm_records_v8', 'steelcraft_crm_records_v7', 'steelcraft_crm_records_v6', 'steelcraft_crm_records_v5', 'steelcraft_live_crm_records_v3'];
 const optionsKey = 'steelcraft_crm_options_v5';
 const colorKey = 'steelcraft_crm_color_map_v2';
 
@@ -139,6 +139,11 @@ const styles = {
   noteComposer: { display: 'grid', gridTemplateColumns: '150px 190px minmax(0,1fr) auto', gap: 8, alignItems: 'end' },
   driveHeader: { border: '1px solid rgba(255,255,255,.14)', borderRadius: 16, background: 'rgba(255,255,255,.04)', padding: 14, display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 12, alignItems: 'center' },
   drivePanel: { border: '1px solid rgba(255,255,255,.12)', borderRadius: 16, background: 'rgba(0,0,0,.18)', padding: 14, display: 'grid', gap: 12 },
+  providerGrid: { display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 10 },
+  providerCard: { border: '1px solid rgba(255,255,255,.18)', borderRadius: 14, background: 'rgba(255,255,255,.055)', color: 'var(--text)', padding: 12, display: 'grid', gap: 8, textAlign: 'left', cursor: 'pointer' },
+  selectedProviderCard: { border: '1px solid var(--brand-accent)', boxShadow: 'inset 5px 0 0 var(--brand-accent)', background: 'rgba(173,66,72,.16)' },
+  providerName: { color: 'var(--text)', fontSize: 15, fontWeight: 950, lineHeight: 1.2 },
+  providerHelp: { color: 'var(--muted)', fontSize: 12, lineHeight: 1.35, fontWeight: 700 },
   statusPill: { display: 'inline-flex', alignItems: 'center', width: 'fit-content', borderRadius: 999, border: '1px solid var(--line)', background: 'rgba(255,255,255,.06)', padding: '5px 9px', color: 'var(--muted)', fontSize: 12, fontWeight: 900 }
 };
 
@@ -174,21 +179,17 @@ function ModalShell({ title, subtitle, close, children }) { return <div style={s
 
 function NeroaDriveEmailSetup({ record, onSave }) {
   const [open, setOpen] = useState(false);
-  const [providerId, setProviderId] = useState(record.emailProviderId || '');
   const [customName, setCustomName] = useState(record.emailProviderName || '');
   const [route, setRoute] = useState(record.emailProviderLink || '');
-  const selectedProvider = emailProviderApps.find((provider) => provider.id === providerId);
-  const visibleProvider = record.emailProviderName || selectedProvider?.name || 'No provider linked';
+  const visibleProvider = record.emailProviderName || 'No provider linked';
   const status = record.emailProviderStatus || 'Not linked';
-  function saveProvider() {
-    const provider = emailProviderApps.find((item) => item.id === providerId) || { id: 'custom-provider', name: customName || 'Custom Email Provider', auth: 'Custom' };
+  function chooseProvider(provider) {
     const name = provider.id === 'custom-provider' ? (customName || provider.name) : provider.name;
     const patch = { emailProviderName: name, emailProviderId: provider.id, emailProviderLink: route, emailProviderStatus: 'Ready to connect through Neroa Drive' };
     onSave(patch);
     saveProviderContext(record, { ...provider, name }, route);
-    setOpen(false);
   }
-  return <div style={{ display: 'grid', gap: 10 }}><div style={styles.driveHeader}><div><strong>Neroa Drive Email Setup</strong><div style={{ color: 'var(--muted)' }}>Neroa Drive · {visibleProvider}</div><span style={styles.statusPill}>{status}</span></div><button type="button" style={styles.activeButton} onClick={() => setOpen((value) => !value)}>{record.emailProviderName ? 'Manage in Neroa Drive' : 'Link Email Provider'}</button></div>{open ? <div style={styles.drivePanel}><p style={{ margin: 0, color: 'var(--muted)' }}>Provider choices are handled through Neroa Drive. The CRM stores the selected provider and shows connection status; the integration app completes the real OAuth or mailbox setup.</p><div style={styles.detailGrid}><label><span>Provider</span><select style={inputStyle} value={providerId} onChange={(event) => { const next = event.target.value; setProviderId(next); const provider = emailProviderApps.find((item) => item.id === next); if (provider && provider.id !== 'custom-provider') setCustomName(provider.name); }}><option value="">Choose provider</option>{emailProviderApps.map((provider) => <option key={provider.id} value={provider.id}>{provider.name} · {provider.auth}</option>)}</select></label><label><span>Neroa Drive app route / setup URL</span><TextCell value={route} onChange={setRoute} placeholder="Neroa Drive setup route" /></label>{providerId === 'custom-provider' ? <label><span>Custom provider name</span><TextCell value={customName} onChange={setCustomName} placeholder="Any internet email provider" /></label> : null}</div><div style={styles.tabs}><button type="button" style={styles.activeButton} onClick={saveProvider}>Save Provider</button>{route ? <button type="button" style={styles.button} onClick={() => openExternal(hrefFor(route))}>Open Neroa Drive</button> : null}</div></div> : null}</div>;
+  return <div style={{ display: 'grid', gap: 10 }}><div style={styles.driveHeader}><div><strong>Neroa Drive Email Setup</strong><div style={{ color: 'var(--muted)' }}>Neroa Drive · {visibleProvider}</div><span style={styles.statusPill}>{status}</span></div><button type="button" style={styles.activeButton} onClick={() => setOpen((value) => !value)}>{record.emailProviderName ? 'Switch Email Provider' : 'Link Email Provider'}</button></div>{open ? <div style={styles.drivePanel}><p style={{ margin: 0, color: 'var(--muted)' }}>Choose or switch the email provider. Neroa Drive handles the connection, and synced emails appear in the CRM timeline.</p><div style={styles.providerGrid}>{emailProviderApps.map((provider) => { const selected = record.emailProviderId === provider.id || record.emailProviderName === provider.name; return <button type="button" key={provider.id} style={{ ...styles.providerCard, ...(selected ? styles.selectedProviderCard : {}) }} onClick={() => chooseProvider(provider)}><span style={styles.providerName}>{provider.name}</span><span style={styles.statusPill}>{provider.auth}</span><span style={styles.providerHelp}>{selected ? 'Selected provider. Click another option to switch.' : 'Click to use this provider through Neroa Drive.'}</span></button>; })}</div><div style={styles.panel}><h4 style={{ margin: 0, color: 'var(--text)' }}>Custom provider / integration app</h4><div style={styles.detailGrid}><label><span>Custom provider name</span><TextCell value={customName} onChange={setCustomName} placeholder="Any internet email provider" /></label><label><span>Neroa Drive route / setup URL</span><TextCell value={route} onChange={setRoute} placeholder="Neroa Drive setup route" /></label></div><div style={styles.tabs}><button type="button" style={styles.activeButton} onClick={() => chooseProvider({ id: 'custom-provider', name: customName || 'Custom Email Provider', auth: 'Custom' })}>Save Custom Provider</button>{route ? <button type="button" style={styles.button} onClick={() => openExternal(hrefFor(route))}>Open Neroa Drive</button> : null}</div></div></div> : null}</div>;
 }
 
 function ActivityTimeline({ record, linkedEmails = [], onAddNote }) {
