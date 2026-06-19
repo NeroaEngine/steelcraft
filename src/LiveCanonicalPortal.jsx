@@ -102,8 +102,8 @@ const seedContacts = [
   })
 ];
 
-const crmKey = 'steelcraft_crm_records_v11';
-const oldCrmKeys = ['steelcraft_crm_records_v10', 'steelcraft_crm_records_v9', 'steelcraft_crm_records_v8', 'steelcraft_crm_records_v7', 'steelcraft_crm_records_v6', 'steelcraft_crm_records_v5', 'steelcraft_live_crm_records_v3'];
+const crmKey = 'steelcraft_crm_records_v12';
+const oldCrmKeys = ['steelcraft_crm_records_v11', 'steelcraft_crm_records_v10', 'steelcraft_crm_records_v9', 'steelcraft_crm_records_v8', 'steelcraft_crm_records_v7', 'steelcraft_crm_records_v6', 'steelcraft_crm_records_v5', 'steelcraft_live_crm_records_v3'];
 const optionsKey = 'steelcraft_crm_options_v5';
 const colorKey = 'steelcraft_crm_color_map_v2';
 
@@ -159,7 +159,7 @@ function names(value) { return Array.isArray(value) ? value.join(', ') : (value 
 function hrefFor(value) { const text = String(value || '').trim(); const url = text.match(/https?:\/\/[^\s,]+/i)?.[0]; if (url) return url; const domain = text.split(' - ')[0]; return domain.includes('.') ? `https://${domain}` : ''; }
 function emailFor(value) { return String(value || '').match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || ''; }
 function emailProviderUrl(email, subject) { return `mailto:${encodeURIComponent(email || '')}?subject=${encodeURIComponent(subject || 'Steel Craft CRM')}`; }
-function providerSetupRoute(provider, record, route) { const selected = route || provider.route || `/portal/neroa-drive/email/${provider.id}`; const joiner = selected.includes('?') ? '&' : '?'; return `${selected}${joiner}recordId=${encodeURIComponent(record.id)}&recordName=${encodeURIComponent(record.name || '')}&source=steelcraft-crm`; }
+function providerSetupRoute(provider, record, route) { return route || provider.route || `/portal/neroa-drive/email/${provider.id}`; }
 function clampPage(page, totalPages) { return Math.min(Math.max(page, 1), Math.max(totalPages, 1)); }
 function openExternal(url) { if (url) window.open(url, '_blank', 'noopener,noreferrer'); }
 function todayString() { return new Date().toISOString().slice(0, 10); }
