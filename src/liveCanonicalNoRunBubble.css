@@ -51,3 +51,39 @@
 .dashboard:has(.accounting-section-nav) .accounting-report-room > .feature:first-child {
   margin-top: 0 !important;
 }
+
+/* Contacts / CRM full-width board override. This file loads after the app CSS. */
+.dashboard:has(.canonical-force-live) {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+.dashboard:has(.canonical-force-live) .workspace {
+  width: 100% !important;
+  max-width: none !important;
+  margin-inline: 0 !important;
+  justify-self: stretch !important;
+}
+
+.dashboard:has(.canonical-force-live) .live-module-shell.canonical-force-live {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  justify-self: stretch !important;
+}
+
+.dashboard:has(.canonical-force-live) .live-module-shell.canonical-force-live > .live-module-card {
+  width: 100% !important;
+  max-width: none !important;
+  justify-self: stretch !important;
+}
+
+.dashboard:has(.canonical-force-live) .crm-wide-grid,
+.dashboard:has(.canonical-force-live) .crm-wide-card {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+.dashboard:has(.canonical-force-live) .live-module-shell.canonical-force-live [style*="min-width: 1500px"] {
+  min-width: 100% !important;
+}
