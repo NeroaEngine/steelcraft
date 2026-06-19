@@ -66,7 +66,7 @@
 }
 
 .dashboard:has(.canonical-force-live) .live-module-shell.canonical-force-live {
-  width: 100% !important;
+  width: calc(100vw - 32px) !important;
   max-width: none !important;
   margin: 0 !important;
   justify-self: stretch !important;
