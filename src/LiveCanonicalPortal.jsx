@@ -102,8 +102,8 @@ const seedContacts = [
   })
 ];
 
-const crmKey = 'steelcraft_crm_records_v14';
-const oldCrmKeys = ['steelcraft_crm_records_v13', 'steelcraft_crm_records_v12', 'steelcraft_crm_records_v11', 'steelcraft_crm_records_v10', 'steelcraft_crm_records_v9', 'steelcraft_crm_records_v8', 'steelcraft_crm_records_v7', 'steelcraft_crm_records_v6', 'steelcraft_crm_records_v5', 'steelcraft_live_crm_records_v3'];
+const crmKey = 'steelcraft_crm_records_v15';
+const oldCrmKeys = ['steelcraft_crm_records_v14', 'steelcraft_crm_records_v13', 'steelcraft_crm_records_v12', 'steelcraft_crm_records_v11', 'steelcraft_crm_records_v10', 'steelcraft_crm_records_v9', 'steelcraft_crm_records_v8', 'steelcraft_crm_records_v7', 'steelcraft_crm_records_v6', 'steelcraft_crm_records_v5', 'steelcraft_live_crm_records_v3'];
 const optionsKey = 'steelcraft_crm_options_v5';
 const colorKey = 'steelcraft_crm_color_map_v2';
 const optionMetaKey = 'steelcraft_crm_option_meta_v1';
@@ -145,6 +145,8 @@ const styles = {
   selectedProviderCard: { border: '1px solid var(--brand-accent)', boxShadow: 'inset 5px 0 0 var(--brand-accent)', background: 'rgba(173,66,72,.16)' },
   providerName: { color: 'var(--text)', fontSize: 15, fontWeight: 950, lineHeight: 1.2 },
   providerHelp: { color: 'var(--muted)', fontSize: 12, lineHeight: 1.35, fontWeight: 700 },
+  createPanel: { border: '1px solid rgba(255,255,255,.18)', borderRadius: 14, background: 'rgba(0,0,0,.28)', padding: 12, display: 'grid', gap: 10 },
+  createGrid: { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.25fr) 96px', gap: 8, alignItems: 'end' },
   statusPill: { display: 'inline-flex', alignItems: 'center', width: 'fit-content', borderRadius: 999, border: '1px solid var(--line)', background: 'rgba(255,255,255,.06)', padding: '5px 9px', color: 'var(--muted)', fontSize: 12, fontWeight: 900 }
 };
 
@@ -156,7 +158,6 @@ function loadCrm() { try { const saved = JSON.parse(localStorage.getItem(crmKey)
 function loadOptions() { try { return JSON.parse(localStorage.getItem(optionsKey)) || {}; } catch { return {}; } }
 function loadColors() { try { return { ...defaultColors, ...(JSON.parse(localStorage.getItem(colorKey)) || {}) }; } catch { return defaultColors; } }
 function loadOptionMeta() { try { return JSON.parse(localStorage.getItem(optionMetaKey)) || {}; } catch { return {}; } }
-function createMondayOption(fieldLabel = 'cell') { const name = window.prompt(`New ${fieldLabel}\nName`); const value = String(name || '').trim(); if (!value) return null; const description = String(window.prompt(`What does "${value}" do?`, '') || '').trim(); const picked = String(window.prompt(`Pick a color for "${value}" (#RRGGBB)`, '#777777') || '').trim(); const color = /^#[0-9A-F]{6}$/i.test(picked) ? picked : '#777777'; return { value, description, color, createdAt: new Date().toISOString() }; }
 function splitNames(value) { return String(value || '').split(',').map((part) => part.trim()).filter(Boolean); }
 function names(value) { return Array.isArray(value) ? value.join(', ') : (value || ''); }
 function hrefFor(value) { const text = String(value || '').trim(); const url = text.match(/https?:\/\/[^\s,]+/i)?.[0]; if (url) return url; const domain = text.split(' - ')[0]; return domain.includes('.') ? `https://${domain}` : ''; }
@@ -174,7 +175,15 @@ function Metric({ row }) { return <div className="live-module-metric"><strong>{r
 function SimpleGrid({ title, rows }) { return <div className="live-module-grid crm-wide-grid"><article className="live-module-card crm-wide-card"><h3>{title}</h3><div className="live-module-list">{rows.map((row) => <div className="live-module-row" key={row[0]}><div><strong>{row[0]}</strong><span>{row[1]}</span></div><b>{row[2]}</b></div>)}</div></article></div>; }
 function TextCell({ value, onChange, placeholder }) { return <input style={inputStyle} value={value || ''} placeholder={placeholder || ''} onChange={(event) => onChange(event.target.value)} />; }
 function TextAreaCell({ value, onChange, placeholder }) { return <textarea style={styles.textarea} value={value || ''} placeholder={placeholder || ''} onChange={(event) => onChange(event.target.value)} />; }
-function SelectCell({ value, options, onChange, onAdd, color, fieldLabel = 'cell', optionMeta = {} }) { return <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 62px', gap: 8, alignItems: 'center' }}><select style={{ ...inputStyle, borderColor: color || 'rgba(255,255,255,.13)', boxShadow: color ? `inset 6px 0 0 ${color}` : 'none', paddingLeft: color ? 16 : 10 }} value={value || ''} onChange={(event) => onChange(event.target.value)}><option value="">No value</option>{options.map((option) => <option key={option} value={option} title={optionMeta[option]?.description || ''}>{option}</option>)}</select><button type="button" style={styles.button} onClick={() => { const created = createMondayOption(fieldLabel); if (!created) return; onAdd(created.value, created); onChange(created.value); }}>New</button></div>; }
+function SelectCell({ value, options, onChange, onAdd, color, fieldLabel = 'cell', optionMeta = {} }) {
+  const [creating, setCreating] = useState(false);
+  const [draftName, setDraftName] = useState('');
+  const [draftDescription, setDraftDescription] = useState('');
+  const [draftColor, setDraftColor] = useState('#777777');
+  function reset() { setDraftName(''); setDraftDescription(''); setDraftColor('#777777'); setCreating(false); }
+  function saveNew() { const next = draftName.trim(); if (!next) return; const meta = { value: next, description: draftDescription.trim(), color: draftColor, createdAt: new Date().toISOString() }; onAdd(next, meta); onChange(next); reset(); }
+  return <div style={{ display: 'grid', gap: 8 }}><div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 62px', gap: 8, alignItems: 'center' }}><select style={{ ...inputStyle, borderColor: color || 'rgba(255,255,255,.13)', boxShadow: color ? `inset 6px 0 0 ${color}` : 'none', paddingLeft: color ? 16 : 10 }} value={value || ''} onChange={(event) => onChange(event.target.value)}><option value="">No value</option>{options.map((option) => <option key={option} value={option} title={optionMeta[option]?.description || ''}>{option}</option>)}</select><button type="button" style={styles.button} onClick={() => setCreating(true)}>New</button></div>{creating ? <div style={styles.createPanel}><strong>Create new {fieldLabel}</strong><div style={styles.createGrid}><label><span>Name</span><TextCell value={draftName} onChange={setDraftName} placeholder={`New ${fieldLabel}`} /></label><label><span>What does it do?</span><TextCell value={draftDescription} onChange={setDraftDescription} placeholder="Description / purpose" /></label><label><span>Color</span><input type="color" style={styles.swatch} value={draftColor} onChange={(event) => setDraftColor(event.target.value)} /></label></div><div style={styles.tabs}><button type="button" style={styles.activeButton} onClick={saveNew}>Create</button><button type="button" style={styles.button} onClick={reset}>Cancel</button></div></div> : null}</div>;
+}
 function ColorCell({ value, color, onColor }) { return <div style={styles.colorCell}><input type="color" style={styles.swatch} value={color || '#777777'} title={`Set color for ${value || 'blank'}`} onChange={(event) => onColor(event.target.value)} /><span style={styles.colorLabel}>Set color</span></div>; }
 function LinkCell({ value, onChange, kind, label = '+ Link' }) { const href = kind === 'email' ? (emailFor(value) ? `mailto:${emailFor(value)}` : '') : hrefFor(value); return <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto auto', gap: 6 }}><TextCell value={value} onChange={onChange} placeholder={kind === 'email' ? 'email' : 'domain or URL'} /><button type="button" style={styles.button} onClick={() => { const next = window.prompt(kind === 'email' ? 'Add or edit email' : 'Add or edit link', value || ''); if (next !== null) onChange(next); }}>{label}</button>{href ? <a style={styles.button} href={href} target={kind === 'email' ? undefined : '_blank'} rel="noreferrer">Open</a> : null}</div>; }
 function Head({ columns, rowStyle }) { return <div style={rowStyle}>{columns.map((column) => <div style={styles.headCell} key={column}>{column}</div>)}</div>; }
