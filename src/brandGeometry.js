@@ -125,7 +125,115 @@ function injectGeometryPanel() {
   applyGeometry();
 }
 
+const CRM_CONTACTS_STORAGE_KEY = 'steelcraft_crm_records_v15';
+const CRM_CONTACTS_BOARD_ID = '1781806557';
+
+const contactBoardRows1781806557 = [["9910767289","Aaron Schrey","General Contractors","Tallen Builders, LLC","","13862326217","aschrey@tallenbuilders.com",""]];
+
+function crmSlug(value) {
+  return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'record';
+}
+
+function crmAccountIdForName(name) {
+  return name ? `acc-board-${crmSlug(name)}` : '';
+}
+
+function crmHasImportedContactNames(records = []) {
+  return records.some((record) => /^imported\s+contact(?:\s+\d+)?$/i.test(String(record?.name || '').trim()));
+}
+
+function crmBuildContactsFromBoardRows() {
+  return contactBoardRows1781806557.map(([itemId, name, type, linkedAccount, title, phone, email, notes], index) => {
+    const accountId = crmAccountIdForName(linkedAccount);
+    return {
+      id: `con-${itemId || CRM_CONTACTS_BOARD_ID + '-' + index}`,
+      name,
+      type: type || 'No Label',
+      accountId,
+      linkedAccount: linkedAccount || '',
+      title: title || '',
+      phone: phone || '',
+      email: email || '',
+      url: '',
+      emailProviderLink: '',
+      emailProviderName: '',
+      emailProviderId: '',
+      emailProviderStatus: '',
+      notes: notes || '',
+      notesLog: [],
+      emailLog: [],
+      itemId: itemId || `${CRM_CONTACTS_BOARD_ID}-${index + 1}`
+    };
+  });
+}
+
+function crmBuildAccountsFromContacts(contacts = []) {
+  const byAccount = new Map();
+  contacts.forEach((contact) => {
+    const accountName = String(contact.linkedAccount || '').trim();
+    if (!accountName) return;
+    const id = contact.accountId || crmAccountIdForName(accountName);
+    if (!byAccount.has(id)) {
+      byAccount.set(id, {
+        id,
+        name: accountName,
+        type: 'Contacts Board Account',
+        domain: '',
+        industry: '',
+        contacts: [],
+        itemId: id.replace(/^acc-board-/, ''),
+        accountEmail: '',
+        emailProviderLink: '',
+        emailProviderName: '',
+        emailProviderId: '',
+        emailProviderStatus: '',
+        neroaLink: '',
+        notes: '',
+        notesLog: [],
+        emailLog: [],
+        description: '',
+        employees: '',
+        headquarters: '',
+        salesEstimating: ''
+      });
+    }
+    byAccount.get(id).contacts.push(contact.name);
+  });
+  return Array.from(byAccount.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function repairCrmContactsBoardNames() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(CRM_CONTACTS_STORAGE_KEY) || 'null');
+    const savedContacts = Array.isArray(saved?.contacts) ? saved.contacts : [];
+    const needsRepair = !savedContacts.length || crmHasImportedContactNames(savedContacts);
+    if (!needsRepair) return;
+
+    const contacts = crmBuildContactsFromBoardRows();
+    const savedAccounts = Array.isArray(saved?.accounts) && saved.accounts.length ? saved.accounts : [];
+    const hasBadAccountContacts = savedAccounts.some((account) => crmHasImportedContactNames(account?.contacts || []));
+    const accounts = savedAccounts.length && !hasBadAccountContacts ? savedAccounts : crmBuildAccountsFromContacts(contacts);
+
+    localStorage.setItem(CRM_CONTACTS_STORAGE_KEY, JSON.stringify({
+      ...(saved || {}),
+      accounts,
+      contacts,
+      repairedFromBoardId: CRM_CONTACTS_BOARD_ID,
+      repairedAt: new Date().toISOString()
+    }));
+  } catch {
+    const contacts = crmBuildContactsFromBoardRows();
+    localStorage.setItem(CRM_CONTACTS_STORAGE_KEY, JSON.stringify({
+      accounts: crmBuildAccountsFromContacts(contacts),
+      contacts,
+      repairedFromBoardId: CRM_CONTACTS_BOARD_ID,
+      repairedAt: new Date().toISOString()
+    }));
+  }
+}
+
 function start() {
+  repairCrmContactsBoardNames();
   applyGeometry();
   injectGeometryPanel();
   const observer = new MutationObserver(() => {
