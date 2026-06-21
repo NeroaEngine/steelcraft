@@ -1,0 +1,45 @@
+name: Migrate SteelCraft DB to Neroa
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Dump DigitalOcean SteelCraft database
+        env:
+          SOURCE_DATABASE_URL: ${{ secrets.DIGITALOCEAN_STEELCRAFT_DATABASE_URL }}
+        run: |
+          test -n "$SOURCE_DATABASE_URL"
+          docker run --rm \
+            -e SOURCE_DATABASE_URL \
+            -v "$PWD:/backup" \
+            postgres:18 \
+            sh -c 'pg_dump --format=custom --no-owner --no-acl --dbname="$SOURCE_DATABASE_URL" --file=/backup/steelcraft-db.dump'
+
+      - name: Restore into Neroa database
+        env:
+          TARGET_DATABASE_URL: ${{ secrets.NEROA_DATABASE_URL }}
+        run: |
+          test -n "$TARGET_DATABASE_URL"
+          docker run --rm \
+            -e TARGET_DATABASE_URL \
+            -v "$PWD:/backup" \
+            postgres:18 \
+            sh -c 'pg_restore --clean --if-exists --no-owner --no-acl --dbname="$TARGET_DATABASE_URL" /backup/steelcraft-db.dump'
+
+      - name: Verify Neroa database
+        env:
+          TARGET_DATABASE_URL: ${{ secrets.NEROA_DATABASE_URL }}
+        run: |
+          docker run --rm \
+            -e TARGET_DATABASE_URL \
+            postgres:18 \
+            sh -c '
+              psql "$TARGET_DATABASE_URL" -c "select current_database(), current_user, now();"
+              psql "$TARGET_DATABASE_URL" -c "select count(*) as companies from companies;" || true
+              psql "$TARGET_DATABASE_URL" -c "select count(*) as projects from projects;" || true
+              psql "$TARGET_DATABASE_URL" -c "select count(*) as activity_logs from portal_activity_logs;" || true
+            '
