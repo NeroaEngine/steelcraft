@@ -48,9 +48,18 @@ app.use((req, res, next) => {
 });
 app.use(express.static(path.join(__dirname, 'dist'), { etag: false, lastModified: false, setHeaders(res, filePath) { if (filePath.endsWith('.html')) res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate'); } }));
 
-function getDatabaseUrl() { if (!process.env.DATABASE_URL) return null; const url = new URL(process.env.DATABASE_URL); url.searchParams.delete('sslmode'); return url.toString(); }
-const databaseUrl = getDatabaseUrl();
-const pool = databaseUrl ? new Pool({ connectionString: databaseUrl, ssl: { rejectUnauthorized: false } }) : null;
+function getDatabaseConfig() {
+  if (!process.env.DATABASE_URL) return null;
+  const url = new URL(process.env.DATABASE_URL);
+  const sslmode = url.searchParams.get('sslmode');
+  url.searchParams.delete('sslmode');
+  return {
+    connectionString: url.toString(),
+    ssl: sslmode === 'disable' ? false : { rejectUnauthorized: false }
+  };
+}
+const databaseConfig = getDatabaseConfig();
+const pool = databaseConfig ? new Pool(databaseConfig) : null;
 function requireDatabase() { if (!pool) { const error = new Error('DATABASE_URL is not configured.'); error.statusCode = 500; throw error; } return pool; }
 function safeJson(value) { try { return value ? JSON.parse(value) : null; } catch { return null; } }
 function tenantKey(req) { return req.params.tenantKey || req.query.tenantKey || req.body?.tenantKey || req.body?.tenant_key || steelcraftProfileKey; }
