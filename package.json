@@ -9,8 +9,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "node --import ./server/pgSafeQueryPatch.js --import ./server/steelcraftSqlAdminAutoRegister.js server.js",
-    "start": "node --import ./server/pgSafeQueryPatch.js --import ./server/steelcraftSqlAdminAutoRegister.js server.js"
+    "preview": "node --import ./server/pgSafeQueryPatch.js --import ./server/steelcraftSqlAdminAutoRegister.js --import ./server/steelcraftCrmSqlAutoRegister.js server.js",
+    "start": "node --import ./server/pgSafeQueryPatch.js --import ./server/steelcraftSqlAdminAutoRegister.js --import ./server/steelcraftCrmSqlAutoRegister.js server.js"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
