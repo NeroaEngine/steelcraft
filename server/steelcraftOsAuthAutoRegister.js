@@ -4,7 +4,20 @@ import { Pool } from 'pg';
 
 const DEFAULT_SCHEMA = process.env.DATABASE_SCHEMA || 'steelcraft_os_v1';
 const SESSION_COOKIE = 'scb_os_session';
-const STATE_COOKIE = 'scb_ms_oauth_state';
+const STATE_COOKIE = 'scb_neroa_oauth_state';
+
+const AUTH_REFS = Object.freeze({
+  tenant: process.env.NEROA_AUTH_TENANT || 'tenant:steelcraft',
+  app: process.env.NEROA_AUTH_APP || 'app:steelcraft',
+  vaultNamespace: process.env.NEROA_AUTH_VAULT_NAMESPACE || 'steelcraft',
+  clientSecretRef: process.env.NEROA_AUTH_CLIENT_SECRET_REF || 'vault-secret:steelcraft-microsoft-oauth-client-secret',
+  tokenSecretRef: process.env.NEROA_AUTH_TOKEN_SECRET_REF || 'vault-secret:steelcraft-microsoft-oauth-tokens',
+  database: process.env.NEROA_AUTH_DATABASE || 'database:steelcraft',
+  policybound: process.env.NEROA_AUTH_POLICYBOUND || 'policybound:steelcraft-auth-runtime',
+  guard: process.env.NEROA_AUTH_GUARD || 'guard:steelcraft-microsoft-oauth-issued',
+  scan: process.env.NEROA_AUTH_SCAN || 'scan:steelcraft-microsoft-oauth-issued',
+  liveUnlockRef: process.env.STEELCRAFT_LIVE_UNLOCK_REF || null
+});
 
 function getDatabaseConfig() {
   if (!process.env.DATABASE_URL) return null;
@@ -38,6 +51,10 @@ function baseUrl(req) {
   return `${proto}://${host}`;
 }
 
+function appCallbackUrl(req) {
+  return process.env.NEROA_AUTH_REDIRECT_URI || `${baseUrl(req)}/api/os/auth/neroa/callback`;
+}
+
 function cookieOptions(maxAgeMs) {
   return { httpOnly: true, sameSite: 'lax', secure: true, path: '/', maxAge: maxAgeMs };
 }
@@ -46,20 +63,19 @@ function hash(value) {
   return crypto.createHash('sha256').update(String(value)).digest('hex');
 }
 
-function decodeJwt(jwt) {
-  const part = String(jwt || '').split('.')[1];
-  if (!part) return {};
-  return JSON.parse(Buffer.from(part, 'base64url').toString('utf8'));
+function pkceChallenge(verifier) {
+  return crypto.createHash('sha256').update(verifier).digest('base64url');
 }
 
-function microsoftConfig(req) {
-  const tenant = process.env.MICROSOFT_TENANT_ID || process.env.AZURE_TENANT_ID || 'common';
+function authSpineConfig(req) {
+  const spineBaseUrl = process.env.NEROA_AUTH_SPINE_URL || process.env.NEROA_AUTH_URL || null;
   return {
-    tenant,
-    clientId: process.env.MICROSOFT_CLIENT_ID || process.env.AZURE_CLIENT_ID || null,
-    clientSecret: process.env.MICROSOFT_CLIENT_SECRET || process.env.AZURE_CLIENT_SECRET || null,
-    redirectUri: process.env.MICROSOFT_REDIRECT_URI || process.env.AZURE_REDIRECT_URI || `${baseUrl(req)}/api/os/auth/microsoft/callback`,
-    scopes: process.env.MICROSOFT_OAUTH_SCOPES || 'openid profile email offline_access User.Read'
+    spineBaseUrl,
+    authorizeUrl: process.env.NEROA_AUTH_AUTHORIZE_URL || (spineBaseUrl ? `${spineBaseUrl.replace(/\/+$/, '')}/oauth/authorize` : null),
+    clientId: process.env.NEROA_AUTH_CLIENT_ID || 'steelcraft-microsoft-oauth-client',
+    provider: process.env.NEROA_AUTH_PROVIDER || 'microsoft',
+    redirectUri: appCallbackUrl(req),
+    scope: process.env.NEROA_AUTH_SCOPE || 'openid profile email offline_access User.Read'
   };
 }
 
@@ -91,6 +107,30 @@ async function ensureOsSchema(conn = db()) {
     expires_at timestamptz not null,
     created_at timestamptz not null default now()
   )`);
+  await conn.query(`alter table ${schema}.os_sessions add column if not exists neroa_session_ref text`);
+  await conn.query(`alter table ${schema}.os_sessions add column if not exists tenant_ref text default 'tenant:steelcraft'`);
+  await conn.query(`alter table ${schema}.os_sessions add column if not exists app_ref text default 'app:steelcraft'`);
+  await conn.query(`alter table ${schema}.os_sessions add column if not exists vault_token_ref text`);
+  await conn.query(`alter table ${schema}.os_sessions add column if not exists guard_receipt_ref text`);
+  await conn.query(`alter table ${schema}.os_sessions add column if not exists scan_receipt_ref text`);
+  await conn.query(`create table if not exists ${schema}.os_oauth_runtime_requests (
+    id uuid primary key default gen_random_uuid(),
+    state_hash text not null unique,
+    nonce_hash text not null,
+    pkce_verifier_hash text not null,
+    tenant_ref text not null,
+    app_ref text not null,
+    provider text not null,
+    client_id text not null,
+    redirect_uri text not null,
+    vault_namespace text not null,
+    policybound_ref text not null,
+    guard_ref text not null,
+    scan_ref text not null,
+    consumed_at timestamptz,
+    expires_at timestamptz not null,
+    created_at timestamptz not null default now()
+  )`);
   await conn.query(`create table if not exists ${schema}.os_projects (
     id uuid primary key default gen_random_uuid(),
     scb_job_number text unique,
@@ -117,27 +157,39 @@ async function ensureOsSchema(conn = db()) {
 async function audit(action, metadata = {}, actorUserId = null) {
   await ensureOsSchema();
   const schema = qident(DEFAULT_SCHEMA);
-  await db().query(`insert into ${schema}.os_audit_log (actor_user_id, action, entity_type, entity_id, vault_id, receipt_ref, metadata) values ($1,$2,$3,$4,$5,$6,$7::jsonb)`, [actorUserId, action, metadata.entityType || 'auth', metadata.entityId || null, process.env.NEROA_CANONICAL_VAULT_ID || 'vault_steelcraft_001', metadata.receiptRef || 'guard_receipt_pending', JSON.stringify(metadata)]);
+  await db().query(
+    `insert into ${schema}.os_audit_log (actor_user_id, action, entity_type, entity_id, vault_id, receipt_ref, metadata) values ($1,$2,$3,$4,$5,$6,$7::jsonb)`,
+    [actorUserId, action, metadata.entityType || 'auth', metadata.entityId || null, process.env.NEROA_CANONICAL_VAULT_ID || 'vault_steelcraft_001', metadata.receiptRef || 'guard_receipt_pending', JSON.stringify(metadata)]
+  );
 }
 
-async function upsertOAuthUser({ provider, subject, email, name }) {
+async function upsertNeroaUser({ subject, email, name }) {
   await ensureOsSchema();
   const schema = qident(DEFAULT_SCHEMA);
   const normalizedEmail = String(email || '').trim().toLowerCase();
-  if (!normalizedEmail) throw new Error('OAuth provider did not return an email.');
-  const userResult = await db().query(`insert into ${schema}.os_users (email, full_name, status, default_role) values ($1,$2,'active','admin') on conflict (email) do update set full_name = coalesce(excluded.full_name, ${schema}.os_users.full_name), updated_at = now() returning *`, [normalizedEmail, name || normalizedEmail.split('@')[0]]);
+  if (!normalizedEmail) throw new Error('Neroa Auth Spine did not return a user email.');
+  const userResult = await db().query(
+    `insert into ${schema}.os_users (email, full_name, status, default_role) values ($1,$2,'active','admin') on conflict (email) do update set full_name = coalesce(excluded.full_name, ${schema}.os_users.full_name), updated_at = now() returning *`,
+    [normalizedEmail, name || normalizedEmail.split('@')[0]]
+  );
   const user = userResult.rows[0];
-  await db().query(`insert into ${schema}.os_auth_identities (user_id, provider, provider_subject, provider_email) values ($1,$2,$3,$4) on conflict (provider, provider_subject) do update set user_id = excluded.user_id, provider_email = excluded.provider_email`, [user.id, provider, subject, normalizedEmail]);
+  await db().query(
+    `insert into ${schema}.os_auth_identities (user_id, provider, provider_subject, provider_email) values ($1,$2,$3,$4) on conflict (provider, provider_subject) do update set user_id = excluded.user_id, provider_email = excluded.provider_email`,
+    [user.id, 'neroa_auth_spine:microsoft', subject, normalizedEmail]
+  );
   return user;
 }
 
-async function createSession(userId) {
+async function createTenantSession(userId, handoff) {
   await ensureOsSchema();
   const token = crypto.randomBytes(32).toString('base64url');
   const tokenHash = hash(token);
   const schema = qident(DEFAULT_SCHEMA);
   const expires = new Date(Date.now() + 1000 * 60 * 60 * 12);
-  await db().query(`insert into ${schema}.os_sessions (user_id, session_token_hash, expires_at) values ($1,$2,$3)`, [userId, tokenHash, expires]);
+  await db().query(
+    `insert into ${schema}.os_sessions (user_id, session_token_hash, expires_at, neroa_session_ref, tenant_ref, app_ref, vault_token_ref, guard_receipt_ref, scan_receipt_ref) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+    [userId, tokenHash, expires, handoff.sessionRef, AUTH_REFS.tenant, AUTH_REFS.app, handoff.vaultTokenRef, handoff.guardReceiptRef, handoff.scanReceiptRef]
+  );
   return { token, expires };
 }
 
@@ -146,8 +198,40 @@ async function sessionUser(req) {
   if (!token) return null;
   await ensureOsSchema();
   const schema = qident(DEFAULT_SCHEMA);
-  const result = await db().query(`select u.id, u.email, u.full_name, u.status, u.default_role, s.expires_at from ${schema}.os_sessions s join ${schema}.os_users u on u.id = s.user_id where s.session_token_hash = $1 and s.expires_at > now() and u.status = 'active'`, [hash(token)]);
+  const result = await db().query(
+    `select u.id, u.email, u.full_name, u.status, u.default_role, s.expires_at, s.neroa_session_ref, s.tenant_ref, s.app_ref from ${schema}.os_sessions s join ${schema}.os_users u on u.id = s.user_id where s.session_token_hash = $1 and s.expires_at > now() and u.status = 'active'`,
+    [hash(token)]
+  );
   return result.rows[0] || null;
+}
+
+async function saveRuntimeRequest(req, cfg, state, nonce, verifier) {
+  await ensureOsSchema();
+  const schema = qident(DEFAULT_SCHEMA);
+  await db().query(
+    `insert into ${schema}.os_oauth_runtime_requests (state_hash, nonce_hash, pkce_verifier_hash, tenant_ref, app_ref, provider, client_id, redirect_uri, vault_namespace, policybound_ref, guard_ref, scan_ref, expires_at) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,now() + interval '10 minutes')`,
+    [hash(state), hash(nonce), hash(verifier), AUTH_REFS.tenant, AUTH_REFS.app, cfg.provider, cfg.clientId, cfg.redirectUri, AUTH_REFS.vaultNamespace, AUTH_REFS.policybound, AUTH_REFS.guard, AUTH_REFS.scan]
+  );
+}
+
+async function consumeRuntimeRequest(state, expected) {
+  await ensureOsSchema();
+  const schema = qident(DEFAULT_SCHEMA);
+  const result = await db().query(
+    `update ${schema}.os_oauth_runtime_requests set consumed_at = now() where state_hash = $1 and consumed_at is null and expires_at > now() and tenant_ref = $2 and app_ref = $3 and provider = $4 and client_id = $5 and redirect_uri = $6 returning *`,
+    [hash(state), AUTH_REFS.tenant, AUTH_REFS.app, expected.provider, expected.clientId, expected.redirectUri]
+  );
+  return result.rows[0] || null;
+}
+
+function requireQuery(req, name) {
+  const value = req.query?.[name];
+  if (!value) {
+    const error = new Error(`Missing required auth handoff field: ${name}`);
+    error.statusCode = 400;
+    throw error;
+  }
+  return String(value);
 }
 
 function registerSteelcraftOsAuthRoutes(app) {
@@ -171,46 +255,77 @@ function registerSteelcraftOsAuthRoutes(app) {
   });
 
   app.get('/api/os/auth/config', (req, res) => {
-    const cfg = microsoftConfig(req);
-    res.json({ ok: true, primaryProvider: 'microsoft', microsoftConfigured: Boolean(cfg.clientId && cfg.clientSecret), redirectUri: cfg.redirectUri, schema: DEFAULT_SCHEMA, vaultId: process.env.NEROA_CANONICAL_VAULT_ID || null });
+    const cfg = authSpineConfig(req);
+    res.json({
+      ok: true,
+      authority: 'neroa_auth_spine',
+      primaryProvider: 'microsoft',
+      microsoftConfigured: Boolean(cfg.authorizeUrl && cfg.clientId),
+      redirectUri: cfg.redirectUri,
+      schema: DEFAULT_SCHEMA,
+      vaultId: process.env.NEROA_CANONICAL_VAULT_ID || null,
+      refs: AUTH_REFS
+    });
   });
 
   app.get('/api/os/auth/session', async (req, res, next) => {
-    try { res.json({ ok: true, user: await sessionUser(req), vaultId: process.env.NEROA_CANONICAL_VAULT_ID || null }); } catch (error) { next(error); }
+    try { res.json({ ok: true, user: await sessionUser(req), vaultId: process.env.NEROA_CANONICAL_VAULT_ID || null, authority: 'neroa_auth_spine' }); } catch (error) { next(error); }
   });
 
   app.get('/api/os/auth/microsoft/start', async (req, res, next) => {
     try {
-      const cfg = microsoftConfig(req);
-      if (!cfg.clientId || !cfg.clientSecret) return res.status(501).json({ ok: false, error: 'Microsoft OAuth is not configured. Set MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, and MICROSOFT_TENANT_ID.' });
+      const cfg = authSpineConfig(req);
+      if (!cfg.authorizeUrl || !cfg.clientId) return res.status(501).json({ ok: false, error: 'Neroa Auth Spine is not configured. Set NEROA_AUTH_SPINE_URL and NEROA_AUTH_CLIENT_ID.' });
+      if (process.env.STEELCRAFT_PRODUCTION_CUTOVER === 'true' && !AUTH_REFS.liveUnlockRef) return res.status(423).json({ ok: false, error: 'Production auth cutover requires STEELCRAFT_LIVE_UNLOCK_REF.' });
       const state = crypto.randomBytes(24).toString('base64url');
+      const nonce = crypto.randomBytes(24).toString('base64url');
+      const verifier = crypto.randomBytes(32).toString('base64url');
+      await saveRuntimeRequest(req, cfg, state, nonce, verifier);
       res.cookie(STATE_COOKIE, state, cookieOptions(10 * 60 * 1000));
-      const url = new URL(`https://login.microsoftonline.com/${cfg.tenant}/oauth2/v2.0/authorize`);
-      url.searchParams.set('client_id', cfg.clientId);
+      const url = new URL(cfg.authorizeUrl);
       url.searchParams.set('response_type', 'code');
+      url.searchParams.set('client_id', cfg.clientId);
       url.searchParams.set('redirect_uri', cfg.redirectUri);
-      url.searchParams.set('response_mode', 'query');
-      url.searchParams.set('scope', cfg.scopes);
+      url.searchParams.set('scope', cfg.scope);
       url.searchParams.set('state', state);
-      await audit('microsoft_oauth_started', { provider: 'microsoft', proofState: 'anchor_requested' });
+      url.searchParams.set('nonce', nonce);
+      url.searchParams.set('code_challenge', pkceChallenge(verifier));
+      url.searchParams.set('code_challenge_method', 'S256');
+      url.searchParams.set('tenant', AUTH_REFS.tenant);
+      url.searchParams.set('app', AUTH_REFS.app);
+      url.searchParams.set('provider', cfg.provider);
+      url.searchParams.set('vault_namespace', AUTH_REFS.vaultNamespace);
+      url.searchParams.set('vault_secret_client', AUTH_REFS.clientSecretRef);
+      url.searchParams.set('vault_secret_tokens', AUTH_REFS.tokenSecretRef);
+      url.searchParams.set('policybound', AUTH_REFS.policybound);
+      url.searchParams.set('guard', AUTH_REFS.guard);
+      url.searchParams.set('scan', AUTH_REFS.scan);
+      await audit('neroa_auth_spine_oauth_started', { provider: cfg.provider, proofState: 'anchor_requested', refs: AUTH_REFS });
       res.redirect(url.toString());
     } catch (error) { next(error); }
   });
 
-  app.get('/api/os/auth/microsoft/callback', async (req, res, next) => {
+  app.get('/api/os/auth/neroa/callback', async (req, res, next) => {
     try {
-      const cfg = microsoftConfig(req);
-      if (!req.query.code || req.query.state !== req.cookies?.[STATE_COOKIE]) return res.redirect('/?auth=state_failed');
-      const tokenResponse = await fetch(`https://login.microsoftonline.com/${cfg.tenant}/oauth2/v2.0/token`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: cfg.clientId, client_secret: cfg.clientSecret, code: String(req.query.code), redirect_uri: cfg.redirectUri, grant_type: 'authorization_code', scope: cfg.scopes }) });
-      const tokenPayload = await tokenResponse.json();
-      if (!tokenResponse.ok) throw new Error(tokenPayload.error_description || tokenPayload.error || 'Microsoft token exchange failed.');
-      const claims = decodeJwt(tokenPayload.id_token);
-      const subject = claims.oid || claims.sub;
-      const email = claims.preferred_username || claims.email || claims.upn;
-      const name = claims.name || email;
-      const user = await upsertOAuthUser({ provider: 'microsoft', subject, email, name });
-      const session = await createSession(user.id);
-      await audit('microsoft_oauth_completed', { provider: 'microsoft', providerSubject: subject, email, proofState: 'anchor_requested' }, user.id);
+      const cfg = authSpineConfig(req);
+      const state = requireQuery(req, 'state');
+      if (state !== req.cookies?.[STATE_COOKIE]) return res.redirect('/?auth=state_failed');
+      const request = await consumeRuntimeRequest(state, cfg);
+      if (!request) return res.redirect('/?auth=request_failed');
+      if (requireQuery(req, 'tenant') !== AUTH_REFS.tenant) return res.redirect('/?auth=tenant_failed');
+      if (requireQuery(req, 'app') !== AUTH_REFS.app) return res.redirect('/?auth=app_failed');
+      if (requireQuery(req, 'provider') !== cfg.provider) return res.redirect('/?auth=provider_failed');
+      const userRef = requireQuery(req, 'user_ref');
+      const sessionRef = requireQuery(req, 'session_ref');
+      const membershipRef = requireQuery(req, 'membership_ref');
+      const vaultTokenRef = requireQuery(req, 'vault_token_ref');
+      const guardReceiptRef = requireQuery(req, 'guard_receipt_ref');
+      const scanReceiptRef = requireQuery(req, 'scan_receipt_ref');
+      const email = String(req.query.email || '').trim().toLowerCase();
+      const name = String(req.query.name || email || userRef);
+      const user = await upsertNeroaUser({ subject: userRef, email, name });
+      const session = await createTenantSession(user.id, { sessionRef, vaultTokenRef, guardReceiptRef, scanReceiptRef });
+      await audit('neroa_tenant_session_issued', { provider: cfg.provider, userRef, sessionRef, membershipRef, vaultTokenRef, receiptRef: guardReceiptRef, refs: AUTH_REFS }, user.id);
       res.clearCookie(STATE_COOKIE, { path: '/' });
       res.cookie(SESSION_COOKIE, session.token, cookieOptions(1000 * 60 * 60 * 12));
       res.redirect('/');
