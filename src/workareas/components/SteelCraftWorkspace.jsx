@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { loadWorkspaceRuntime } from '../runtime/workspace-runtime.ts';
 import { getWorkAreas } from '../registry/workarea-registry.ts';
+import CrmSalesWorkArea from './CrmSalesWorkArea.jsx';
 
 function Badge({ children, tone = 'dark' }) {
   return <span className={`badge badge-${tone}`}>{children}</span>;
@@ -25,6 +26,23 @@ function RuntimeCard({ card }) {
       <p>{card.description}</p>
       <small>{card.sqlTable ? `SQL: ${card.sqlTable}` : 'Runtime card'}</small>
     </article>
+  );
+}
+
+function WorkAreaRenderer({ runtime, cards }) {
+  if (runtime?.manifest?.id === 'crm-sales') return <CrmSalesWorkArea runtime={runtime} />;
+
+  return (
+    <section className="card">
+      <div className="section-heading">
+        <Badge>Runtime Cards</Badge>
+        <h2>{runtime?.manifest?.title || 'Loading'} Cards</h2>
+        <p>{runtime?.manifest?.description || 'Loading active work area cards.'}</p>
+      </div>
+      <div className="module-grid four-up">
+        {cards.map((card) => <RuntimeCard key={card.id} card={card} />)}
+      </div>
+    </section>
   );
 }
 
@@ -86,16 +104,7 @@ export default function SteelCraftWorkspace({ status }) {
         </div>
       </section>
 
-      <section className="card">
-        <div className="section-heading">
-          <Badge>Runtime Cards</Badge>
-          <h2>{runtime?.manifest?.title || 'Loading'} Cards</h2>
-          <p>{runtime?.manifest?.description || 'Loading active work area cards.'}</p>
-        </div>
-        <div className="module-grid four-up">
-          {cards.map((card) => <RuntimeCard key={card.id} card={card} />)}
-        </div>
-      </section>
+      <WorkAreaRenderer runtime={runtime} cards={cards} />
     </main>
   );
 }
