@@ -1,9 +1,16 @@
 import type { MasterProjectRecord } from '../contracts/project-contract';
 
-const fallbackProject: MasterProjectRecord = {
-  id: 'demo-project-1',
-  projectNumber: 'SCB-2026-0001',
-  name: 'Example Project Record',
+type QuoteRuntimeRecord = MasterProjectRecord & {
+  recordType: 'quote' | 'project';
+  quoteNumber: string;
+};
+
+const fallbackProject: QuoteRuntimeRecord = {
+  id: 'demo-quote-1',
+  recordType: 'quote',
+  quoteNumber: 'Q-2026-0001',
+  projectNumber: '',
+  name: 'Example Quote Record',
   stage: 'estimating',
   customerId: 'acme-corp',
   accountId: 'acme-corp',
@@ -15,8 +22,8 @@ const fallbackProject: MasterProjectRecord = {
   contractNumber: '',
 };
 
-export async function loadProjectRecord(projectId?: string): Promise<MasterProjectRecord> {
-  if (!projectId || projectId === fallbackProject.id || projectId === fallbackProject.projectNumber) {
+export async function loadProjectRecord(projectId?: string): Promise<QuoteRuntimeRecord> {
+  if (!projectId || projectId === fallbackProject.id || projectId === fallbackProject.quoteNumber) {
     return fallbackProject;
   }
 
@@ -29,6 +36,6 @@ export async function loadProjectRecord(projectId?: string): Promise<MasterProje
   }
 }
 
-export function getFallbackProjectRecord(): MasterProjectRecord {
+export function getFallbackProjectRecord(): QuoteRuntimeRecord {
   return fallbackProject;
 }
