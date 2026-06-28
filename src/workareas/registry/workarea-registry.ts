@@ -2,8 +2,9 @@ import type { WorkAreaId, WorkAreaManifest } from '../contracts/workarea-contrac
 
 export const steelCraftWorkAreas: WorkAreaManifest[] = [
   { id: 'command-center', title: 'Command Center', description: 'Steel Craft OS front door and operational overview.', cardIds: ['project-summary', 'today-priorities', 'recent-activity'] },
-  { id: 'crm-sales', title: 'CRM & Sales', description: 'Lead intake through contract award.', cardIds: ['lead', 'account', 'contact', 'follow-up', 'proposal-history'] },
-  { id: 'estimating', title: 'Estimating', description: 'Quote import, yellow inputs, estimate calculations, alternates, and markup.', cardIds: ['manufacturer-quote', 'estimate', 'alternates', 'margin'] },
+  { id: 'crm-sales', title: 'Lead Generation / CRM', description: 'Lead intake, customer account, opportunity, quote creation, and follow-up.', cardIds: ['lead', 'account', 'contact', 'follow-up', 'proposal-history'] },
+  { id: 'estimating', title: 'Quote / Estimating', description: 'Quote import, approved templates, guided inputs, calculations, alternates, and markup.', cardIds: ['manufacturer-quote', 'estimate', 'alternates', 'margin'] },
+  { id: 'model-designer', title: 'Plan Upload / Building Designer', description: 'Customer plan upload, metal building model, structural layout, doors, windows, components, takeoff, and MBS export.', cardIds: ['plan-upload', 'building-model', 'structural', 'doors-windows', 'component-takeoff', 'mbs-export'] },
   { id: 'proposal', title: 'Proposal', description: 'Proposal generation and customer quote package.', cardIds: ['proposal', 'proposal-documents'] },
   { id: 'contract', title: 'Contract', description: 'Contract conversion, permanent SCB project number, and secondary identifiers.', cardIds: ['contract', 'project-identifiers'] },
   { id: 'schedule-of-values', title: 'Schedule of Values', description: 'Material and labor draw schedule tied to contract value.', cardIds: ['schedule-of-values', 'material-draws', 'labor-draws'] },
