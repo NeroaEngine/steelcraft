@@ -2,6 +2,7 @@ export type WorkAreaId =
   | 'command-center'
   | 'crm-sales'
   | 'estimating'
+  | 'model-designer'
   | 'proposal'
   | 'contract'
   | 'schedule-of-values'
