@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { loadWorkspaceRuntime } from '../runtime/workspace-runtime.ts';
 import { getWorkAreas } from '../registry/workarea-registry.ts';
 import CrmSalesWorkArea from './CrmSalesWorkArea.jsx';
+import EstimatingWorkArea from './EstimatingWorkArea.jsx';
 
 function Badge({ children, tone = 'dark' }) {
   return <span className={`badge badge-${tone}`}>{children}</span>;
@@ -31,6 +32,7 @@ function RuntimeCard({ card }) {
 
 function WorkAreaRenderer({ runtime, cards }) {
   if (runtime?.manifest?.id === 'crm-sales') return <CrmSalesWorkArea runtime={runtime} />;
+  if (runtime?.manifest?.id === 'estimating') return <EstimatingWorkArea runtime={runtime} />;
 
   return (
     <section className="card">
