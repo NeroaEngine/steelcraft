@@ -58,7 +58,7 @@ export default function SteelCraftWorkspace({ status }) {
     async function load() {
       setRuntimeStatus('Loading Steel Craft runtime...');
       try {
-        const nextRuntime = await loadWorkspaceRuntime(activeWorkAreaId, 'SCB-2026-0001');
+        const nextRuntime = await loadWorkspaceRuntime(activeWorkAreaId, 'Q-2026-0001');
         if (!cancelled) {
           setRuntime(nextRuntime);
           setRuntimeStatus('Steel Craft runtime active');
@@ -74,6 +74,8 @@ export default function SteelCraftWorkspace({ status }) {
 
   const project = runtime?.project;
   const cards = runtime?.state?.cards || [];
+  const recordNumber = project?.projectNumber || project?.quoteNumber || 'Q-2026-0001';
+  const recordLabel = project?.projectNumber ? 'Active Project' : 'Active Quote';
 
   return (
     <main className="app-shell steelcraft-workspace">
@@ -81,13 +83,13 @@ export default function SteelCraftWorkspace({ status }) {
         <div>
           <Badge tone="red">Steel Craft OS</Badge>
           <h1>{runtime?.manifest?.title || 'Command Center'}</h1>
-          <p>One Master Project Record. Many Work Areas. Every card attaches to the same project history.</p>
+          <p>Quotes become projects only after award. Work starts as a quote record, then converts to an SCB job number after contract or PO.</p>
           <p className="connection-status">{status} · {runtimeStatus}</p>
         </div>
         <aside className="hero-panel">
-          <span>Active Project</span>
-          <strong>{project?.projectNumber || 'SCB-2026-0001'}</strong>
-          <small>{project?.name || 'Example Project Record'} · Stage: {project?.stage || 'estimating'}</small>
+          <span>{recordLabel}</span>
+          <strong>{recordNumber}</strong>
+          <small>{project?.name || 'Example Quote Record'} · Stage: {project?.stage || 'estimating'}</small>
         </aside>
       </header>
 
@@ -95,7 +97,7 @@ export default function SteelCraftWorkspace({ status }) {
         <div className="section-heading">
           <Badge>Work Areas</Badge>
           <h2>Steel Craft Command Center</h2>
-          <p>CRM, estimating, proposal, contract, billing, delivery, erection, vendor, customer, documents, change orders, and activity all reference one project record.</p>
+          <p>CRM and estimating begin on a quote record. SCB project numbers are generated only after award, then delivery, billing, erection, vendor, customer, documents, change orders, and activity attach to that job.</p>
         </div>
         <div className="portal-grid landing-grid">
           {workAreas.map((workArea) => (
