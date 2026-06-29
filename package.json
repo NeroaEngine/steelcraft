@@ -5,7 +5,9 @@
     "server": "node server.js",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "start": "node server.js"
+    "start": "node server.js",
+    "import:data": "node scripts/import-steelcraft-data.js",
+    "import:contacts": "node scripts/import-steelcraft-data.js --kind contacts"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
@@ -16,7 +18,8 @@
     "express": "latest",
     "pg": "latest",
     "cors": "latest",
-    "dotenv": "latest"
+    "dotenv": "latest",
+    "xlsx": "latest"
   },
   "devDependencies": {}
 }
