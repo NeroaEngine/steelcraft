@@ -1,0 +1,58 @@
+{
+  "id": "metal-building-generator",
+  "title": "Metal Building Generator",
+  "type": "steelcraft.model.card",
+  "runtime": "forge-azuia",
+  "description": "Manual metal building model generator for quotation and component takeoff workflows.",
+  "status": "prototype-ready",
+  "primaryActions": [
+    {
+      "id": "generate-model",
+      "label": "Generate Model",
+      "action": "steelcraft.model.generate"
+    },
+    {
+      "id": "send-to-estimate",
+      "label": "Send to Estimate",
+      "action": "steelcraft.estimate.consumeModel"
+    },
+    {
+      "id": "send-to-mbs",
+      "label": "Prepare MBS Export",
+      "action": "steelcraft.mbs.prepareExport"
+    }
+  ],
+  "inputs": [
+    { "key": "length", "label": "Building Length", "type": "number", "unit": "ft", "default": 100 },
+    { "key": "width", "label": "Building Width", "type": "number", "unit": "ft", "default": 60 },
+    { "key": "eaveHeight", "label": "Eave Height", "type": "number", "unit": "ft", "default": 16 },
+    { "key": "roofPitch", "label": "Roof Pitch", "type": "number", "unit": "rise/12", "default": 1 },
+    { "key": "baySpacing", "label": "Bay Spacing", "type": "number", "unit": "ft", "default": 25 },
+    { "key": "doors", "label": "Doors", "type": "component-list", "source": "dynamic-door" },
+    { "key": "windows", "label": "Windows", "type": "component-list", "source": "component-library" }
+  ],
+  "outputs": [
+    { "key": "model", "label": "Structured Building Model", "type": "json" },
+    { "key": "quantities", "label": "Quantity Takeoff", "type": "takeoff" },
+    { "key": "components", "label": "Component List", "type": "component-list" },
+    { "key": "viewer", "label": "3D Viewer Payload", "type": "viewer-payload" }
+  ],
+  "dataBindings": {
+    "project": "project_information",
+    "estimate": "estimate",
+    "workingSheet": "working_sheet",
+    "doorCatalog": "dynamic_door",
+    "feQuotation": "fe_quotation",
+    "eoQuotation": "eo_quotation"
+  },
+  "viewer": {
+    "engine": "azuia-canvas",
+    "mode": "isometric-building-shell",
+    "phase": "manual-shell-first",
+    "futureEngines": ["threejs", "plan-recognition", "mbs-export"]
+  },
+  "receiptPolicy": {
+    "required": true,
+    "events": ["model_generated", "takeoff_created", "estimate_handoff_created", "mbs_export_prepared"]
+  }
+}
