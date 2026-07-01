@@ -1,0 +1,20 @@
+{
+  "catalogId": "trim-rainwater-accessories",
+  "name": "Trim, Rainwater, and Accessories",
+  "version": "0.1.0",
+  "components": [
+    { "id": "corner-trim", "category": "trim", "family": "corners", "label": "Corner Trim", "unit": "lf", "measurementInputs": ["eaveHeight", "cornerCount"], "estimateBehavior": "quantity_takeoff", "modelBehavior": "linear", "takeoffRule": "linearFeet = eaveHeight x cornerCount" },
+    { "id": "eave-trim", "category": "trim", "family": "eave", "label": "Eave Trim", "unit": "lf", "measurementInputs": ["length"], "estimateBehavior": "quantity_takeoff", "modelBehavior": "linear", "takeoffRule": "linearFeet = length x 2" },
+    { "id": "rake-trim", "category": "trim", "family": "rake", "label": "Rake Trim", "unit": "lf", "measurementInputs": ["width", "roofPitch"], "estimateBehavior": "quantity_takeoff", "modelBehavior": "linear", "takeoffRule": "linearFeet = roof slope width x 4" },
+    { "id": "base-trim", "category": "trim", "family": "base", "label": "Base Trim", "unit": "lf", "measurementInputs": ["perimeter"], "estimateBehavior": "quantity_takeoff", "modelBehavior": "linear", "takeoffRule": "linearFeet = perimeter" },
+    { "id": "door-trim", "category": "trim", "family": "openings", "label": "Door Trim", "unit": "lf", "measurementInputs": ["doorWidth", "doorHeight", "quantity"], "estimateBehavior": "quantity_takeoff", "modelBehavior": "linear", "takeoffRule": "linearFeet = opening perimeter x quantity" },
+    { "id": "window-trim", "category": "trim", "family": "openings", "label": "Window Trim", "unit": "lf", "measurementInputs": ["windowWidth", "windowHeight", "quantity"], "estimateBehavior": "quantity_takeoff", "modelBehavior": "linear", "takeoffRule": "linearFeet = opening perimeter x quantity" },
+    { "id": "gutter", "category": "rainwater", "family": "gutters", "label": "Gutter", "unit": "lf", "measurementInputs": ["length", "sides"], "estimateBehavior": "quantity_takeoff", "modelBehavior": "linear", "takeoffRule": "linearFeet = length x selected sides" },
+    { "id": "downspout", "category": "rainwater", "family": "downspouts", "label": "Downspout", "unit": "ea", "measurementInputs": ["quantity", "eaveHeight"], "estimateBehavior": "catalog_item", "modelBehavior": "linear", "takeoffRule": "quantity = selected count" },
+    { "id": "ridge-vent", "category": "accessories", "family": "ventilation", "label": "Ridge Vent", "unit": "lf", "measurementInputs": ["length"], "estimateBehavior": "quantity_takeoff", "modelBehavior": "linear", "takeoffRule": "linearFeet = selected ridge vent length" },
+    { "id": "wall-vent", "category": "accessories", "family": "ventilation", "label": "Wall Vent", "unit": "ea", "measurementInputs": ["quantity"], "estimateBehavior": "catalog_item", "modelBehavior": "opening", "takeoffRule": "quantity = selected count" },
+    { "id": "canopy", "category": "accessories", "family": "canopies", "label": "Canopy", "unit": "ea", "measurementInputs": ["length", "projection", "quantity"], "estimateBehavior": "catalog_item", "modelBehavior": "geometry", "takeoffRule": "quantity = selected count" },
+    { "id": "mezzanine", "category": "accessories", "family": "mezzanines", "label": "Mezzanine", "unit": "sf", "measurementInputs": ["length", "width", "area"], "estimateBehavior": "quantity_takeoff", "modelBehavior": "geometry", "takeoffRule": "quantity = mezzanine area" },
+    { "id": "crane-allowance", "category": "accessories", "family": "cranes", "label": "Crane Allowance", "unit": "allowance", "measurementInputs": ["capacity", "span", "runwayLength"], "estimateBehavior": "allowance", "modelBehavior": "reference", "takeoffRule": "allowance by crane requirements" }
+  ]
+}
