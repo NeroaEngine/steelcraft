@@ -1,0 +1,55 @@
+{
+  "catalogId": "wall-systems",
+  "name": "Wall Systems",
+  "version": "0.1.0",
+  "components": [
+    {
+      "id": "wall-panel-r-panel",
+      "category": "wall_systems",
+      "family": "wall_panels",
+      "label": "R-Panel Wall Panel",
+      "unit": "sf",
+      "measurementInputs": ["length", "width", "eaveHeight", "wallArea"],
+      "estimateBehavior": "quantity_takeoff",
+      "modelBehavior": "surface",
+      "takeoffRule": "quantity = wallArea minus openings plus waste factor",
+      "manufacturerRefs": ["mbs.wall_panel.r_panel"]
+    },
+    {
+      "id": "wall-insulation",
+      "category": "wall_systems",
+      "family": "insulation",
+      "label": "Wall Insulation",
+      "unit": "sf",
+      "measurementInputs": ["wallArea", "rValue"],
+      "estimateBehavior": "quantity_takeoff",
+      "modelBehavior": "surface",
+      "takeoffRule": "quantity = wallArea minus openings",
+      "manufacturerRefs": ["vendor.insulation.wall"]
+    },
+    {
+      "id": "liner-panel",
+      "category": "wall_systems",
+      "family": "liner_panels",
+      "label": "Interior Liner Panel",
+      "unit": "sf",
+      "measurementInputs": ["wallArea", "height"],
+      "estimateBehavior": "quantity_takeoff",
+      "modelBehavior": "surface",
+      "takeoffRule": "quantity = selected liner area",
+      "manufacturerRefs": ["mbs.wall_panel.liner"]
+    },
+    {
+      "id": "wainscot-panel",
+      "category": "wall_systems",
+      "family": "wainscot",
+      "label": "Wainscot Panel",
+      "unit": "sf",
+      "measurementInputs": ["perimeter", "height"],
+      "estimateBehavior": "quantity_takeoff",
+      "modelBehavior": "surface",
+      "takeoffRule": "quantity = perimeter x wainscot height minus openings",
+      "manufacturerRefs": ["mbs.wall_panel.wainscot"]
+    }
+  ]
+}
