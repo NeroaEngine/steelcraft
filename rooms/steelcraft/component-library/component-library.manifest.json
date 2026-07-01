@@ -1,0 +1,43 @@
+{
+  "id": "steelcraft-component-library",
+  "name": "Steel Craft Component Library",
+  "version": "0.1.0",
+  "description": "Reusable component catalog for metal building modeling, estimating, quotation, procurement, manufacturing, and MBS export workflows.",
+  "runtime": "forge-azuia",
+  "ownerRoom": "steelcraft-room",
+  "catalogs": [
+    "./structural-components.json",
+    "./roof-systems.json",
+    "./wall-systems.json",
+    "./openings.json",
+    "./trim-rainwater-accessories.json",
+    "./manufacturer-libraries.json"
+  ],
+  "consumers": [
+    "metal-building-generator",
+    "estimate",
+    "fe-quotation",
+    "eo-quotation",
+    "project-delivery",
+    "invoice",
+    "mbs-export"
+  ],
+  "componentShape": {
+    "id": "string",
+    "category": "string",
+    "family": "string",
+    "label": "string",
+    "unit": "ea|lf|sf|cf|ton|allowance",
+    "measurementInputs": ["length", "width", "height", "quantity", "area", "weight"],
+    "estimateBehavior": "quantity_takeoff|allowance|catalog_item|manual",
+    "modelBehavior": "geometry|opening|surface|linear|reference",
+    "manufacturerRefs": [],
+    "rawSource": {}
+  },
+  "phases": {
+    "phase1": "manual component catalog and quantity takeoff",
+    "phase2": "Dynamic Door and vendor catalog binding",
+    "phase3": "MBS export mapping",
+    "phase4": "AI plan recognition and automatic component mapping"
+  }
+}
