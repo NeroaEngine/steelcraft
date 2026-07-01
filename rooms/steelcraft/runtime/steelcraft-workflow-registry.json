@@ -1,0 +1,63 @@
+{
+  "registryId": "steelcraft-workflow-registry",
+  "version": "0.1.0",
+  "workflows": [
+    {
+      "id": "lead-to-project",
+      "title": "Lead to Project",
+      "trigger": "account_or_contact_created",
+      "steps": ["contacts", "accounts", "project-information"],
+      "outputs": ["project_information"]
+    },
+    {
+      "id": "quote-to-project-spine",
+      "title": "Quote to Project Spine",
+      "trigger": "project_information_ready",
+      "steps": ["project-information", "working-sheet", "estimate", "metal-building-generator", "fe-quotation", "eo-quotation", "project-delivery", "erection-schedule", "labor-sov", "material-sov", "invoice"],
+      "outputs": ["quotation_package", "project_package", "billing_package"]
+    },
+    {
+      "id": "estimate-to-model",
+      "title": "Estimate to Metal Building Model",
+      "trigger": "estimate_ready",
+      "steps": ["estimate", "metal-building-generator", "dynamic-door", "component-library"],
+      "actions": ["steelcraft.model.generate", "steelcraft.estimate.consumeModel"],
+      "outputs": ["structured_model", "quantity_takeoff", "component_list"]
+    },
+    {
+      "id": "model-to-quotation",
+      "title": "Model to Quotation",
+      "trigger": "model_generated",
+      "steps": ["metal-building-generator", "fe-quotation", "eo-quotation"],
+      "outputs": ["fe_quote", "eo_quote", "quote_receipt"]
+    },
+    {
+      "id": "contract-to-delivery",
+      "title": "Contract to Delivery",
+      "trigger": "contract_signed",
+      "steps": ["project-information", "project-delivery", "erection-schedule"],
+      "outputs": ["delivery_plan", "erection_plan"]
+    },
+    {
+      "id": "delivery-to-billing",
+      "title": "Delivery to Billing",
+      "trigger": "delivery_or_erection_progressed",
+      "steps": ["project-delivery", "erection-schedule", "labor-sov", "material-sov", "invoice"],
+      "outputs": ["sov_update", "invoice"]
+    },
+    {
+      "id": "change-order-flow",
+      "title": "Change Order Flow",
+      "trigger": "change_order_requested",
+      "steps": ["project-information", "change-orders", "estimate", "fe-quotation", "invoice"],
+      "outputs": ["change_order", "quote_revision", "invoice_adjustment"]
+    },
+    {
+      "id": "closeout-package",
+      "title": "Closeout Package",
+      "trigger": "project_completed",
+      "steps": ["project-information", "invoice", "coi", "project-delivery", "erection-schedule"],
+      "outputs": ["closeout_package"]
+    }
+  ]
+}
