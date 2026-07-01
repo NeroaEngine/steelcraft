@@ -1,0 +1,79 @@
+{
+  "catalogId": "structural-components",
+  "name": "Structural Components",
+  "version": "0.1.0",
+  "components": [
+    {
+      "id": "primary-frame-rigid",
+      "category": "structural",
+      "family": "primary_frames",
+      "label": "Rigid Frame",
+      "unit": "ea",
+      "measurementInputs": ["width", "eaveHeight", "roofPitch", "bayCount"],
+      "estimateBehavior": "quantity_takeoff",
+      "modelBehavior": "geometry",
+      "takeoffRule": "frameLines = bayCount + 1",
+      "manufacturerRefs": ["mbs.primary_frame"]
+    },
+    {
+      "id": "endwall-frame",
+      "category": "structural",
+      "family": "endwalls",
+      "label": "Endwall Frame",
+      "unit": "ea",
+      "measurementInputs": ["width", "eaveHeight", "roofPitch"],
+      "estimateBehavior": "quantity_takeoff",
+      "modelBehavior": "geometry",
+      "takeoffRule": "quantity = 2",
+      "manufacturerRefs": ["mbs.endwall_frame"]
+    },
+    {
+      "id": "secondary-purlins",
+      "category": "structural",
+      "family": "secondary_framing",
+      "label": "Roof Purlins",
+      "unit": "lf",
+      "measurementInputs": ["length", "width", "roofPitch"],
+      "estimateBehavior": "quantity_takeoff",
+      "modelBehavior": "linear",
+      "takeoffRule": "linearFeet = roofArea / typicalSpacing",
+      "manufacturerRefs": ["mbs.roof_purlin"]
+    },
+    {
+      "id": "secondary-girts",
+      "category": "structural",
+      "family": "secondary_framing",
+      "label": "Wall Girts",
+      "unit": "lf",
+      "measurementInputs": ["length", "width", "eaveHeight"],
+      "estimateBehavior": "quantity_takeoff",
+      "modelBehavior": "linear",
+      "takeoffRule": "linearFeet = wallArea / typicalSpacing",
+      "manufacturerRefs": ["mbs.wall_girt"]
+    },
+    {
+      "id": "base-angle",
+      "category": "structural",
+      "family": "base",
+      "label": "Base Angle",
+      "unit": "lf",
+      "measurementInputs": ["length", "width"],
+      "estimateBehavior": "quantity_takeoff",
+      "modelBehavior": "linear",
+      "takeoffRule": "linearFeet = perimeter",
+      "manufacturerRefs": ["mbs.base_angle"]
+    },
+    {
+      "id": "rod-bracing",
+      "category": "structural",
+      "family": "bracing",
+      "label": "Rod Bracing",
+      "unit": "allowance",
+      "measurementInputs": ["length", "width", "bayCount"],
+      "estimateBehavior": "allowance",
+      "modelBehavior": "reference",
+      "takeoffRule": "allowance by bay and engineering requirement",
+      "manufacturerRefs": ["mbs.bracing"]
+    }
+  ]
+}
