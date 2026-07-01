@@ -1,0 +1,1 @@
+{"registryId":"steelcraft-receipt-definitions","version":"0.1.0","receipts":["import_completed","entity_linked","model_generated","quantity_takeoff_created","quotation_generated","contract_signed","delivery_scheduled","erection_updated","invoice_generated","change_order_processed","closeout_package_created"],"policy":{"persist":true,"authority":"forge","replayable":true}}
