@@ -1,0 +1,67 @@
+{
+  "catalogId": "roof-systems",
+  "name": "Roof Systems",
+  "version": "0.1.0",
+  "components": [
+    {
+      "id": "roof-panel-r-panel",
+      "category": "roof_systems",
+      "family": "roof_panels",
+      "label": "R-Panel Roof Panel",
+      "unit": "sf",
+      "measurementInputs": ["length", "width", "roofPitch", "roofArea"],
+      "estimateBehavior": "quantity_takeoff",
+      "modelBehavior": "surface",
+      "takeoffRule": "quantity = roofArea plus waste factor",
+      "manufacturerRefs": ["mbs.roof_panel.r_panel"]
+    },
+    {
+      "id": "roof-panel-standing-seam",
+      "category": "roof_systems",
+      "family": "roof_panels",
+      "label": "Standing Seam Roof Panel",
+      "unit": "sf",
+      "measurementInputs": ["length", "width", "roofPitch", "roofArea"],
+      "estimateBehavior": "quantity_takeoff",
+      "modelBehavior": "surface",
+      "takeoffRule": "quantity = roofArea plus clips and waste factor",
+      "manufacturerRefs": ["mbs.roof_panel.standing_seam"]
+    },
+    {
+      "id": "roof-insulation",
+      "category": "roof_systems",
+      "family": "insulation",
+      "label": "Roof Insulation",
+      "unit": "sf",
+      "measurementInputs": ["roofArea", "rValue"],
+      "estimateBehavior": "quantity_takeoff",
+      "modelBehavior": "surface",
+      "takeoffRule": "quantity = roofArea",
+      "manufacturerRefs": ["vendor.insulation.roof"]
+    },
+    {
+      "id": "ridge-cap",
+      "category": "roof_systems",
+      "family": "ridge",
+      "label": "Ridge Cap",
+      "unit": "lf",
+      "measurementInputs": ["length"],
+      "estimateBehavior": "quantity_takeoff",
+      "modelBehavior": "linear",
+      "takeoffRule": "linearFeet = building length",
+      "manufacturerRefs": ["mbs.trim.ridge_cap"]
+    },
+    {
+      "id": "skylight-panel",
+      "category": "roof_systems",
+      "family": "skylights",
+      "label": "Skylight Panel",
+      "unit": "ea",
+      "measurementInputs": ["quantity", "length", "width"],
+      "estimateBehavior": "catalog_item",
+      "modelBehavior": "surface",
+      "takeoffRule": "quantity = selected count",
+      "manufacturerRefs": ["vendor.skylight"]
+    }
+  ]
+}
