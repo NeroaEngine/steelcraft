@@ -1,0 +1,50 @@
+{
+  "id": "steelcraft-room",
+  "name": "Steel Craft OS",
+  "version": "0.1.0",
+  "runtime": "forge-azuia",
+  "description": "Steel Craft ERP room package built on the Forge/Azuia runtime foundation.",
+  "entryWorker": "./steelcraft.worker.ts",
+  "dataSpine": {
+    "primaryRecord": "project_information",
+    "tenantKey": "steelcraft",
+    "relationshipKeyCandidates": ["project_number", "project_name", "job_number", "customer_company"]
+  },
+  "cards": [
+    "./cards/project-information-card.json",
+    "./cards/accounts-card.json",
+    "./cards/contacts-card.json",
+    "./cards/working-sheet-card.json",
+    "./cards/estimate-card.json",
+    "./cards/fe-quotation-card.json",
+    "./cards/eo-quotation-card.json",
+    "./cards/dynamic-door-card.json",
+    "./cards/change-order-card.json",
+    "./cards/project-delivery-card.json",
+    "./cards/erection-schedule-card.json",
+    "./cards/labor-sov-card.json",
+    "./cards/material-sov-card.json",
+    "./cards/invoice-card.json",
+    "./cards/coi-card.json",
+    "./cards/metal-building-generator-card.json"
+  ],
+  "workflows": [
+    {
+      "id": "quote-to-project-spine",
+      "name": "Quote to Project Spine",
+      "steps": [
+        "project-information",
+        "working-sheet",
+        "estimate",
+        "metal-building-generator",
+        "fe-quotation",
+        "eo-quotation",
+        "project-delivery",
+        "erection-schedule",
+        "labor-sov",
+        "material-sov",
+        "invoice"
+      ]
+    }
+  ]
+}
