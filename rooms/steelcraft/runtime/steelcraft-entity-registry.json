@@ -1,0 +1,22 @@
+{
+  "registryId": "steelcraft-entity-registry",
+  "version": "0.1.0",
+  "primarySpine": "project_information",
+  "entities": [
+    { "id": "accounts", "table": "steelcraft_crm_accounts", "title": "Accounts", "primaryLabel": "account_name", "relationshipKeys": ["account_name", "main_email", "main_phone"] },
+    { "id": "contacts", "table": "steelcraft_crm_contacts", "title": "Contacts", "primaryLabel": "full_name", "relationshipKeys": ["company_name", "email", "phone"] },
+    { "id": "project_information", "table": "project_information", "title": "Project Information", "primaryLabel": "project_name", "relationshipKeys": ["project_number", "project_name", "customer_company"] },
+    { "id": "working_sheet", "table": "working_sheet", "title": "Working Sheet", "primaryLabel": "project_name", "relationshipKeys": ["project_number", "project_name", "job_number"] },
+    { "id": "estimate", "table": "estimate", "title": "Estimate", "primaryLabel": "project_name", "relationshipKeys": ["project_number", "project_name", "estimate_number"] },
+    { "id": "fe_quotation", "table": "fe_quotation", "title": "F&E Quotation", "primaryLabel": "project_name", "relationshipKeys": ["project_number", "project_name", "quote_number"] },
+    { "id": "eo_quotation", "table": "eo_quotation", "title": "EO Quotation", "primaryLabel": "project_name", "relationshipKeys": ["project_number", "project_name", "quote_number"] },
+    { "id": "dynamic_door", "table": "dynamic_door", "title": "Dynamic Door", "primaryLabel": "door_type", "relationshipKeys": ["door_type", "size", "model"] },
+    { "id": "change_orders", "table": "change_orders", "title": "Change Orders", "primaryLabel": "change_order_number", "relationshipKeys": ["project_number", "project_name", "change_order_number"] },
+    { "id": "project_delivery", "table": "project_delivery", "title": "Project Delivery", "primaryLabel": "project_name", "relationshipKeys": ["project_name", "mbs_job_number", "manufacturer"] },
+    { "id": "erection_schedule", "table": "erection_schedule", "title": "Erection Schedule", "primaryLabel": "project_name", "relationshipKeys": ["project_name", "crew", "superintendent"] },
+    { "id": "labor_sov", "table": "labor_sov", "title": "Labor SOV", "primaryLabel": "project_name", "relationshipKeys": ["project_number", "project_name", "line_item"] },
+    { "id": "material_sov", "table": "material_sov", "title": "Material SOV", "primaryLabel": "project_name", "relationshipKeys": ["project_number", "project_name", "line_item"] },
+    { "id": "invoice", "table": "invoice", "title": "Invoice", "primaryLabel": "invoice_number", "relationshipKeys": ["project_number", "project_name", "invoice_number"] },
+    { "id": "coi", "table": "coi_documents", "title": "COI", "primaryLabel": "certificate_number", "relationshipKeys": ["project_number", "certificate_holder", "insured"] }
+  ]
+}
