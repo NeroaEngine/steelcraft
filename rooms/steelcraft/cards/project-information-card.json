@@ -1,0 +1,11 @@
+{
+  "id": "project-information",
+  "title": "Project Information",
+  "type": "steelcraft.entity.card",
+  "table": "project_information",
+  "description": "Master project record and relationship spine for Steel Craft OS.",
+  "primaryKey": "project_number",
+  "displayFields": ["project_number", "project_name", "customer_company", "project_total", "project_address"],
+  "relationships": ["accounts", "contacts", "estimate", "working-sheet", "project-delivery", "erection-schedule", "invoice"],
+  "actions": ["open-project", "link-records", "generate-package"]
+}
