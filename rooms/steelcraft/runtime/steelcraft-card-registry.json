@@ -1,0 +1,23 @@
+{
+  "registryId": "steelcraft-card-registry",
+  "version": "0.1.0",
+  "cards": [
+    { "id": "dashboard", "title": "Steel Craft Dashboard", "type": "overview", "entity": null, "room": "steelcraft-room" },
+    { "id": "accounts", "title": "Accounts", "type": "entity-card", "entity": "accounts", "room": "steelcraft-room" },
+    { "id": "contacts", "title": "Contacts", "type": "entity-card", "entity": "contacts", "room": "steelcraft-room" },
+    { "id": "project-information", "title": "Project Information", "type": "entity-card", "entity": "project_information", "manifest": "../cards/project-information-card.json" },
+    { "id": "working-sheet", "title": "Working Sheet", "type": "entity-card", "entity": "working_sheet" },
+    { "id": "estimate", "title": "Estimate", "type": "entity-card", "entity": "estimate" },
+    { "id": "fe-quotation", "title": "F&E Quotation", "type": "document-card", "entity": "fe_quotation" },
+    { "id": "eo-quotation", "title": "EO Quotation", "type": "document-card", "entity": "eo_quotation" },
+    { "id": "dynamic-door", "title": "Dynamic Door", "type": "catalog-card", "entity": "dynamic_door" },
+    { "id": "change-orders", "title": "Change Orders", "type": "document-card", "entity": "change_orders" },
+    { "id": "project-delivery", "title": "Project Delivery", "type": "workflow-card", "entity": "project_delivery" },
+    { "id": "erection-schedule", "title": "Erection Schedule", "type": "schedule-card", "entity": "erection_schedule" },
+    { "id": "labor-sov", "title": "Labor SOV", "type": "billing-card", "entity": "labor_sov" },
+    { "id": "material-sov", "title": "Material SOV", "type": "billing-card", "entity": "material_sov" },
+    { "id": "invoice", "title": "Invoice", "type": "billing-card", "entity": "invoice" },
+    { "id": "coi", "title": "COI", "type": "document-card", "entity": "coi" },
+    { "id": "metal-building-generator", "title": "Metal Building Generator", "type": "model-card", "entity": "estimate", "manifest": "../cards/metal-building-generator-card.json" }
+  ]
+}
