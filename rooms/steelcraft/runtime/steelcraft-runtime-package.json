@@ -1,0 +1,42 @@
+{
+  "packageId": "steelcraft-runtime-v1",
+  "name": "Steel Craft Runtime Package",
+  "version": "0.1.0",
+  "runtime": "forge-azuia",
+  "status": "assembly-v1",
+  "description": "Deployable Steel Craft room package for Forge hydration and Azuia rendering.",
+  "roomManifest": "../steelcraft.manifest.json",
+  "worker": "../steelcraft.worker.ts",
+  "registries": {
+    "entities": "./steelcraft-entity-registry.json",
+    "cards": "./steelcraft-card-registry.json",
+    "workflows": "./steelcraft-workflow-registry.json",
+    "imports": "./steelcraft-import-registry.json",
+    "receipts": "./steelcraft-receipt-definitions.json"
+  },
+  "componentLibrary": "../component-library/component-library.manifest.json",
+  "primarySpine": "project_information",
+  "runtimeBoundaries": {
+    "forge": ["actions", "receipts", "authority", "hydration", "workflow execution"],
+    "azuia": ["rooms", "cards", "canvas", "viewer", "interactions"],
+    "steelcraft": ["entities", "business workflows", "component takeoff", "quote pipeline"]
+  },
+  "entryCards": [
+    "dashboard",
+    "project-information",
+    "estimate",
+    "metal-building-generator",
+    "fe-quotation",
+    "eo-quotation",
+    "project-delivery",
+    "erection-schedule",
+    "invoice"
+  ],
+  "nextRuntimeWork": [
+    "native Azuia card rendering",
+    "SQL endpoint binding",
+    "interactive building viewer",
+    "MBS export adapter",
+    "Dynamic Door catalog binding"
+  ]
+}
