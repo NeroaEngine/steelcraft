@@ -1,15 +1,20 @@
 {
-  "id": "steelcraft-room",
-  "name": "Steel Craft OS",
+  "schema_version": "azua-room-contract-v1",
+  "room_id": "steelcraft-room",
+  "room_name": "Steel Craft OS",
+  "room_type": "erp-runtime-room",
+  "status": "prototype-ready",
+  "description": "Steel Craft ERP room package hydrated by Forge and rendered through Azuia.",
   "version": "0.1.0",
-  "runtime": "forge-azuia",
-  "description": "Steel Craft ERP room package built on the Forge/Azuia runtime foundation.",
-  "entryWorker": "./steelcraft.worker.ts",
-  "dataSpine": {
-    "primaryRecord": "project_information",
-    "tenantKey": "steelcraft",
-    "relationshipKeyCandidates": ["project_number", "project_name", "job_number", "customer_company"]
-  },
+  "required_services": [
+    "forge-runtime",
+    "azuia-room-runtime",
+    "guard",
+    "vault",
+    "wire",
+    "sql-card-store",
+    "receipt-service"
+  ],
   "cards": [
     "./cards/project-information-card.json",
     "./cards/accounts-card.json",
@@ -28,23 +33,51 @@
     "./cards/coi-card.json",
     "./cards/metal-building-generator-card.json"
   ],
-  "workflows": [
-    {
-      "id": "quote-to-project-spine",
-      "name": "Quote to Project Spine",
-      "steps": [
-        "project-information",
-        "working-sheet",
-        "estimate",
-        "metal-building-generator",
-        "fe-quotation",
-        "eo-quotation",
-        "project-delivery",
-        "erection-schedule",
-        "labor-sov",
-        "material-sov",
-        "invoice"
-      ]
-    }
+  "worker": "./steelcraft.worker.ts",
+  "sql_card": "./steelcraft.sql_card",
+  "fluid_canvas": {
+    "mode": "liquid-canvas-grid",
+    "sections": [
+      "dashboard",
+      "crm",
+      "project-spine",
+      "estimating",
+      "modeling",
+      "quotations",
+      "delivery",
+      "erection",
+      "billing",
+      "documents",
+      "runtime"
+    ]
+  },
+  "permissions": {
+    "tenant_key": "steelcraft",
+    "project_spine": "project_information",
+    "requires_guard": true,
+    "read_models": ["project_information", "estimate", "component_library"],
+    "write_models": ["runtime_receipts", "quantity_takeoffs", "quotation_packages"]
+  },
+  "runtime_refs": [
+    "./runtime/steelcraft-runtime-package.json",
+    "./runtime/steelcraft-entity-registry.json",
+    "./runtime/steelcraft-card-registry.json",
+    "./runtime/steelcraft-workflow-registry.json",
+    "./runtime/steelcraft-import-registry.json",
+    "./runtime/steelcraft-receipt-definitions.json",
+    "./component-library/component-library.manifest.json"
+  ],
+  "receipt_events": [
+    "room_hydrated",
+    "card_loaded",
+    "import_completed",
+    "entity_linked",
+    "model_generated",
+    "quantity_takeoff_created",
+    "quotation_generated",
+    "delivery_scheduled",
+    "erection_updated",
+    "invoice_generated",
+    "closeout_package_created"
   ]
 }
