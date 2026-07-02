@@ -1,0 +1,96 @@
+{
+  "schema_version": "azua-universe-card-groups-v1",
+  "universe_id": "steelcraft-command-center",
+  "default_group": "estimating",
+  "groups": [
+    {
+      "id": "crm",
+      "label": "CRM",
+      "description": "Customer, company, contact, and activity management.",
+      "cards": [
+        { "id": "accounts", "label": "Accounts", "manifest": "../cards/accounts-card.json", "entity": "accounts" },
+        { "id": "contacts", "label": "Contacts", "manifest": "../cards/contacts-card.json", "entity": "contacts" },
+        { "id": "customer-history", "label": "Customer History", "entity": "project_information", "mode": "history-view" }
+      ]
+    },
+    {
+      "id": "estimating",
+      "label": "Estimating",
+      "description": "All estimating, takeoff, quote, and metal building generator work.",
+      "cards": [
+        { "id": "working-sheet", "label": "Working Sheet", "manifest": "../cards/working-sheet-card.json", "entity": "working_sheet" },
+        { "id": "estimate", "label": "Estimate", "manifest": "../cards/estimate-card.json", "entity": "estimate" },
+        { "id": "metal-building-generator", "label": "Metal Building Generator", "manifest": "../cards/metal-building-generator-card.json", "entity": "estimate" },
+        { "id": "dynamic-door", "label": "Dynamic Door", "manifest": "../cards/dynamic-door-card.json", "entity": "dynamic_door" },
+        { "id": "fe-quotation", "label": "F&E Quotation", "manifest": "../cards/fe-quotation-card.json", "entity": "fe_quotation" },
+        { "id": "eo-quotation", "label": "EO Quotation", "manifest": "../cards/eo-quotation-card.json", "entity": "eo_quotation" }
+      ]
+    },
+    {
+      "id": "projects",
+      "label": "Projects",
+      "description": "Project spine, delivery, scheduling, change orders, and closeout.",
+      "cards": [
+        { "id": "project-information", "label": "Project Information", "manifest": "../cards/project-information-card.json", "entity": "project_information" },
+        { "id": "project-delivery", "label": "Project Delivery", "manifest": "../cards/project-delivery-card.json", "entity": "project_delivery" },
+        { "id": "change-orders", "label": "Change Orders", "manifest": "../cards/change-order-card.json", "entity": "change_orders" },
+        { "id": "closeout", "label": "Closeout", "entity": "project_information", "mode": "closeout-package" }
+      ]
+    },
+    {
+      "id": "accounting",
+      "label": "Accounting",
+      "description": "Accounting control, project values, cost views, and financial summaries.",
+      "cards": [
+        { "id": "invoice", "label": "Invoices", "manifest": "../cards/invoice-card.json", "entity": "invoice" },
+        { "id": "labor-sov", "label": "Labor SOV", "manifest": "../cards/labor-sov-card.json", "entity": "labor_sov" },
+        { "id": "material-sov", "label": "Material SOV", "manifest": "../cards/material-sov-card.json", "entity": "material_sov" },
+        { "id": "project-financials", "label": "Project Financials", "entity": "project_information", "mode": "financial-summary" }
+      ]
+    },
+    {
+      "id": "erection",
+      "label": "Erection",
+      "description": "Erection schedule, crew visibility, field progress, and delivery coordination.",
+      "cards": [
+        { "id": "erection-schedule", "label": "Erection Schedule", "manifest": "../cards/erection-schedule-card.json", "entity": "erection_schedule" },
+        { "id": "project-delivery", "label": "Project Delivery", "manifest": "../cards/project-delivery-card.json", "entity": "project_delivery" },
+        { "id": "field-progress", "label": "Field Progress", "entity": "erection_schedule", "mode": "progress-view" }
+      ]
+    },
+    {
+      "id": "billing",
+      "label": "Billing",
+      "description": "Invoices, SOVs, billing progress, and payment packages.",
+      "cards": [
+        { "id": "invoice", "label": "Invoices", "manifest": "../cards/invoice-card.json", "entity": "invoice" },
+        { "id": "labor-sov", "label": "Labor SOV", "manifest": "../cards/labor-sov-card.json", "entity": "labor_sov" },
+        { "id": "material-sov", "label": "Material SOV", "manifest": "../cards/material-sov-card.json", "entity": "material_sov" },
+        { "id": "billing-package", "label": "Billing Package", "entity": "invoice", "mode": "package-builder" }
+      ]
+    },
+    {
+      "id": "documents",
+      "label": "Documents",
+      "description": "COI, quote documents, change order PDFs, invoices, and closeout packages.",
+      "cards": [
+        { "id": "coi", "label": "COI", "manifest": "../cards/coi-card.json", "entity": "coi" },
+        { "id": "fe-quotation", "label": "F&E Quote Docs", "manifest": "../cards/fe-quotation-card.json", "entity": "fe_quotation" },
+        { "id": "eo-quotation", "label": "EO Quote Docs", "manifest": "../cards/eo-quotation-card.json", "entity": "eo_quotation" },
+        { "id": "change-orders", "label": "Change Order Docs", "manifest": "../cards/change-order-card.json", "entity": "change_orders" },
+        { "id": "invoice", "label": "Invoice Docs", "manifest": "../cards/invoice-card.json", "entity": "invoice" }
+      ]
+    },
+    {
+      "id": "profile",
+      "label": "Profile",
+      "description": "User profile, company profile, tenant settings, permissions, and runtime preferences.",
+      "cards": [
+        { "id": "user-profile", "label": "User Profile", "mode": "profile-view" },
+        { "id": "company-profile", "label": "Company Profile", "mode": "tenant-view" },
+        { "id": "settings", "label": "Settings", "mode": "settings-view" },
+        { "id": "permissions", "label": "Permissions", "mode": "guard-policy-view" }
+      ]
+    }
+  ]
+}
