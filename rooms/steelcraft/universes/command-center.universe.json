@@ -1,0 +1,38 @@
+{
+  "schema_version": "azua-universe-contract-v1",
+  "universe_id": "steelcraft-command-center",
+  "universe_name": "Command Center",
+  "tenant_key": "steelcraft",
+  "landing_route": "/command-center",
+  "description": "Primary Steel Craft OS universe. This is the post-login landing space for all Steel Craft cards and workflows.",
+  "header_navigation": [
+    { "id": "crm", "label": "CRM", "route": "/command-center/crm", "card_group": "crm" },
+    { "id": "estimating", "label": "Estimating", "route": "/command-center/estimating", "card_group": "estimating" },
+    { "id": "projects", "label": "Projects", "route": "/command-center/projects", "card_group": "projects" },
+    { "id": "accounting", "label": "Accounting", "route": "/command-center/accounting", "card_group": "accounting" },
+    { "id": "erection", "label": "Erection", "route": "/command-center/erection", "card_group": "erection" },
+    { "id": "billing", "label": "Billing", "route": "/command-center/billing", "card_group": "billing" },
+    { "id": "documents", "label": "Documents", "route": "/command-center/documents", "card_group": "documents" },
+    { "id": "profile", "label": "Profile", "route": "/command-center/profile", "card_group": "profile" }
+  ],
+  "default_section": "estimating",
+  "canvas": {
+    "mode": "liquid-command-center",
+    "layout": "section-header-with-card-grid",
+    "supports_nested_universes": true,
+    "supports_card_hydration": true
+  },
+  "card_groups_ref": "./command-center.card-groups.json",
+  "auth": {
+    "required": true,
+    "provider_mode": "clean-oauth-spine",
+    "post_login_route": "/command-center",
+    "logout_route": "/"
+  },
+  "receipts": [
+    "universe_hydrated",
+    "section_opened",
+    "card_group_loaded",
+    "card_action_dispatched"
+  ]
+}
