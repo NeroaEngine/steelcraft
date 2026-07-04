@@ -1,0 +1,24 @@
+{
+  "schema_version": "azua-card-v1",
+  "card_id": "accounts",
+  "card_name": "Accounts",
+  "card_type": "entity-card",
+  "room_id": "steelcraft-room",
+  "universe_section": "crm",
+  "entity": "accounts",
+  "data_binding": {
+    "source": "sql-card-store",
+    "table": "steelcraft_crm_accounts",
+    "primary_label": "account_name"
+  },
+  "layout": {
+    "variant": "list-detail",
+    "size": "large",
+    "priority": 10
+  },
+  "actions": [
+    { "id": "open-account", "label": "Open Account", "action": "steelcraft.entity.open" },
+    { "id": "link-project", "label": "Link Project", "action": "steelcraft.entity.link" }
+  ],
+  "receipt_events": ["card_loaded", "entity_opened", "entity_linked"]
+}
