@@ -1,0 +1,16 @@
+{
+  "schema_version": "azua-card-v1",
+  "card_id": "contacts",
+  "card_name": "Contacts",
+  "card_type": "entity-card",
+  "room_id": "steelcraft-room",
+  "universe_section": "crm",
+  "entity": "contacts",
+  "data_binding": { "source": "sql-card-store", "table": "steelcraft_crm_contacts", "primary_label": "full_name" },
+  "layout": { "variant": "list-detail", "size": "large", "priority": 20 },
+  "actions": [
+    { "id": "open-contact", "label": "Open Contact", "action": "steelcraft.entity.open" },
+    { "id": "link-account", "label": "Link Account", "action": "steelcraft.entity.link" }
+  ],
+  "receipt_events": ["card_loaded", "entity_opened", "entity_linked"]
+}
