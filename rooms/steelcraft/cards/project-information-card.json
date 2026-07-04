@@ -1,11 +1,29 @@
 {
-  "id": "project-information",
-  "title": "Project Information",
-  "type": "steelcraft.entity.card",
-  "table": "project_information",
+  "schema_version": "azua-card-v1",
+  "card_id": "project-information",
+  "card_name": "Project Information",
+  "card_type": "entity-card",
+  "room_id": "steelcraft-room",
+  "universe_section": "projects",
+  "entity": "project_information",
   "description": "Master project record and relationship spine for Steel Craft OS.",
-  "primaryKey": "project_number",
-  "displayFields": ["project_number", "project_name", "customer_company", "project_total", "project_address"],
-  "relationships": ["accounts", "contacts", "estimate", "working-sheet", "project-delivery", "erection-schedule", "invoice"],
-  "actions": ["open-project", "link-records", "generate-package"]
+  "data_binding": {
+    "source": "sql-card-store",
+    "table": "project_information",
+    "primary_key": "project_number",
+    "primary_label": "project_name",
+    "display_fields": ["project_number", "project_name", "customer_company", "project_total", "project_address"]
+  },
+  "relationships": ["accounts", "contacts", "estimate", "working_sheet", "project_delivery", "erection_schedule", "invoice"],
+  "layout": {
+    "variant": "project-spine",
+    "size": "wide",
+    "priority": 10
+  },
+  "actions": [
+    { "id": "open-project", "label": "Open Project", "action": "steelcraft.entity.open" },
+    { "id": "link-records", "label": "Link Records", "action": "steelcraft.entity.link" },
+    { "id": "generate-package", "label": "Generate Project Package", "action": "steelcraft.project.generatePackage" }
+  ],
+  "receipt_events": ["card_loaded", "entity_opened", "entity_linked", "project_package_generated"]
 }
