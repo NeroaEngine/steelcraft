@@ -1,63 +1,179 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import AccountingPortal from './AccountingPortal.jsx';
-import LiveCanonicalPortal, { isLiveCanonicalPortal } from './LiveCanonicalPortal.jsx';
-import {
-  canonicalPortals,
-  createTenantModuleMap,
-  defaultTenantModuleMap,
-  getIndustryPack,
-  getIndustryPackWiringStatus,
-  getTenantPortals,
-  industryPackOptions
-} from './portalRegistry.js';
-import { createIndustryPackInstallProof, getIndustryPackInstallProofLog } from './industryPackInstallProof.js';
 import './styles.css';
-import './brandGeometry.js';
-import './brandThemePacks.js';
-import './accountingLayout.css';
-import './accountingHardLock.css';
-import './liveCanonicalNoRunBubble.css';
+import './steelcraftAuth.css';
 
-const brandKey = 'steelcraft_brand_controls_v1';
-const enabledKey = 'steelcraft_enabled_portals_v1';
-const tenantModuleMapKey = 'neroa_tenant_module_map_v1';
-const sessionKey = 'steelcraft_auth_session_v1';
-const developerLockedKey = 'steelcraft_developer_room_locked';
-const developerMeta = ['developer', 'Developer Room', 'System builder controls', 'Brand Room, package controls, tenant setup, integrations, infrastructure, and module enablement.'];
-const languages = [['en', 'English'], ['es', 'Spanish / Espanol'], ['ht', 'Haitian Creole'], ['pt', 'Portuguese'], ['fr', 'French'], ['de', 'German']];
-const brandDefaults = { tenantName: 'Steel Craft', logoText: 'Steel Craft', logoSubtext: 'Operations Portal', logoUrl: '/logo-03.png', logoMode: 'image', logoShape: 'wide', navLayout: 'dock-left', uiTheme: 'steelcraft-dark', primaryColor: '#0f1014', accentColor: '#9f3d42', pageBgColor: '#030303', surfaceColor: '#141418', surfaceAltColor: '#1e1e24', textColor: '#f6f0ea', mutedTextColor: '#b7aaa3', borderColor: '#343036', buttonColor: '#9f3d42', buttonTextColor: '#ffffff', successColor: '#3fb56f', warningColor: '#d99b34', dangerColor: '#d34b4b', infoColor: '#4c9bd9', sidebarColor: '#111116', topbarColor: '#111116', cardColor: '#151519', inputColor: '#202026', shadowColor: '#000000', radius: 22, buttonRadius: 999, cardPadding: 24, density: 14, borderWidth: 1, shadowStrength: 58, fontScale: 100, logoSize: 44 };
-function portalTuple(portal) { return [portal.id, portal.title, portal.kind, portal.description, portal]; }
-function loadBrand() { try { const saved = JSON.parse(localStorage.getItem(brandKey)) || {}; return { ...brandDefaults, ...saved, logoUrl: brandDefaults.logoUrl, logoMode: brandDefaults.logoMode, logoShape: brandDefaults.logoShape }; } catch { return brandDefaults; } }
-function saveBrand(next) { localStorage.setItem(brandKey, JSON.stringify(next)); }
-function loadTenantModuleMap() { try { const saved = JSON.parse(localStorage.getItem(tenantModuleMapKey)); return saved?.industryPack ? saved : defaultTenantModuleMap; } catch { return defaultTenantModuleMap; } }
-function saveTenantModuleMap(next) { localStorage.setItem(tenantModuleMapKey, JSON.stringify(next)); }
-function allPortalIds(moduleMap) { return getTenantPortals(moduleMap).map((portal) => portal.id); }
-function loadEnabledPortals(moduleMap) { try { const valid = allPortalIds(moduleMap); const saved = JSON.parse(localStorage.getItem(enabledKey)); return Array.isArray(saved) && saved.length ? saved.filter((id) => valid.includes(id)) : valid; } catch { return allPortalIds(moduleMap); } }
-function saveEnabledPortals(next) { localStorage.setItem(enabledKey, JSON.stringify(next)); }
-function resetTenant(moduleMap = defaultTenantModuleMap) { saveBrand(brandDefaults); saveTenantModuleMap(moduleMap); saveEnabledPortals(allPortalIds(moduleMap)); }
-function lockDeveloperRoom() { localStorage.setItem(developerLockedKey, 'true'); }
-function unlockDeveloperRoom() { localStorage.removeItem(developerLockedKey); }
-function isDeveloperLocked() { return localStorage.getItem(developerLockedKey) === 'true'; }
-function routePath() { return location.pathname.replace(/\/$/, '') || '/'; }
-function portalUrl(id) { return `/portal/${id}`; }
-function pathPortalId() { return routePath().match(/^\/portal\/([^/]+)/)?.[1] || null; }
-function goTo(path) { history.pushState({}, '', path); window.dispatchEvent(new PopStateEvent('popstate')); }
-function initials(text) { return (text || 'Brand').split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]).join('').toUpperCase(); }
-function languageName(code) { return languages.find(([id]) => id === code)?.[1] || code || 'English'; }
-function styleVars(b) { return { '--brand-accent': b.accentColor, '--page-bg': b.pageBgColor, '--surface': b.surfaceColor, '--surface-alt': b.surfaceAltColor, '--text': b.textColor, '--muted': b.mutedTextColor, '--line': b.borderColor, '--button': b.buttonColor, '--button-text': b.buttonTextColor, '--sidebar': b.sidebarColor, '--topbar': b.topbarColor, '--card': b.cardColor, '--input': b.inputColor, '--shadow': b.shadowColor, '--radius': `${b.radius}px`, '--button-radius': `${b.buttonRadius}px`, '--card-padding': `${b.cardPadding}px`, '--gap': `${b.density}px`, '--border-width': `${b.borderWidth}px`, '--shadow-strength': `${b.shadowStrength}%`, '--font-scale': `${b.fontScale}%`, '--logo-size': `${b.logoSize}px` }; }
-function toAppUser(dbUser, moduleMap = loadTenantModuleMap()) { const customerPortalIds = allPortalIds(moduleMap); const role = dbUser?.role || 'admin'; const rolePortals = { developer: ['developer', ...customerPortalIds], admin: customerPortalIds, accounting: ['accounting', 'contacts', 'employee'], employee: ['employee'], vendor: ['vendor'], customer: ['customer'] }; return { id: String(dbUser?.id || role), dbId: dbUser?.id, role, name: dbUser?.name || dbUser?.full_name || 'User', email: dbUser?.email || '', language: dbUser?.language || 'en', portals: rolePortals[role] || rolePortals.employee }; }
-function loadSession(moduleMap = loadTenantModuleMap()) { try { const saved = JSON.parse(sessionStorage.getItem(sessionKey)); return saved ? toAppUser(saved, moduleMap) : null; } catch { return null; } }
-function saveSession(user) { sessionStorage.setItem(sessionKey, JSON.stringify(user)); }
-function clearSession() { sessionStorage.removeItem(sessionKey); }
-function LogoGlyph({ brand }) { if (brand.logoMode === 'none') return null; if (brand.logoMode === 'image' && brand.logoUrl) return <img className={`brand-logo-img logo-${brand.logoShape}`} src={brand.logoUrl} alt={`${brand.logoText} logo`} />; if (brand.logoMode === 'text') return null; return <div className={`brand-initials logo-${brand.logoShape}`}>{initials(brand.logoText)}</div>; }
-function BrandMark({ brand }) { return <div className={`brand logo-mode-${brand.logoMode}`}><LogoGlyph brand={brand} /><div><strong>{brand.logoText}</strong><small>{brand.logoSubtext}</small></div></div>; }
-function DockButton({ onClick }) { return <button className="dock-trigger" onClick={onClick} aria-label="Open portal dock"><span></span><span></span><span></span></button>; }
-function PortalList({ items, active, open }) { return <div className="nav-list">{items.map(([id, title, kind, desc]) => <button key={id} className={active === id ? 'active' : ''} onClick={() => open(id)}><strong>{title}</strong><span>{kind}</span><small>{desc}</small></button>)}</div>; }
-function RecordList({ title, rows }) { return <article className="feature panel"><h2>{title}</h2><div className="data-rows">{rows.map(([a, b, c]) => <div className="data-row" key={`${a}-${b}`}><div><strong>{a}</strong><span>{b}</span></div><b>{c}</b></div>)}</div></article>; }
-function StatusPill({ children }) { return <b>{children}</b>; }
-function Shell({ brand, user, active, signOut, children, enabledPortals, portals, meta }) { const [open, setOpen] = useState(false); const allowed = portals.filter(([id]) => user.portals.includes(id) && enabledPortals.includes(id)); const current = meta(active); const choose = (id) => { goTo(portalUrl(id)); setOpen(false); }; return <main className={`dashboard layout-${brand.navLayout} theme-${brand.uiTheme}`} style={styleVars(brand)}><header className="erp-topbar panel"><BrandMark brand={brand} /><div className="topbar-meta"><span>Signed in as</span><strong>{user.name}</strong><small>{languageName(user.language)} · {allowed.length} portals</small></div><div className="current-portal"><span>Current portal</span><strong>{current[1]}</strong></div><button className="sign-out" onClick={signOut}>Sign out</button></header><DockButton onClick={() => setOpen(true)} /><div className={`dock-backdrop ${open ? 'open' : ''}`} onClick={() => setOpen(false)} /><aside className={`portal-dock panel ${open ? 'open' : ''}`}><div className="dock-head"><div><p className="eyebrow">Portal dock</p><h2>Available workspaces</h2></div><button onClick={() => setOpen(false)}>×</button></div><PortalList items={allowed} active={active} open={choose} /></aside><section className="workspace">{children}</section></main>; }
-function DeveloperShell({ brand, user, signOut, children }) { return <main className="dashboard layout-dock-left theme-steelcraft-dark developer-route" style={styleVars(brand)}><header className="erp-topbar panel"><BrandMark brand={brand} /><div className="topbar-meta"><span>Signed in as</span><strong>{user.name}</strong><small>developer-only system area</small></div><div className="current-portal"><span>Current room</span><strong>Developer</strong></div><button className="sign-out" onClick={signOut}>Sign out</button></header><section className="workspace">{children}</section></main>; }
-function DeveloperRoom({ moduleMap, setModuleMap, enabledPortals, setEnabledPortals, portals, user }) { const [locked, setLocked] = useState(isDeveloperLocked()); const [proofLog, setProofLog] = useState(getIndustryPackInstallProofLog()); const selectedPack = getIndustryPack(moduleMap.industryPack); const selectedStatus = getIndustryPackWiringStatus(moduleMap.industryPack); const canonicalRows = portals.filter(([id, , , , record]) => record?.scope === 'canonical'); const industryRows = portals.filter(([id, , , , record]) => record?.scope === 'industry'); const togglePortal = (portalId) => setEnabledPortals((current) => { const next = current.includes(portalId) ? current.filter((id) => id !== portalId) : [...current, portalId]; saveEnabledPortals(next); return next; }); const selectPack = (packId) => { const pack = getIndustryPack(packId); const proof = createIndustryPackInstallProof({ actor_id: user?.id || user?.email || 'developer', from_pack: moduleMap.industryPack, to_pack: packId, to_pack_title: pack.title, tenant_id: moduleMap.tenantId, tenant_name: moduleMap.tenantName }); if (!proof.ok) { setProofLog(getIndustryPackInstallProofLog()); return; } const next = createTenantModuleMap({ tenantId: moduleMap.tenantId, tenantName: moduleMap.tenantName, industryPack: packId }); setModuleMap(next); saveTenantModuleMap(next); const nextEnabled = [...next.enabledCanonicalPortals, ...next.enabledIndustryPortals]; setEnabledPortals(nextEnabled); saveEnabledPortals(nextEnabled); setProofLog(getIndustryPackInstallProofLog()); }; const reset = () => { const next = createTenantModuleMap({ tenantId: 'steelcraft-default', tenantName: 'Steel Craft', industryPack: 'metal_buildings' }); resetTenant(next); window.location.reload(); }; const rows = [['Canonical core', 'Admin, Accounting, Contacts, HR, Vendor, Customer, Employee stay reusable for every tenant.', 'Core'], ['Selected industry pack', `${selectedPack.title}: ${selectedPack.description}`, 'Active'], ['TrustNet wiring', selectedStatus.note, selectedStatus.trustNetStatus], ['Vault lineage', selectedStatus.note, selectedStatus.vaultStatus]]; return <><header className="workspace-header panel"><div><p className="eyebrow">Developer Room</p><h1>Package installer</h1><p>Pick the industry pack that gets pushed down. Each install creates a local Neroa Guard / TrustNet receipt and linked Neroa Vault lineage record.</p></div><div className="live-badge">Industry packs</div></header><div className="workspace-grid"><article className="feature panel large"><p className="eyebrow">Industry pack selector</p><h2>Choose what this customer gets</h2><label>Installed industry pack<select value={moduleMap.industryPack} disabled={locked} onChange={(event) => selectPack(event.target.value)}>{industryPackOptions.map((pack) => <option value={pack.id} key={pack.id}>{pack.title}</option>)}</select></label><div className="quote-actions"><button type="button" onClick={() => goTo('/brand')}>Open Brand Room</button><button type="button" onClick={reset}>Reset to Metal Buildings</button><button type="button" onClick={locked ? () => { unlockDeveloperRoom(); setLocked(false); } : () => { lockDeveloperRoom(); setLocked(true); }}>{locked ? 'Unlock Developer' : 'Lock Developer'}</button></div></article><RecordList title="Installed package readiness" rows={rows} /></div><article className="feature panel access-manager"><p className="eyebrow">Available industry packs</p><h2>Package catalog + wiring status</h2><div className="portal-permission-grid">{industryPackOptions.map((pack) => <button type="button" className={`permission-toggle ${moduleMap.industryPack === pack.id ? 'active' : ''}`} disabled={locked} key={pack.id} onClick={() => selectPack(pack.id)}><span><strong>{pack.title}</strong><small>{pack.description}</small><small>UI: {pack.wiringStatus} · TrustNet: {pack.trustNetStatus} · Vault: {pack.vaultStatus}</small><small>{pack.note}</small></span><StatusPill>{moduleMap.industryPack === pack.id ? 'Installed' : pack.installStatus}</StatusPill></button>)}</div></article><article className="feature panel access-manager"><p className="eyebrow">Install proof log</p><h2>Latest package receipts</h2><div className="data-rows">{proofLog.length ? proofLog.slice(0, 5).map((entry) => <div className="data-row" key={entry.receipt_id}><div><strong>{entry.receipt.requested_event_type}</strong><span>{entry.receipt_id}</span><small>{entry.lineage_id}</small></div><b>{entry.policy_result}</b></div>) : <div className="notice">No local package install receipts yet.</div>}</div></article><article className="feature panel access-manager"><p className="eyebrow">Canonical Core</p><h2>Reusable portals every tenant can share</h2><div className="portal-permission-grid">{canonicalRows.map(([id, title, kind]) => <label className="permission-toggle" key={id}><input type="checkbox" disabled={locked} checked={enabledPortals.includes(id)} onChange={() => togglePortal(id)} /><span><strong>{title}</strong><small>{kind} · core · {portalUrl(id)}</small></span></label>)}</div></article><article className="feature panel access-manager"><p className="eyebrow">Selected Industry Pack / {selectedPack.title}</p><h2>Modules pushed down to this tenant</h2><div className="portal-permission-grid">{industryRows.map(([id, title, kind, desc, record]) => <label className="permission-toggle" key={id}><input type="checkbox" disabled={locked} checked={enabledPortals.includes(id)} onChange={() => togglePortal(id)} /><span><strong>{title}</strong><small>{kind} · {record.package} · {portalUrl(id)}</small></span></label>)}</div></article></>; }
-function App() { const [moduleMap, setModuleMap] = useState(loadTenantModuleMap); const portalRecords = useMemo(() => getTenantPortals(moduleMap), [moduleMap]); const portals = useMemo(() => portalRecords.map(portalTuple), [portalRecords]); const customerPortalIds = useMemo(() => portalRecords.map((portal) => portal.id), [portalRecords]); const [enabledPortals, setEnabledPortals] = useState(() => loadEnabledPortals(loadTenantModuleMap())); const [profiles, setProfiles] = useState([{ id: 'admin', name: 'Admin / Owner', email: 'seth@steelcraftbuilders.com', portals: customerPortalIds }, { id: 'accounting', name: 'Accounting', email: 'accounting@steelcraft.local', portals: ['accounting', 'contacts', 'employee'] }, { id: 'employee', name: 'Employee', email: 'employee@steelcraft.local', portals: ['employee'] }, { id: 'vendor', name: 'Vendor User', email: 'vendor@steelcraft.local', portals: ['vendor'] }, { id: 'customer', name: 'Customer User', email: 'customer@steelcraft.local', portals: ['customer'] }]); const [user, setUser] = useState(() => loadSession(moduleMap)); const [path, setPath] = useState(routePath()); const brand = useMemo(loadBrand, []); useEffect(() => { const onPop = () => setPath(routePath()); window.addEventListener('popstate', onPop); return () => window.removeEventListener('popstate', onPop); }, []); useEffect(() => { const valid = new Set(customerPortalIds); setEnabledPortals((current) => { const next = current.filter((id) => valid.has(id)); const hydrated = next.length ? next : customerPortalIds; saveEnabledPortals(hydrated); return hydrated; }); setProfiles((all) => all.map((p) => p.id === 'admin' ? { ...p, portals: customerPortalIds } : p)); setUser((current) => current && (current.role === 'developer' || current.role === 'admin') ? { ...current, portals: current.role === 'developer' ? ['developer', ...customerPortalIds] : customerPortalIds } : current); }, [customerPortalIds.join('|')]); const meta = (id) => id === 'developer' ? developerMeta : (portals.find(([pid]) => pid === id) || portals[0]); const portalRecord = (id) => meta(id)?.[4] || null; const portalPackageLabel = (id) => { const record = portalRecord(id); return record?.scope === 'industry' ? getIndustryPack(record.package).title : 'Canonical Core'; }; const enabledPortalMeta = (list) => portals.filter(([id]) => list.includes(id)); const Header = ({ id }) => { const [, title, kind, desc] = meta(id); return <header className="workspace-header panel"><div><p className="eyebrow">{kind}</p><h1>{title}</h1><p>{desc}</p></div><div className="live-badge">{portalPackageLabel(id)}</div></header>; }; const Portal = ({ id }) => { const record = portalRecord(id); const rows = record?.scope === 'industry' ? [[record.title, `${record.canonicalKey} lives in the ${getIndustryPack(record.package).title} industry pack.`, record.package], ['Data boundary', 'Industry-specific tables extend canonical records only when this pack is installed.', 'Industry']] : [[record?.title || 'Workspace', `${record?.canonicalKey || id} is part of the reusable core package.`, 'Core'], ['Data boundary', 'Reusable across tenants and industry packs.', 'Canonical']]; return <><Header id={id} /><div className="workspace-grid"><article className="feature panel large"><p className="eyebrow">{record?.scope === 'industry' ? 'Industry portal' : 'Canonical portal'}</p><h2>{meta(id)[1]}</h2><p>{meta(id)[3]}</p></article><RecordList title="Portal registry" rows={rows} /></div></>; }; const Admin = () => { const roleOptions = [['admin', 'Admin'], ['accounting', 'Accounting'], ['employee', 'Employee'], ['vendor', 'Vendor'], ['customer', 'Customer'], ['developer', 'Developer']]; const thStyle = { textAlign: 'left', padding: '10px 12px', fontSize: 12, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--muted)', borderBottom: '1px solid var(--line)' }; const tdStyle = { padding: '10px 12px', borderBottom: '1px solid var(--line)', verticalAlign: 'middle' }; const [users, setUsers] = useState([]); const [loadingUsers, setLoadingUsers] = useState(true); const [form, setForm] = useState({ fullName: '', email: '', role: 'employee' }); const [busy, setBusy] = useState(false); const [formError, setFormError] = useState(''); const [created, setCreated] = useState(''); const businessAuthorityId = (users.find((u) => u.email === user?.email) || users.find((u) => (u.authority_display_id || '').startsWith('BUSV')) || {}).authority_display_id || null; const loadUsers = async () => { setLoadingUsers(true); try { const res = await fetch('/api/auth/users'); const json = await res.json(); if (json.ok) setUsers(json.users || []); } catch (err) { /* ignore load errors */ } finally { setLoadingUsers(false); } }; useEffect(() => { loadUsers(); }, []); const addUser = async (event) => { event.preventDefault(); setBusy(true); setFormError(''); setCreated(''); try { const payload = businessAuthorityId ? { authority_start_mode: 'existing', existing_authority_id: businessAuthorityId, business_join_method: 'existing_assignment', email: form.email, fullName: form.fullName, role: form.role, language: 'en' } : { authority_start_mode: 'new_business', email: form.email, fullName: form.fullName, role: form.role, language: 'en' }; const res = await fetch('/api/erp/onboarding/authority-signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); const json = await res.json(); if (!res.ok || !json.ok) throw new Error(json.error || 'Could not create user.'); setCreated(`Created ${json.erpUser?.email || form.email}.`); setForm({ fullName: '', email: '', role: 'employee' }); await loadUsers(); } catch (err) { setFormError(err.message || 'Could not create user.'); } finally { setBusy(false); } }; return <><Header id="admin" /><div className="workspace-grid"><article className="feature panel large"><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}><div><p className="eyebrow">Directory</p><h2>Users{loadingUsers ? '' : ` (${users.length})`}</h2></div><button type="button" className="auth-submit" style={{ width: 'auto', padding: '8px 14px' }} onClick={loadUsers} disabled={loadingUsers}>{loadingUsers ? 'Loading...' : 'Refresh'}</button></div><div style={{ overflowX: 'auto', marginTop: 12 }}><table style={{ width: '100%', borderCollapse: 'collapse' }}><thead><tr><th style={thStyle}>Name</th><th style={thStyle}>Email</th><th style={thStyle}>Role</th><th style={thStyle}>Status</th></tr></thead><tbody>{loadingUsers ? <tr><td style={tdStyle} colSpan={4}>Loading users…</td></tr> : (users.length ? users.map((u) => <tr key={u.id}><td style={tdStyle}><strong>{u.full_name}</strong></td><td style={tdStyle}>{u.email}</td><td style={tdStyle}>{(roleOptions.find(([id]) => id === u.role) || [u.role, u.role])[1]}</td><td style={tdStyle}>{u.status === 'pending' ? 'Pending — needs password' : (u.must_change_password ? 'Active — must set password' : 'Active')}</td></tr>) : <tr><td style={tdStyle} colSpan={4}>No users yet — add one using the form on the right.</td></tr>)}</tbody></table></div></article><article className="feature panel"><p className="eyebrow">User management</p><h2>Add a user</h2><p>Creates a real account in the erp_users table. New users appear in the directory and can sign in once their password is set.</p>{formError && <div className="notice">{formError}</div>}{created && <div className="notice">{created}</div>}<form className="accounting-live-form" onSubmit={addUser}><label>Full name<input value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} placeholder="Jane Smith" /></label><label>Email<input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="name@company.com" /></label><label>Role<select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>{roleOptions.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label><button className="auth-submit" disabled={busy}>{busy ? 'Creating...' : 'Create user'}</button></form></article></div></>; }; const signIn = (nextUser) => { const hydrated = toAppUser(nextUser, moduleMap); saveSession(hydrated); setUser(hydrated); if (hydrated.role === 'developer' && (path === '/developer' || path === '/brand')) return; goTo(hydrated.portals.includes('admin') ? '/portal/admin' : portalUrl(hydrated.portals[0] || 'employee')); }; const signOut = () => { clearSession(); setUser(null); goTo('/'); }; function Auth({ requestedPath }) { const isDeveloperPath = requestedPath === '/developer'; const [email, setEmail] = useState(isDeveloperPath ? 'admin@neroa.io' : 'seth@steelcraftbuilders.com'); const [password, setPassword] = useState(''); const [error, setError] = useState(''); const [busy, setBusy] = useState(false); async function submit(event) { event.preventDefault(); setBusy(true); setError(''); try { const res = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) }); const json = await res.json(); if (!res.ok || !json.ok) throw new Error(json.error || 'Login failed.'); signIn(json.user); } catch (err) { setError(err.message || 'Login failed.'); } finally { setBusy(false); } } return <main className={`landing-dark auth-page theme-${brand.uiTheme}`} style={styleVars(brand)}><section className="landing-card panel auth-only"><BrandMark brand={brand} /><p className="eyebrow">Database authentication</p><h1>{brand.logoText} Login</h1><p>{isDeveloperPath ? 'Developer URL detected. Use admin@neroa.io to open Developer Room.' : 'Customer/admin login opens the Admin portal first.'}</p>{error && <div className="notice">{error}</div>}<form className="accounting-live-form" onSubmit={submit}><label>Email<input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@company.com" /></label><label>Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" /></label><button className="auth-submit" disabled={busy}>{busy ? 'Signing in...' : 'Sign in'}</button></form></section></main>; } function BrandControls() { const [localBrand, setLocalBrand] = useState(loadBrand); const update = (k, v) => { const next = { ...localBrand, [k]: v }; setLocalBrand(next); saveBrand(next); }; if (!user || user.role !== 'developer') return <Auth requestedPath="/developer" />; return <main className={`dashboard brand-controls layout-${localBrand.navLayout} theme-${localBrand.uiTheme}`} style={styleVars(localBrand)}><section className="workspace solo"><header className="workspace-header panel brand-studio-header"><div><p className="eyebrow">Max Developer / Brand Room</p><h1>White-label Design Studio</h1><p>Choose tenant UI/UX, logo, and colors.</p></div><div className="quote-actions"><button onClick={() => { resetTenant(moduleMap); window.location.reload(); }}>Reset Brand</button><button onClick={() => goTo('/developer')}>Back to Developer</button></div></header><div className="brand-studio-grid"><article className="feature panel"><h2>Logo controls</h2><BrandMark brand={localBrand} /><label>Logo URL<input value={localBrand.logoUrl} onChange={(e) => update('logoUrl', e.target.value)} placeholder="https://..." /></label><label>Logo text<input value={localBrand.logoText} onChange={(e) => update('logoText', e.target.value)} /></label><label>Logo subtext<input value={localBrand.logoSubtext} onChange={(e) => update('logoSubtext', e.target.value)} /></label></article></div></section></main>; } if (path === '/brand') return <BrandControls />; const requestedPortal = pathPortalId(); if (!user) return <Auth requestedPath={path} />; if (path === '/developer') { if (user.role !== 'developer') { goTo('/portal/admin'); return null; } return <DeveloperShell brand={brand} user={user} signOut={signOut}><DeveloperRoom moduleMap={moduleMap} setModuleMap={setModuleMap} enabledPortals={enabledPortals} setEnabledPortals={setEnabledPortals} portals={portals} user={user} /></DeveloperShell>; } const active = requestedPortal && user.portals.includes(requestedPortal) && enabledPortals.includes(requestedPortal) ? requestedPortal : (user.portals.find((id) => enabledPortals.includes(id)) || 'admin'); if (!requestedPortal) goTo(portalUrl(active)); return <Shell brand={brand} user={user} active={active} signOut={signOut} enabledPortals={enabledPortals} portals={portals} meta={meta}>{active === 'admin' ? <Admin /> : active === 'accounting' ? <AccountingPortal /> : isLiveCanonicalPortal(active) ? <LiveCanonicalPortal id={active} Header={Header} /> : <Portal id={active} />}</Shell>; }
+const sessionKey = 'steelcraft_auth_session_v2';
+
+const commandSections = [
+  { id: 'crm', label: 'CRM', cards: ['Accounts', 'Contacts', 'Customer History'] },
+  { id: 'estimating', label: 'Estimating', cards: ['Working Sheet', 'Estimate', 'Metal Building Generator', 'Dynamic Door', 'F&E Quotation', 'EO Quotation'] },
+  { id: 'projects', label: 'Projects', cards: ['Project Information', 'Project Delivery', 'Change Orders', 'Closeout'] },
+  { id: 'accounting', label: 'Accounting', cards: ['Invoices', 'Labor SOV', 'Material SOV', 'Project Financials'] },
+  { id: 'erection', label: 'Erection', cards: ['Erection Schedule', 'Project Delivery', 'Field Progress'] },
+  { id: 'billing', label: 'Billing', cards: ['Invoices', 'Labor SOV', 'Material SOV', 'Billing Package'] },
+  { id: 'documents', label: 'Documents', cards: ['COI', 'Quote Docs', 'Change Orders', 'Invoices'] },
+  { id: 'profile', label: 'Profile', cards: ['User Profile', 'Company Profile', 'Settings', 'Permissions'] }
+];
+
+const kpis = [
+  ['Active Projects', '47', '+6 this week'],
+  ['Open Quotes', '3,000', '$127,842,000'],
+  ['Jobs in Erection', '23', '+3 this week'],
+  ['Invoices Due', '28', '$4,523,750'],
+  ['Pending COs', '14', '$2,184,300'],
+  ['Receipts Today', '156', '+28 today']
+];
+
+function readSession() {
+  try { return JSON.parse(sessionStorage.getItem(sessionKey)); } catch { return null; }
+}
+
+function saveSession(user) {
+  sessionStorage.setItem(sessionKey, JSON.stringify(user));
+}
+
+function clearSession() {
+  sessionStorage.removeItem(sessionKey);
+}
+
+function SteelCraftLogin({ onLogin }) {
+  const [email, setEmail] = useState('seth@steelcraftbuilders.com');
+  const [password, setPassword] = useState('');
+
+  function submit(event) {
+    event.preventDefault();
+    const user = {
+      email: email || 'steelcraft@steelcraftbuilders.com',
+      name: (email || 'Steel Craft User').split('@')[0],
+      role: 'admin',
+      temporaryAuth: true,
+      issuedAt: new Date().toISOString()
+    };
+    saveSession(user);
+    history.pushState({}, '', '/command-center');
+    onLogin(user);
+  }
+
+  return (
+    <main className="sc-auth-page">
+      <section className="sc-login-card">
+        <img className="sc-login-logo" src="/logo-03.png" alt="Steel Craft Builders" />
+        <h1>Steel Craft Login</h1>
+        <form onSubmit={submit} className="sc-login-form">
+          <label>
+            <span>Email</span>
+            <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" />
+          </label>
+          <label>
+            <span>Password</span>
+            <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" autoComplete="current-password" />
+          </label>
+          <button type="submit">Sign in</button>
+        </form>
+      </section>
+    </main>
+  );
+}
+
+function CommandCenter({ user, onSignOut }) {
+  const [active, setActive] = useState('command-center');
+  const activeSection = useMemo(() => commandSections.find((section) => section.id === active), [active]);
+
+  return (
+    <main className="sc-command-shell">
+      <header className="sc-topbar">
+        <div className="sc-brand-lockup">
+          <img src="/logo-03.png" alt="Steel Craft Builders" />
+          <div>
+            <strong>Steel Craft OS</strong>
+            <span>Forge Runtime</span>
+          </div>
+        </div>
+        <nav>
+          <button className={active === 'command-center' ? 'active' : ''} onClick={() => setActive('command-center')}>Command Center</button>
+          {commandSections.map((section) => <button key={section.id} className={active === section.id ? 'active' : ''} onClick={() => setActive(section.id)}>{section.label}</button>)}
+        </nav>
+        <div className="sc-user-pill">
+          <span>{user.email}</span>
+          <button onClick={onSignOut}>Sign out</button>
+        </div>
+      </header>
+
+      <section className="sc-command-content">
+        <div className="sc-welcome-row">
+          <div>
+            <p className="sc-eyebrow">Command Center Universe</p>
+            <h2>{active === 'command-center' ? 'Welcome to Steel Craft OS' : activeSection?.label}</h2>
+            <p>{active === 'command-center' ? 'Post-login command center for CRM, Estimating, Projects, Accounting, Erection, Billing, Documents, and Profile.' : `${activeSection?.label} universe card group loaded through the Steel Craft runtime.`}</p>
+          </div>
+          <div className="sc-status-card">
+            <span>Runtime status</span>
+            <strong>Preview Ready</strong>
+            <small>Temporary auth now routes to Command Center. SQL/OAuth hardening comes next.</small>
+          </div>
+        </div>
+
+        <div className="sc-kpi-grid">
+          {kpis.map(([label, value, note]) => <article key={label}><span>{label}</span><strong>{value}</strong><small>{note}</small></article>)}
+        </div>
+
+        {active === 'command-center' ? <CommandOverview /> : <UniverseSection section={activeSection} />}
+      </section>
+    </main>
+  );
+}
+
+function CommandOverview() {
+  return (
+    <>
+      <section className="sc-two-panel">
+        <article className="sc-panel">
+          <p className="sc-eyebrow">Ask Steel Craft OS</p>
+          <h3>Build, open, and route work</h3>
+          <div className="sc-prompt-box">How can I help you today?</div>
+          <div className="sc-action-row">
+            <button>Open a Project</button>
+            <button>Create a Quote</button>
+            <button>Check Erection Schedule</button>
+            <button>Generate Building Model</button>
+          </div>
+        </article>
+        <article className="sc-panel sc-building-panel">
+          <p className="sc-eyebrow">System Overview</p>
+          <h3>Steel Craft OS unifies operations from lead to closeout.</h3>
+          <ul>
+            <li>CRM, estimating, and quote management</li>
+            <li>Project management and delivery</li>
+            <li>Erection and field operations</li>
+            <li>Accounting, billing, and documents</li>
+          </ul>
+        </article>
+      </section>
+      <UniverseGrid />
+    </>
+  );
+}
+
+function UniverseGrid() {
+  return <section className="sc-module-grid">{commandSections.map((section) => <article key={section.id}><span>{section.label}</span><h3>{section.cards[0]}</h3><p>{section.cards.slice(0, 4).join(' · ')}</p><button>Open</button></article>)}</section>;
+}
+
+function UniverseSection({ section }) {
+  return <section className="sc-module-grid active-universe">{section.cards.map((card) => <article key={card}><span>{section.label}</span><h3>{card}</h3><p>{card} card is registered for the {section.label} universe and ready for SQL hydration.</p><button>Open {card}</button></article>)}</section>;
+}
+
+function App() {
+  const [user, setUser] = useState(() => readSession());
+
+  function signOut() {
+    clearSession();
+    history.pushState({}, '', '/');
+    setUser(null);
+  }
+
+  if (!user) return <SteelCraftLogin onLogin={setUser} />;
+  return <CommandCenter user={user} onSignOut={signOut} />;
+}
+
 createRoot(document.getElementById('root')).render(<App />);
