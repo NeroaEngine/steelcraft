@@ -1,0 +1,17 @@
+room_id: steelcraft-room
+room_type: erp-runtime-room
+tenant_id: steelcraft
+workspace_id: steelcraft-command-center
+owner_actor_id: null
+runtime_state: ready
+active_canvas: steelcraft_command_center_canvas
+manifest_version: 0.1.0
+sql_card_version: 0.1.0
+worker_version: 0.1.0
+canvas_version: 0.1.0
+permission_ref: guard://steelcraft/command-center
+public_url: https://app.steelcraftbuilders.com
+post_login_route: /command-center
+database_binding: env:DATABASE_URL
+oauth_binding: env:STEELCRAFT_OAUTH_CLIENT_ID
+state_sections: {}
