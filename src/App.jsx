@@ -38,21 +38,45 @@ function clearSession() {
 }
 
 function SteelCraftLogin({ onLogin }) {
-  const [email, setEmail] = useState('seth@steelcraftbuilders.com');
+  const [email, setEmail] = useState('admin@neroa.io');
   const [password, setPassword] = useState('');
+  const [status, setStatus] = useState('Use the Steel Craft preview login to enter Command Center.');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function submit(event) {
+  async function submit(event) {
     event.preventDefault();
-    const user = {
-      email: email || 'steelcraft@steelcraftbuilders.com',
-      name: (email || 'Steel Craft User').split('@')[0],
-      role: 'admin',
-      temporaryAuth: true,
-      issuedAt: new Date().toISOString()
-    };
-    saveSession(user);
-    history.pushState({}, '', '/command-center');
-    onLogin(user);
+    setIsSubmitting(true);
+    setStatus('Checking login...');
+
+    try {
+      const response = await fetch('/api/auth/preview-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.message || 'Invalid login.');
+      }
+
+      const user = payload.user || {
+        email,
+        name: (email || 'Steel Craft User').split('@')[0],
+        role: 'admin',
+        temporaryAuth: true,
+        issuedAt: new Date().toISOString()
+      };
+
+      saveSession(user);
+      history.pushState({}, '', payload.redirectTo || '/command-center');
+      onLogin(user);
+    } catch (error) {
+      setStatus(error.message || 'Login failed.');
+      setPassword('');
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -69,7 +93,8 @@ function SteelCraftLogin({ onLogin }) {
             <span>Password</span>
             <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" autoComplete="current-password" />
           </label>
-          <button type="submit">Sign in</button>
+          <button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Signing in...' : 'Sign in'}</button>
+          <p className="sc-login-status">{status}</p>
         </form>
       </section>
     </main>
@@ -110,7 +135,7 @@ function CommandCenter({ user, onSignOut }) {
           <div className="sc-status-card">
             <span>Runtime status</span>
             <strong>Preview Ready</strong>
-            <small>Temporary auth now routes to Command Center. SQL/OAuth hardening comes next.</small>
+            <small>Login is now routed through the preview auth endpoint. SQL/OAuth hardening comes next.</small>
           </div>
         </div>
 
