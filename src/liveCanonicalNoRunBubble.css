@@ -1,0 +1,89 @@
+.workspace > .workspace-header:has(+ .live-module-shell) {
+  display: none !important;
+}
+
+.live-action-panel .live-module-status-strip .live-module-step button,
+.live-action-panel .live-module-status-strip .live-click-step button,
+.live-action-panel .live-module-status-strip button:not(.live-click-step) {
+  display: none !important;
+}
+
+.live-action-panel .live-module-status-strip .live-click-step,
+.live-action-panel .live-module-status-strip button.live-click-step {
+  display: grid !important;
+  grid-template-columns: 30px minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 10px !important;
+  width: 100% !important;
+  text-align: left !important;
+  border: 1px solid color-mix(in srgb, var(--line, #343036) 70%, transparent) !important;
+  border-radius: 16px !important;
+  background: color-mix(in srgb, var(--surface-alt, #1e1e24) 58%, transparent) !important;
+  color: inherit !important;
+  padding: 12px !important;
+  min-height: 0 !important;
+  font-weight: inherit !important;
+}
+
+.live-action-panel .live-module-status-strip .live-click-step::after,
+.live-action-panel .live-module-status-strip .live-module-step::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* Final Accounting spacing override. This file loads after accountingHardLock.css. */
+.workspace:has(.accounting-section-nav),
+.workspace:has(.accounting-subroom-header) {
+  padding-top: 12px !important;
+  gap: 10px !important;
+}
+
+.dashboard:has(.accounting-section-nav) .accounting-section-nav {
+  margin-bottom: 0 !important;
+}
+
+.dashboard:has(.accounting-section-nav) .accounting-focus-grid,
+.dashboard:has(.accounting-section-nav) .accounting-report-room {
+  margin-top: 10px !important;
+}
+
+.dashboard:has(.accounting-section-nav) .accounting-focus-grid > .feature:first-child,
+.dashboard:has(.accounting-section-nav) .accounting-report-room > .feature:first-child {
+  margin-top: 0 !important;
+}
+
+/* Contacts / CRM full-width board override. This file loads after the app CSS. */
+.dashboard:has(.canonical-force-live) {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+.dashboard:has(.canonical-force-live) .workspace {
+  width: 100% !important;
+  max-width: none !important;
+  margin-inline: 0 !important;
+  justify-self: stretch !important;
+}
+
+.dashboard:has(.canonical-force-live) .live-module-shell.canonical-force-live {
+  width: calc(100vw - 32px) !important;
+  max-width: none !important;
+  margin: 0 !important;
+  justify-self: stretch !important;
+}
+
+.dashboard:has(.canonical-force-live) .live-module-shell.canonical-force-live > .live-module-card {
+  width: 100% !important;
+  max-width: none !important;
+  justify-self: stretch !important;
+}
+
+.dashboard:has(.canonical-force-live) .crm-wide-grid,
+.dashboard:has(.canonical-force-live) .crm-wide-card {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+.dashboard:has(.canonical-force-live) .live-module-shell.canonical-force-live [style*="min-width: 1500px"] {
+  min-width: 100% !important;
+}

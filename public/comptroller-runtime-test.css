@@ -1,0 +1,150 @@
+/* Runtime test panel for Neroa Comptroller. */
+
+.comptroller-runtime-panel {
+  width: min(100%, 1120px);
+  margin: 0 auto 16px;
+  padding: 22px;
+  border: 1px solid color-mix(in srgb, var(--brand-accent) 42%, var(--line));
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 8% 0%, color-mix(in srgb, var(--brand-accent) 18%, transparent), transparent 32%),
+    color-mix(in srgb, var(--surface) 93%, #000 7%);
+  box-shadow: 0 24px 70px rgb(0 0 0 / 0.25);
+}
+
+.comptroller-runtime-panel h2 {
+  margin: 4px 0 8px;
+  font-size: clamp(28px, 2.7vw, 42px);
+  line-height: 0.95;
+  letter-spacing: -0.06em;
+}
+
+.comptroller-runtime-panel p {
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.comptroller-user-strip,
+.comptroller-action-row,
+.comptroller-report-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.comptroller-user-strip {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 16px;
+}
+
+.comptroller-user-card,
+.comptroller-report-card,
+.comptroller-brief-sheet {
+  border: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--surface-alt) 62%, transparent);
+  padding: 14px;
+}
+
+.comptroller-user-card strong,
+.comptroller-report-card strong {
+  display: block;
+  color: var(--text);
+}
+
+.comptroller-user-card span,
+.comptroller-report-card span,
+.comptroller-brief-sheet span {
+  display: block;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.comptroller-action-row {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 16px;
+}
+
+.comptroller-action-row button,
+.comptroller-approval-row button {
+  border: 1px solid color-mix(in srgb, var(--brand-accent) 40%, var(--line));
+  background: var(--button);
+  color: var(--button-text);
+  border-radius: 999px;
+  padding: 11px 14px;
+  font-weight: 900;
+}
+
+.comptroller-report-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 16px;
+}
+
+.comptroller-brief-sheet {
+  margin-top: 16px;
+}
+
+.comptroller-brief-sheet h3 {
+  margin: 0 0 10px;
+  font-size: clamp(22px, 1.8vw, 30px);
+  letter-spacing: -0.04em;
+}
+
+.comptroller-brief-lines {
+  display: grid;
+  gap: 8px;
+}
+
+.comptroller-brief-line {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.55fr) minmax(220px, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 74%, transparent);
+}
+
+.comptroller-brief-line b {
+  color: var(--brand-accent);
+  text-transform: uppercase;
+  font-size: 0.76rem;
+  letter-spacing: 0.1em;
+}
+
+.comptroller-approval-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.comptroller-runtime-status {
+  margin-top: 12px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--brand-accent) 28%, var(--line));
+  padding: 10px 12px;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--surface-alt) 58%, transparent);
+}
+
+@media (max-width: 900px) {
+  .comptroller-user-strip,
+  .comptroller-action-row,
+  .comptroller-report-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .comptroller-brief-line {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .comptroller-user-strip,
+  .comptroller-action-row,
+  .comptroller-report-grid {
+    grid-template-columns: 1fr;
+  }
+}

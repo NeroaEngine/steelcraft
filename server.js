@@ -1,958 +1,145 @@
 import express from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import pg from 'pg';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import multer from 'multer';
+import { Pool } from 'pg';
+import { S3Client, ListBucketsCommand } from '@aws-sdk/client-s3';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { ensureEstimatingSchema } from './server/estimatingSchema.js';
+import { ensureHrSchema } from './server/hrSchema.js';
+import { ensureAccountingSchema } from './server/accountingSchema.js';
+import { registerAccountingRoutes } from './server/accountingApi.js';
+import { registerAccountingBankingDemoRoutes } from './server/accountingBankingDemoRoutes.js';
+import { registerComptrollerProductionDemoRoutes } from './server/comptrollerProductionDemo.js';
+import { registerNeroaConnectRoutes, ensureNeroaConnectSchema } from './server/neroaConnect.js';
+import { registerErpAuthorityOnboardingRoutes } from './server/erpAuthorityOnboarding.js';
+import { authenticateUser, ensureAuthSchema, listAuthUsers, requestPasswordReset, resetPasswordWithToken, seedAuthUsers, updateUserLanguage } from './server/authSchema.js';
+import { ensureQuoteWorkbookSchema, importQuoteWorkbook } from './server/quoteWorkbook.js';
+import { ensureQuoteTemplateSchema, createTemplateFromWorkbook, listTemplates, getTemplate, updateTemplateVersion, upsertTemplateOverride } from './server/quoteTemplate.js';
+import { mapMondayBoardsToSteelCraftWorkflow } from './server/steelcraftWorkflow.js';
+import {
+  GENERIC_WORKBOOK_MAPPING_KEY,
+  STEELCRAFT_WORKBOOK_MAPPING_KEY,
+  ensureImportProfileSchema,
+  getProfileWorkbookUpload,
+  getTenantImportProfile,
+  listProfileWorkbookUploads,
+  profileWorkbookUpload,
+  tenantMondayEnvKey,
+  upsertMondaySourceMapping,
+  upsertTenantImportMapping
+} from './server/importProfiles.js';
 
-dotenv.config();
-
-const { Pool } = pg;
-const app = express();
-const port = process.env.PORT || 8080;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const app = express();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+const port = process.env.PORT || 8080;
+const mondayApiUrl = process.env.MONDAY_API_URL || 'https://api.monday.com/v2';
+const steelcraftProfileKey = process.env.STEELCRAFT_TENANT_KEY || 'steelcraft';
 
-app.use(cors());
-app.use(express.json({ limit: '2mb' }));
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
-});
-
-const mondayAccountsBoardId = process.env.MONDAY_ACCOUNTS_BOARD_ID || '1781805791';
-const mondayContactsBoardId = process.env.MONDAY_CONTACTS_BOARD_ID || '1781806557';
-const mondayCrmBoardId = process.env.MONDAY_CRM_BOARD_ID || '7281109774';
-
-function toCamel(row) {
-  if (!row) return row;
-  const out = {};
-  for (const [key, value] of Object.entries(row)) {
-    out[key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase())] = value;
+app.use(express.json({ limit: '10mb' }));
+app.use((req, res, next) => {
+  if (req.path === '/' || req.path.endsWith('.html')) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
   }
-  return out;
+  next();
+});
+app.use(express.static(path.join(__dirname, 'dist'), { etag: false, lastModified: false, setHeaders(res, filePath) { if (filePath.endsWith('.html')) res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate'); } }));
+
+function getDatabaseConfig() {
+  if (!process.env.DATABASE_URL) return null;
+  const url = new URL(process.env.DATABASE_URL);
+  const sslmode = url.searchParams.get('sslmode');
+  url.searchParams.delete('sslmode');
+  return {
+    connectionString: url.toString(),
+    ssl: sslmode === 'disable' ? false : { rejectUnauthorized: false }
+  };
 }
+const databaseConfig = getDatabaseConfig();
+const pool = databaseConfig ? new Pool(databaseConfig) : null;
+function requireDatabase() { if (!pool) { const error = new Error('DATABASE_URL is not configured.'); error.statusCode = 500; throw error; } return pool; }
+function safeJson(value) { try { return value ? JSON.parse(value) : null; } catch { return null; } }
+function tenantKey(req) { return req.params.tenantKey || req.query.tenantKey || req.body?.tenantKey || req.body?.tenant_key || steelcraftProfileKey; }
+function normalizeKey(value) { return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'tenant'; }
+function mondayTokenForTenant(key) { const tenantEnv = tenantMondayEnvKey(key); const token = process.env[tenantEnv] || (key === steelcraftProfileKey ? process.env.MONDAY_API_TOKEN : null); if (!token) { const error = new Error(`Monday.com token is not configured for tenant profile "${key}". Set ${tenantEnv}${key === steelcraftProfileKey ? ' or MONDAY_API_TOKEN' : ''}.`); error.statusCode = 500; throw error; } return token; }
+async function mondayQuery(profileKey, query, variables = {}) { const token = mondayTokenForTenant(profileKey); const response = await fetch(mondayApiUrl, { method: 'POST', headers: { Authorization: token, 'Content-Type': 'application/json' }, body: JSON.stringify({ query, variables }) }); const payload = await response.json(); if (!response.ok || payload.errors) { const message = payload.errors?.map((item) => item.message).join('; ') || `Monday API returned ${response.status}`; const error = new Error(message); error.statusCode = response.status || 502; throw error; } return payload.data; }
 
-function rows(result) {
-  return result.rows.map(toCamel);
+async function ensureProfileSchema(db) {
+  await db.query(`
+    create table if not exists tenant_profiles (
+      tenant_key text primary key,
+      display_name text not null,
+      profile_type text not null default 'customer',
+      industry_pack text,
+      uiux_profile jsonb not null default '{}'::jsonb,
+      import_profile jsonb not null default '{}'::jsonb,
+      is_active boolean not null default true,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
+    insert into tenant_profiles (tenant_key, display_name, profile_type, industry_pack, import_profile)
+    values ($1, 'Steel Craft', 'customer', 'metal_buildings', '{"monday":true,"steelcraftWorkbook":true,"defaultWorkbookMapping":"steelcraft_quote_workbook"}'::jsonb)
+    on conflict (tenant_key) do nothing;
+  `, [steelcraftProfileKey]);
 }
-
-async function query(text, params = []) {
-  if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is not configured');
-  return pool.query(text, params);
-}
-
-async function runStatements(sql) {
-  const statements = sql.split(';').map((statement) => statement.trim()).filter(Boolean);
-  for (const statement of statements) {
-    await query(statement);
-  }
-}
-
-function normalizeName(value = '') {
-  return String(value).trim().replace(/\s+/g, ' ').toLowerCase();
-}
-
-function cleanText(value = '') {
-  return String(value || '').trim();
-}
-
-function canExecuteWebsiteOptimizations(access = {}) {
-  return Boolean(
-    access.githubRepoConnected ||
-    access.cmsConnected ||
-    access.uploadedSiteFiles ||
-    access.domainOwnershipVerified
-  );
-}
-
-function mondayToken() {
-  return process.env.MONDAY_API_KEY || process.env.MONDAY_TOKEN || process.env.MONDAY_API_TOKEN || '';
-}
-
-function requireMondayToken() {
-  const token = mondayToken();
-  if (!token) throw new Error('Monday API token is not configured. Set MONDAY_API_KEY in the deployment environment.');
-  return token;
-}
-
-function mondayColumnMap(item = {}) {
-  const map = {};
-  for (const columnValue of item.column_values || []) {
-    const title = columnValue?.column?.title || columnValue?.title || columnValue?.id || '';
-    map[title] = cleanText(columnValue.text);
-    map[title.toLowerCase()] = cleanText(columnValue.text);
-  }
-  return map;
-}
-
-function col(map, ...names) {
-  for (const name of names) {
-    if (map[name] !== undefined && map[name] !== '') return map[name];
-    const lower = String(name).toLowerCase();
-    if (map[lower] !== undefined && map[lower] !== '') return map[lower];
-  }
-  return '';
-}
-
-async function mondayGraphql(queryText, variables = {}) {
-  const token = requireMondayToken();
-  const response = await fetch('https://api.monday.com/v2', {
-    method: 'POST',
-    headers: {
-      Authorization: token,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ query: queryText, variables }),
-  });
-
-  const payload = await response.json();
-  if (!response.ok || payload.errors) {
-    const message = payload.errors?.map((error) => error.message).join('; ') || response.statusText;
-    throw new Error(`Monday API error: ${message}`);
-  }
-  return payload.data;
-}
-
-async function fetchMondayBoard(boardId) {
-  const data = await mondayGraphql(
-    `query FetchBoard($boardIds: [ID!]) {
-      boards(ids: $boardIds) {
-        id
-        name
-        items_page(limit: 500) {
-          cursor
-          items {
-            id
-            name
-            group { id title }
-            column_values { id text value type column { title } }
-            subitems { id name column_values { id text value type column { title } } }
-            updates { id body created_at creator { name } }
-          }
-        }
-      }
-    }`,
-    { boardIds: [String(boardId)] }
-  );
-  return data.boards?.[0] || null;
-}
-
-async function initHrSchema() {
-  await runStatements(`
-    CREATE TABLE IF NOT EXISTS employees (
-      id SERIAL PRIMARY KEY,
-      name TEXT NOT NULL,
-      title TEXT NOT NULL DEFAULT '',
-      department TEXT NOT NULL DEFAULT '',
-      manager TEXT NOT NULL DEFAULT '',
-      employment_type TEXT NOT NULL DEFAULT 'Salary',
-      start_date DATE NOT NULL DEFAULT CURRENT_DATE,
-      pto_balance NUMERIC NOT NULL DEFAULT 0,
-      status TEXT NOT NULL DEFAULT 'Active',
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-
-    CREATE TABLE IF NOT EXISTS pto_requests (
-      id SERIAL PRIMARY KEY,
-      employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
-      type TEXT NOT NULL DEFAULT 'PTO',
-      start_date DATE NOT NULL,
-      end_date DATE NOT NULL,
-      hours NUMERIC NOT NULL DEFAULT 0,
-      reason TEXT NOT NULL DEFAULT '',
-      status TEXT NOT NULL DEFAULT 'Pending',
-      admin_note TEXT NOT NULL DEFAULT '',
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-
-    CREATE TABLE IF NOT EXISTS hr_support_requests (
-      id SERIAL PRIMARY KEY,
-      employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
-      category TEXT NOT NULL DEFAULT 'Other',
-      summary TEXT NOT NULL DEFAULT '',
-      status TEXT NOT NULL DEFAULT 'Open',
-      assigned_to TEXT NOT NULL DEFAULT 'HR Admin',
-      resolution TEXT NOT NULL DEFAULT '',
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-
-    CREATE TABLE IF NOT EXISTS handbook_documents (
-      id SERIAL PRIMARY KEY,
-      title TEXT NOT NULL DEFAULT 'Steel Craft Employee Handbook',
-      version TEXT NOT NULL,
-      effective_date DATE NOT NULL DEFAULT CURRENT_DATE,
-      content_url TEXT NOT NULL DEFAULT '',
-      is_active BOOLEAN NOT NULL DEFAULT TRUE,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-
-    CREATE TABLE IF NOT EXISTS handbook_acknowledgements (
-      id SERIAL PRIMARY KEY,
-      handbook_id INTEGER REFERENCES handbook_documents(id) ON DELETE CASCADE,
-      employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
-      acknowledged_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE(handbook_id, employee_id)
-    );
-
-    CREATE TABLE IF NOT EXISTS training_courses (
-      id SERIAL PRIMARY KEY,
-      title TEXT NOT NULL,
-      category TEXT NOT NULL DEFAULT 'General',
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-
-    CREATE TABLE IF NOT EXISTS training_lessons (
-      id SERIAL PRIMARY KEY,
-      course_id INTEGER REFERENCES training_courses(id) ON DELETE CASCADE,
-      title TEXT NOT NULL,
-      sort_order INTEGER NOT NULL DEFAULT 0
-    );
-
-    CREATE TABLE IF NOT EXISTS employee_training_assignments (
-      id SERIAL PRIMARY KEY,
-      course_id INTEGER REFERENCES training_courses(id) ON DELETE CASCADE,
-      employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
-      completed_at TIMESTAMPTZ,
-      assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE(course_id, employee_id)
-    );
-  `);
-}
-
-async function initCrmWebsiteSchema() {
-  await runStatements(`
-    CREATE TABLE IF NOT EXISTS crm_website_profiles (
-      id SERIAL PRIMARY KEY,
-      company_name TEXT NOT NULL DEFAULT '',
-      domain TEXT NOT NULL DEFAULT '',
-      website_url TEXT NOT NULL,
-      industry_guess TEXT NOT NULL DEFAULT '',
-      business_summary TEXT NOT NULL DEFAULT '',
-      service_summary TEXT NOT NULL DEFAULT '',
-      lead_score INTEGER NOT NULL DEFAULT 0,
-      seo_score INTEGER NOT NULL DEFAULT 0,
-      trust_score INTEGER NOT NULL DEFAULT 0,
-      conversion_score INTEGER NOT NULL DEFAULT 0,
-      crawl_status TEXT NOT NULL DEFAULT 'Not crawled',
-      last_crawled_at TIMESTAMPTZ,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-
-    CREATE TABLE IF NOT EXISTS crm_website_optimizer_access (
-      id SERIAL PRIMARY KEY,
-      website_profile_id INTEGER NOT NULL UNIQUE REFERENCES crm_website_profiles(id) ON DELETE CASCADE,
-      github_repo_connected BOOLEAN NOT NULL DEFAULT FALSE,
-      cms_connected BOOLEAN NOT NULL DEFAULT FALSE,
-      uploaded_site_files BOOLEAN NOT NULL DEFAULT FALSE,
-      domain_ownership_verified BOOLEAN NOT NULL DEFAULT FALSE,
-      verified_by_user_id INTEGER,
-      verified_at TIMESTAMPTZ,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-
-    CREATE TABLE IF NOT EXISTS crm_website_pages (
-      id SERIAL PRIMARY KEY,
-      website_profile_id INTEGER NOT NULL REFERENCES crm_website_profiles(id) ON DELETE CASCADE,
-      url TEXT NOT NULL,
-      page_type TEXT NOT NULL DEFAULT 'public',
-      title TEXT NOT NULL DEFAULT '',
-      meta_description TEXT NOT NULL DEFAULT '',
-      status_code INTEGER NOT NULL DEFAULT 0,
-      indexed_allowed BOOLEAN NOT NULL DEFAULT TRUE,
-      extracted_text_summary TEXT NOT NULL DEFAULT '',
-      detected_ctas TEXT[] NOT NULL DEFAULT '{}',
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-
-    CREATE TABLE IF NOT EXISTS crm_website_recommendations (
-      id SERIAL PRIMARY KEY,
-      website_profile_id INTEGER NOT NULL REFERENCES crm_website_profiles(id) ON DELETE CASCADE,
-      recommendation_type TEXT NOT NULL DEFAULT 'Recommendation',
-      title TEXT NOT NULL,
-      description TEXT NOT NULL DEFAULT '',
-      requires_source_access BOOLEAN NOT NULL DEFAULT FALSE,
-      execution_status TEXT NOT NULL DEFAULT 'Recommendation-only',
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-  `);
-}
-
-async function initCrmAccountsContactsSchema() {
-  await runStatements(`
-    CREATE TABLE IF NOT EXISTS crm_accounts (
-      id SERIAL PRIMARY KEY,
-      account_name TEXT NOT NULL,
-      account_type TEXT NOT NULL DEFAULT '',
-      domain TEXT NOT NULL DEFAULT '',
-      industry TEXT NOT NULL DEFAULT '',
-      description TEXT NOT NULL DEFAULT '',
-      employee_count TEXT NOT NULL DEFAULT '',
-      headquarters_location TEXT NOT NULL DEFAULT '',
-      sales_estimating_link TEXT NOT NULL DEFAULT '',
-      source_board_id TEXT NOT NULL DEFAULT '',
-      source_board_name TEXT NOT NULL DEFAULT '',
-      monday_item_id TEXT NOT NULL UNIQUE,
-      monday_group TEXT NOT NULL DEFAULT '',
-      raw_monday JSONB NOT NULL DEFAULT '{}'::jsonb,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-
-    CREATE TABLE IF NOT EXISTS crm_contacts (
-      id SERIAL PRIMARY KEY,
-      account_id INTEGER REFERENCES crm_accounts(id) ON DELETE SET NULL,
-      full_name TEXT NOT NULL,
-      first_name TEXT NOT NULL DEFAULT '',
-      last_name TEXT NOT NULL DEFAULT '',
-      contact_type TEXT NOT NULL DEFAULT '',
-      title TEXT NOT NULL DEFAULT '',
-      phone TEXT NOT NULL DEFAULT '',
-      email TEXT NOT NULL DEFAULT '',
-      linked_account_text TEXT NOT NULL DEFAULT '',
-      company_text TEXT NOT NULL DEFAULT '',
-      sales_estimating_link TEXT NOT NULL DEFAULT '',
-      source_board_id TEXT NOT NULL DEFAULT '',
-      source_board_name TEXT NOT NULL DEFAULT '',
-      monday_item_id TEXT NOT NULL UNIQUE,
-      monday_group TEXT NOT NULL DEFAULT '',
-      raw_monday JSONB NOT NULL DEFAULT '{}'::jsonb,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-
-    CREATE TABLE IF NOT EXISTS crm_contact_notes (
-      id SERIAL PRIMARY KEY,
-      contact_id INTEGER NOT NULL REFERENCES crm_contacts(id) ON DELETE CASCADE,
-      note_type TEXT NOT NULL DEFAULT 'note',
-      body TEXT NOT NULL DEFAULT '',
-      monday_update_id TEXT NOT NULL DEFAULT '',
-      author_name TEXT NOT NULL DEFAULT '',
-      source TEXT NOT NULL DEFAULT 'monday',
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-
-    CREATE TABLE IF NOT EXISTS crm_monday_sync_runs (
-      id SERIAL PRIMARY KEY,
-      sync_type TEXT NOT NULL DEFAULT 'crm',
-      status TEXT NOT NULL DEFAULT 'started',
-      accounts_imported INTEGER NOT NULL DEFAULT 0,
-      contacts_imported INTEGER NOT NULL DEFAULT 0,
-      contacts_matched INTEGER NOT NULL DEFAULT 0,
-      contacts_unmatched INTEGER NOT NULL DEFAULT 0,
-      error_message TEXT NOT NULL DEFAULT '',
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      finished_at TIMESTAMPTZ
-    );
-  `);
-}
-
-async function seedHrData() {
-  const employeeCount = await query('SELECT COUNT(*)::int AS count FROM employees');
-  if (employeeCount.rows[0].count === 0) {
-    await query(`
-      INSERT INTO employees (name, title, department, manager, employment_type, start_date, pto_balance, status) VALUES
-      ('Avery Taylor', 'Project Manager', 'Operations', 'Seth Farrell', 'Salary', '2024-01-08', 88, 'Active'),
-      ('Jordan Lee', 'Estimator', 'Sales & Estimating', 'Seth Farrell', 'Salary', '2023-08-21', 64, 'Active'),
-      ('Morgan Wells', 'Shop Lead', 'Fabrication', 'Seth Farrell', 'Salary', '2022-03-14', 112, 'Active')
-    `);
-  }
-
-  const handbookCount = await query('SELECT COUNT(*)::int AS count FROM handbook_documents');
-  if (handbookCount.rows[0].count === 0) {
-    await query(`INSERT INTO handbook_documents (title, version, effective_date, is_active) VALUES ('Steel Craft Employee Handbook', '2026.1', CURRENT_DATE, TRUE)`);
-  }
-
-  const trainingCount = await query('SELECT COUNT(*)::int AS count FROM training_courses');
-  if (trainingCount.rows[0].count === 0) {
-    const courses = [
-      ['Company Process', 'Process', ['Portal overview', 'Internal communication', 'Daily project flow']],
-      ['Safety', 'Safety', ['Jobsite basics', 'Shop safety', 'Incident reporting']],
-      ['Software', 'Software', ['Monday workflows', 'Portal records', 'File procedures']],
-      ['Estimating Workflow', 'Estimating', ['Estimate intake', 'Scope builder', 'Quote handoff']],
-    ];
-    const employees = await query('SELECT id FROM employees ORDER BY id');
-    for (const [title, category, lessons] of courses) {
-      const course = await query('INSERT INTO training_courses (title, category) VALUES ($1, $2) RETURNING id', [title, category]);
-      const courseId = course.rows[0].id;
-      for (let index = 0; index < lessons.length; index += 1) {
-        await query('INSERT INTO training_lessons (course_id, title, sort_order) VALUES ($1, $2, $3)', [courseId, lessons[index], index + 1]);
-      }
-      for (const employee of employees.rows) {
-        await query('INSERT INTO employee_training_assignments (course_id, employee_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [courseId, employee.id]);
-      }
-    }
-  }
-}
-
-async function seedCrmWebsiteData() {
-  const profileCount = await query('SELECT COUNT(*)::int AS count FROM crm_website_profiles');
-  if (profileCount.rows[0].count > 0) return;
-
-  const profile = await query(
-    `INSERT INTO crm_website_profiles (company_name, domain, website_url, industry_guess, business_summary, service_summary, lead_score, seo_score, trust_score, conversion_score, crawl_status, last_crawled_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW()) RETURNING id`,
-    [
-      'Prospect Company',
-      'example.com',
-      'https://example.com',
-      'Local services',
-      'Public website profile created for CRM lead intelligence.',
-      'Services, contact paths, public calls to action, metadata, schema, and trust signals are ready for review.',
-      78,
-      64,
-      72,
-      58,
-      'Public analysis ready',
-    ]
-  );
-  const profileId = profile.rows[0].id;
-
-  await query('INSERT INTO crm_website_optimizer_access (website_profile_id) VALUES ($1) ON CONFLICT DO NOTHING', [profileId]);
-  await query(
-    'INSERT INTO crm_website_pages (website_profile_id, url, page_type, title, meta_description, status_code, extracted_text_summary, detected_ctas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
-    [profileId, 'https://example.com', 'homepage', 'Example Domain', 'Public website analysis placeholder', 200, 'Homepage can be analyzed publicly without repo access.', ['Contact', 'Request quote']]
-  );
-
-  const recommendations = [
-    ['Conversion', 'Improve homepage headline and primary call to action.', 'Visible as a recommendation without source access. Requires source access before execution.', true],
-    ['SEO', 'Add service-area pages for target markets.', 'Recommendation can be generated from public data. Page creation requires CMS/repo/files access.', true],
-    ['Schema', 'Add organization, local business, and service schema where appropriate.', 'Schema can be recommended publicly. Source changes require verified access.', true],
-    ['Trust', 'Strengthen contact path with phone, quote request, and form visibility.', 'Can be discussed in outreach before source access is granted.', false],
-  ];
-
-  for (const [type, title, description, requiresAccess] of recommendations) {
-    await query(
-      'INSERT INTO crm_website_recommendations (website_profile_id, recommendation_type, title, description, requires_source_access) VALUES ($1,$2,$3,$4,$5)',
-      [profileId, type, title, description, requiresAccess]
-    );
-  }
-}
-
-async function hrPayload() {
-  const employees = rows(await query('SELECT * FROM employees ORDER BY id'));
-  const ptoRequests = rows(await query('SELECT * FROM pto_requests ORDER BY created_at DESC, id DESC'));
-  const supportRequests = rows(await query('SELECT * FROM hr_support_requests ORDER BY created_at DESC, id DESC'));
-  const handbookRow = toCamel((await query('SELECT * FROM handbook_documents WHERE is_active = TRUE ORDER BY created_at DESC LIMIT 1')).rows[0]);
-  const acknowledged = handbookRow ? rows(await query('SELECT employee_id FROM handbook_acknowledgements WHERE handbook_id = $1', [handbookRow.id])).map((row) => row.employeeId) : [];
-  const courseRows = rows(await query('SELECT * FROM training_courses ORDER BY id'));
-  const lessonRows = rows(await query('SELECT * FROM training_lessons ORDER BY sort_order, id'));
-  const assignmentRows = rows(await query('SELECT * FROM employee_training_assignments ORDER BY id'));
-  const training = courseRows.map((course) => ({
-    ...course,
-    lessons: lessonRows.filter((lesson) => lesson.courseId === course.id).map((lesson) => lesson.title),
-    assignedTo: assignmentRows.filter((assignment) => assignment.courseId === course.id).map((assignment) => assignment.employeeId),
-    completedBy: assignmentRows.filter((assignment) => assignment.courseId === course.id && assignment.completedAt).map((assignment) => assignment.employeeId),
-  }));
-  return { employees, ptoRequests, supportRequests, handbook: handbookRow ? { ...handbookRow, acknowledgedBy: acknowledged } : null, training };
-}
-
-async function crmWebsitePayload() {
-  await initCrmWebsiteSchema();
-  await seedCrmWebsiteData();
-
-  const profiles = rows(await query('SELECT * FROM crm_website_profiles ORDER BY updated_at DESC, id DESC'));
-  const accessRows = rows(await query('SELECT * FROM crm_website_optimizer_access ORDER BY id'));
-  const pageRows = rows(await query('SELECT * FROM crm_website_pages ORDER BY id'));
-  const recommendationRows = rows(await query('SELECT * FROM crm_website_recommendations ORDER BY id'));
-
-  return profiles.map((profile) => {
-    const sourceAccess = accessRows.find((access) => access.websiteProfileId === profile.id) || {};
-    return {
-      ...profile,
-      sourceAccess,
-      canAnalyzeWebsite: true,
-      canRecommendOptimizations: true,
-      canExecuteOptimizations: canExecuteWebsiteOptimizations(sourceAccess),
-      pages: pageRows.filter((page) => page.websiteProfileId === profile.id),
-      recommendations: recommendationRows.filter((recommendation) => recommendation.websiteProfileId === profile.id),
-    };
-  });
-}
-
-async function crmWebsiteProfileWithAccess(profileId) {
-  const profile = toCamel((await query('SELECT * FROM crm_website_profiles WHERE id = $1', [profileId])).rows[0]);
-  if (!profile) return null;
-  const sourceAccess = toCamel((await query('SELECT * FROM crm_website_optimizer_access WHERE website_profile_id = $1', [profileId])).rows[0]) || {};
-  return { ...profile, sourceAccess, canExecuteOptimizations: canExecuteWebsiteOptimizations(sourceAccess) };
-}
-
-async function upsertMondayAccount(board, item) {
-  const map = mondayColumnMap(item);
-  const accountName = cleanText(item.name);
-  const result = await query(
-    `INSERT INTO crm_accounts (account_name, account_type, domain, industry, description, employee_count, headquarters_location, sales_estimating_link, source_board_id, source_board_name, monday_item_id, monday_group, raw_monday, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW())
-     ON CONFLICT (monday_item_id) DO UPDATE SET
-       account_name = EXCLUDED.account_name,
-       account_type = EXCLUDED.account_type,
-       domain = EXCLUDED.domain,
-       industry = EXCLUDED.industry,
-       description = EXCLUDED.description,
-       employee_count = EXCLUDED.employee_count,
-       headquarters_location = EXCLUDED.headquarters_location,
-       sales_estimating_link = EXCLUDED.sales_estimating_link,
-       source_board_id = EXCLUDED.source_board_id,
-       source_board_name = EXCLUDED.source_board_name,
-       monday_group = EXCLUDED.monday_group,
-       raw_monday = EXCLUDED.raw_monday,
-       updated_at = NOW()
-     RETURNING *`,
-    [
-      accountName,
-      col(map, 'Account Type'),
-      col(map, 'Domain'),
-      col(map, 'Industry'),
-      col(map, 'Description'),
-      col(map, 'No. of employees'),
-      col(map, 'Headquarters location'),
-      col(map, '*Sales & Estimating', 'Sales & Estimating'),
-      board.id,
-      board.name,
-      String(item.id),
-      item.group?.title || '',
-      JSON.stringify(item),
-    ]
-  );
-  return toCamel(result.rows[0]);
-}
-
-async function upsertMondayContact(board, item, accountsByName) {
-  const map = mondayColumnMap(item);
-  const fullName = cleanText(item.name);
-  const linkedAccountText = col(map, 'Linked Account (Company)', 'Linked Account', 'Account', 'Company');
-  const companyText = col(map, '*Company', 'Company');
-  const matchKey = normalizeName(linkedAccountText || companyText);
-  const account = accountsByName.get(matchKey) || null;
-
-  const result = await query(
-    `INSERT INTO crm_contacts (account_id, full_name, first_name, last_name, contact_type, title, phone, email, linked_account_text, company_text, sales_estimating_link, source_board_id, source_board_name, monday_item_id, monday_group, raw_monday, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,NOW())
-     ON CONFLICT (monday_item_id) DO UPDATE SET
-       account_id = EXCLUDED.account_id,
-       full_name = EXCLUDED.full_name,
-       first_name = EXCLUDED.first_name,
-       last_name = EXCLUDED.last_name,
-       contact_type = EXCLUDED.contact_type,
-       title = EXCLUDED.title,
-       phone = EXCLUDED.phone,
-       email = EXCLUDED.email,
-       linked_account_text = EXCLUDED.linked_account_text,
-       company_text = EXCLUDED.company_text,
-       sales_estimating_link = EXCLUDED.sales_estimating_link,
-       source_board_id = EXCLUDED.source_board_id,
-       source_board_name = EXCLUDED.source_board_name,
-       monday_group = EXCLUDED.monday_group,
-       raw_monday = EXCLUDED.raw_monday,
-       updated_at = NOW()
-     RETURNING *`,
-    [
-      account?.id || null,
-      fullName,
-      col(map, 'First Name'),
-      col(map, 'Last Name'),
-      col(map, 'Type'),
-      col(map, 'Title'),
-      col(map, 'Phone'),
-      col(map, 'Email'),
-      linkedAccountText,
-      companyText,
-      col(map, '*Sales & Estimating', 'Sales & Estimating'),
-      board.id,
-      board.name,
-      String(item.id),
-      item.group?.title || '',
-      JSON.stringify(item),
-    ]
-  );
-
-  const contact = toCamel(result.rows[0]);
-  await query('DELETE FROM crm_contact_notes WHERE contact_id = $1 AND source = $2', [contact.id, 'monday']);
-
-  const comments = col(map, 'Comments', 'Notes');
-  if (comments) {
-    await query('INSERT INTO crm_contact_notes (contact_id, note_type, body, source) VALUES ($1,$2,$3,$4)', [contact.id, 'comments_column', comments, 'monday']);
-  }
-
-  for (const update of item.updates || []) {
-    const body = cleanText(update.body).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-    if (body) {
-      await query(
-        'INSERT INTO crm_contact_notes (contact_id, note_type, body, monday_update_id, author_name, source, created_at) VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7::timestamptz,NOW()))',
-        [contact.id, 'monday_update', body, String(update.id || ''), update.creator?.name || '', 'monday', update.created_at || null]
-      );
-    }
-  }
-
-  for (const subitem of item.subitems || []) {
-    const subMap = mondayColumnMap(subitem);
-    const detail = Object.entries(subMap)
-      .filter(([key, value]) => key === key.toLowerCase() && value)
-      .map(([key, value]) => `${key}: ${value}`)
-      .join('; ');
-    const body = [subitem.name, detail].filter(Boolean).join(' - ');
-    if (body) {
-      await query('INSERT INTO crm_contact_notes (contact_id, note_type, body, monday_update_id, source) VALUES ($1,$2,$3,$4,$5)', [contact.id, 'subitem', body, String(subitem.id || ''), 'monday']);
-    }
-  }
-
-  return { contact, matched: Boolean(account) };
-}
-
-async function syncMondayCrm() {
-  await initCrmAccountsContactsSchema();
-  const run = await query('INSERT INTO crm_monday_sync_runs (sync_type, status) VALUES ($1,$2) RETURNING id', ['crm_accounts_contacts', 'started']);
-  const runId = run.rows[0].id;
-
-  try {
-    const accountsBoard = await fetchMondayBoard(mondayAccountsBoardId);
-    const contactsBoard = await fetchMondayBoard(mondayContactsBoardId);
-    if (!accountsBoard) throw new Error(`Accounts board not found: ${mondayAccountsBoardId}`);
-    if (!contactsBoard) throw new Error(`Contacts board not found: ${mondayContactsBoardId}`);
-
-    const accounts = [];
-    for (const item of accountsBoard.items_page?.items || []) {
-      accounts.push(await upsertMondayAccount(accountsBoard, item));
-    }
-
-    const accountRows = rows(await query('SELECT * FROM crm_accounts ORDER BY account_name'));
-    const accountsByName = new Map(accountRows.map((account) => [normalizeName(account.accountName), account]));
-
-    let contactsImported = 0;
-    let contactsMatched = 0;
-    let contactsUnmatched = 0;
-    for (const item of contactsBoard.items_page?.items || []) {
-      const result = await upsertMondayContact(contactsBoard, item, accountsByName);
-      contactsImported += 1;
-      if (result.matched) contactsMatched += 1;
-      else contactsUnmatched += 1;
-    }
-
-    await query(
-      'UPDATE crm_monday_sync_runs SET status=$1, accounts_imported=$2, contacts_imported=$3, contacts_matched=$4, contacts_unmatched=$5, finished_at=NOW() WHERE id=$6',
-      ['finished', accounts.length, contactsImported, contactsMatched, contactsUnmatched, runId]
-    );
-
-    return {
-      ok: true,
-      runId,
-      boards: { accounts: { id: accountsBoard.id, name: accountsBoard.name }, contacts: { id: contactsBoard.id, name: contactsBoard.name } },
-      accountsImported: accounts.length,
-      contactsImported,
-      contactsMatched,
-      contactsUnmatched,
-    };
-  } catch (error) {
-    await query('UPDATE crm_monday_sync_runs SET status=$1, error_message=$2, finished_at=NOW() WHERE id=$3', ['failed', error.message, runId]);
-    throw error;
-  }
-}
-
-app.get('/api/health', async (_req, res) => {
-  try {
-    await query('SELECT 1');
-    res.json({ ok: true, checks: { app: 'ok', database: 'connected', monday: mondayToken() ? 'configured' : 'not_configured' } });
-  } catch (error) {
-    res.status(500).json({ ok: false, checks: { app: 'ok', database: 'error', monday: mondayToken() ? 'configured' : 'not_configured' }, error: error.message });
-  }
-});
-
-app.post('/api/setup/schema', async (_req, res) => {
-  try {
-    await initHrSchema();
-    await initCrmWebsiteSchema();
-    await initCrmAccountsContactsSchema();
-    await seedHrData();
-    await seedCrmWebsiteData();
-    res.json({ ok: true, message: 'HR, CRM Website Intelligence, and CRM Accounts/Contacts schemas initialized and seeded' });
-  } catch (error) {
-    res.status(500).json({ ok: false, error: error.message });
-  }
-});
-
-app.get('/api/monday/status', (_req, res) => {
-  res.json({
-    ok: true,
-    configured: Boolean(mondayToken()),
-    boards: {
-      crm: mondayCrmBoardId,
-      accounts: mondayAccountsBoardId,
-      contacts: mondayContactsBoardId,
-    },
-  });
-});
-
-app.get('/api/monday/boards', async (req, res) => {
-  try {
-    const ids = String(req.query.ids || `${mondayCrmBoardId},${mondayAccountsBoardId},${mondayContactsBoardId}`).split(',').map((id) => id.trim()).filter(Boolean);
-    const data = await mondayGraphql(
-      `query Boards($boardIds: [ID!]) { boards(ids: $boardIds) { id name description state board_kind workspace { id name } groups { id title } columns { id title type } } }`,
-      { boardIds: ids }
-    );
-    res.json({ ok: true, boards: data.boards || [] });
-  } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
-});
-
-app.get('/api/monday/accounts', async (_req, res) => {
-  try { res.json({ ok: true, board: await fetchMondayBoard(mondayAccountsBoardId) }); } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
-});
-
-app.get('/api/monday/contacts', async (_req, res) => {
-  try { res.json({ ok: true, board: await fetchMondayBoard(mondayContactsBoardId) }); } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
-});
-
-app.post('/api/monday/sync-crm', async (_req, res) => {
-  try { res.json(await syncMondayCrm()); } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
-});
-
-app.get('/api/crm/accounts/schema/status', async (_req, res) => {
-  try {
-    await initCrmAccountsContactsSchema();
-    const result = await query(`
-      SELECT table_name FROM information_schema.tables
-      WHERE table_schema = 'public'
-      AND table_name IN ('crm_accounts','crm_contacts','crm_contact_notes','crm_monday_sync_runs')
-      ORDER BY table_name
-    `);
-    res.json({ ok: true, tables: result.rows.map((row) => row.table_name) });
-  } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
-});
-
-app.get('/api/crm/accounts', async (_req, res) => {
-  try { await initCrmAccountsContactsSchema(); res.json(rows(await query('SELECT * FROM crm_accounts ORDER BY account_name'))); } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
-});
-
-app.get('/api/crm/contacts', async (_req, res) => {
-  try {
-    await initCrmAccountsContactsSchema();
-    res.json(rows(await query(`
-      SELECT c.*, a.account_name, a.account_type
-      FROM crm_contacts c
-      LEFT JOIN crm_accounts a ON a.id = c.account_id
-      ORDER BY c.full_name
-    `)));
-  } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
-});
-
-app.get('/api/crm/accounts/:id/contacts', async (req, res) => {
-  try {
-    await initCrmAccountsContactsSchema();
-    res.json(rows(await query('SELECT * FROM crm_contacts WHERE account_id = $1 ORDER BY full_name', [req.params.id])));
-  } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
-});
-
-app.get('/api/crm/contacts/:id/notes', async (req, res) => {
-  try {
-    await initCrmAccountsContactsSchema();
-    res.json(rows(await query('SELECT * FROM crm_contact_notes WHERE contact_id = $1 ORDER BY created_at DESC, id DESC', [req.params.id])));
-  } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
-});
-
-app.get('/api/crm/monday-sync-runs', async (_req, res) => {
-  try { await initCrmAccountsContactsSchema(); res.json(rows(await query('SELECT * FROM crm_monday_sync_runs ORDER BY created_at DESC, id DESC LIMIT 25'))); } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
-});
-
-app.get('/api/hr/schema/status', async (_req, res) => {
-  try {
-    const result = await query(`
-      SELECT table_name FROM information_schema.tables
-      WHERE table_schema = 'public'
-      AND table_name IN ('employees','pto_requests','hr_support_requests','handbook_documents','handbook_acknowledgements','training_courses','training_lessons','employee_training_assignments')
-      ORDER BY table_name
-    `);
-    res.json({ ok: true, tables: result.rows.map((row) => row.table_name) });
-  } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
-});
-
-app.get('/api/crm/website-intelligence/schema/status', async (_req, res) => {
-  try {
-    const result = await query(`
-      SELECT table_name FROM information_schema.tables
-      WHERE table_schema = 'public'
-      AND table_name IN ('crm_website_profiles','crm_website_optimizer_access','crm_website_pages','crm_website_recommendations')
-      ORDER BY table_name
-    `);
-    res.json({ ok: true, tables: result.rows.map((row) => row.table_name) });
-  } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
-});
-
-app.get('/api/hr', async (_req, res) => {
-  try { await initHrSchema(); await seedHrData(); res.json(await hrPayload()); } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
-});
-
-app.get('/api/hr/employees', async (_req, res) => {
-  try { res.json(rows(await query('SELECT * FROM employees ORDER BY id'))); } catch (error) { res.status(500).json({ error: error.message }); }
-});
-
-app.post('/api/hr/employees', async (req, res) => {
-  try {
-    const { name, title = '', department = '', manager = '', startDate, ptoBalance = 0, status = 'Active' } = req.body;
-    const result = await query(
-      'INSERT INTO employees (name, title, department, manager, employment_type, start_date, pto_balance, status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',
-      [name, title, department, manager, 'Salary', startDate || new Date().toISOString().slice(0, 10), ptoBalance, status]
-    );
-    res.status(201).json(toCamel(result.rows[0]));
-  } catch (error) { res.status(500).json({ error: error.message }); }
-});
-
-app.post('/api/hr/pto/requests', async (req, res) => {
-  try {
-    const { employeeId, type, startDate, endDate, hours, reason } = req.body;
-    const result = await query(
-      'INSERT INTO pto_requests (employee_id, type, start_date, end_date, hours, reason, status) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',
-      [employeeId, type, startDate, endDate, hours, reason || '', 'Pending']
-    );
-    res.status(201).json(toCamel(result.rows[0]));
-  } catch (error) { res.status(500).json({ error: error.message }); }
-});
-
-app.post('/api/hr/pto/requests/:id/approve', async (req, res) => {
-  try {
-    const result = await query('UPDATE pto_requests SET status = $1, admin_note = COALESCE($2, admin_note), updated_at = NOW() WHERE id = $3 RETURNING *', ['Approved', req.body?.adminNote || '', req.params.id]);
-    res.json(toCamel(result.rows[0]));
-  } catch (error) { res.status(500).json({ error: error.message }); }
-});
-
-app.post('/api/hr/pto/requests/:id/deny', async (req, res) => {
-  try {
-    const result = await query('UPDATE pto_requests SET status = $1, admin_note = COALESCE($2, admin_note), updated_at = NOW() WHERE id = $3 RETURNING *', ['Denied', req.body?.adminNote || '', req.params.id]);
-    res.json(toCamel(result.rows[0]));
-  } catch (error) { res.status(500).json({ error: error.message }); }
-});
-
-app.post('/api/hr/concerns', async (req, res) => {
-  try {
-    const { employeeId, category, summary } = req.body;
-    const result = await query('INSERT INTO hr_support_requests (employee_id, category, summary, status, assigned_to) VALUES ($1,$2,$3,$4,$5) RETURNING *', [employeeId, category, summary, 'Open', 'HR Admin']);
-    res.status(201).json(toCamel(result.rows[0]));
-  } catch (error) { res.status(500).json({ error: error.message }); }
-});
-
-app.patch('/api/hr/concerns/:id', async (req, res) => {
-  try {
-    const { status = 'Resolved', resolution = 'Resolved by HR Admin' } = req.body;
-    const result = await query('UPDATE hr_support_requests SET status = $1, resolution = $2, updated_at = NOW() WHERE id = $3 RETURNING *', [status, resolution, req.params.id]);
-    res.json(toCamel(result.rows[0]));
-  } catch (error) { res.status(500).json({ error: error.message }); }
-});
-
-app.get('/api/hr/handbook', async (_req, res) => {
-  try { const payload = await hrPayload(); res.json(payload.handbook); } catch (error) { res.status(500).json({ error: error.message }); }
-});
-
-app.post('/api/hr/handbook/acknowledge', async (req, res) => {
-  try {
-    const handbook = await query('SELECT id FROM handbook_documents WHERE is_active = TRUE ORDER BY created_at DESC LIMIT 1');
-    const handbookId = handbook.rows[0].id;
-    await query('INSERT INTO handbook_acknowledgements (handbook_id, employee_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [handbookId, req.body.employeeId]);
-    res.status(201).json({ ok: true });
-  } catch (error) { res.status(500).json({ error: error.message }); }
-});
-
-app.post('/api/hr/training/modules', async (req, res) => {
-  try {
-    const { title, category, lessons = [] } = req.body;
-    const course = await query('INSERT INTO training_courses (title, category) VALUES ($1, $2) RETURNING *', [title, category]);
-    const courseId = course.rows[0].id;
-    for (let index = 0; index < lessons.length; index += 1) {
-      await query('INSERT INTO training_lessons (course_id, title, sort_order) VALUES ($1,$2,$3)', [courseId, lessons[index], index + 1]);
-    }
-    const employees = await query('SELECT id FROM employees');
-    for (const employee of employees.rows) {
-      await query('INSERT INTO employee_training_assignments (course_id, employee_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [courseId, employee.id]);
-    }
-    res.status(201).json(toCamel(course.rows[0]));
-  } catch (error) { res.status(500).json({ error: error.message }); }
-});
-
-app.patch('/api/hr/training/assignments/:courseId/complete', async (req, res) => {
-  try { await query('UPDATE employee_training_assignments SET completed_at = NOW() WHERE course_id = $1 AND employee_id = $2', [req.params.courseId, req.body.employeeId]); res.json({ ok: true }); } catch (error) { res.status(500).json({ error: error.message }); }
-});
-
-app.get('/api/crm/website-intelligence', async (_req, res) => {
-  try { res.json(await crmWebsitePayload()); } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
-});
-
-app.post('/api/crm/website-intelligence/crawl', async (req, res) => {
-  try {
-    await initCrmWebsiteSchema();
-    const { companyName = 'New prospect', websiteUrl } = req.body;
-    if (!websiteUrl) return res.status(400).json({ ok: false, error: 'websiteUrl is required' });
-    const domain = String(websiteUrl).replace(/^https?:\/\//, '').replace(/\/.*$/, '').toLowerCase();
-    const profile = await query(
-      `INSERT INTO crm_website_profiles (company_name, domain, website_url, industry_guess, business_summary, service_summary, lead_score, seo_score, trust_score, conversion_score, crawl_status, last_crawled_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW()) RETURNING *`,
-      [companyName, domain, websiteUrl, 'Pending AI classification', 'Public website crawl queued for CRM lead intelligence.', 'Public services and CTA analysis pending.', 0, 0, 0, 0, 'Public crawl queued']
-    );
-    const profileId = profile.rows[0].id;
-    await query('INSERT INTO crm_website_optimizer_access (website_profile_id) VALUES ($1) ON CONFLICT DO NOTHING', [profileId]);
-    await query('INSERT INTO crm_website_recommendations (website_profile_id, recommendation_type, title, description, requires_source_access) VALUES ($1,$2,$3,$4,$5)', [profileId, 'Access', 'Optimizer remains locked until source access is verified.', 'Public analysis and recommendations are allowed, but execution requires repo, CMS, uploaded files, or verified domain ownership.', true]);
-    res.status(201).json(await crmWebsiteProfileWithAccess(profileId));
-  } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
-});
-
-app.patch('/api/crm/website-intelligence/:id/access', async (req, res) => {
-  try {
-    await initCrmWebsiteSchema();
-    const profileId = req.params.id;
-    const { githubRepoConnected = false, cmsConnected = false, uploadedSiteFiles = false, domainOwnershipVerified = false, verifiedByUserId = null } = req.body;
-
-    const result = await query(
-      `INSERT INTO crm_website_optimizer_access (website_profile_id, github_repo_connected, cms_connected, uploaded_site_files, domain_ownership_verified, verified_by_user_id, verified_at)
-       VALUES ($1,$2,$3,$4,$5,$6, CASE WHEN ($2 OR $3 OR $4 OR $5) THEN NOW() ELSE NULL END)
-       ON CONFLICT (website_profile_id) DO UPDATE SET
-         github_repo_connected = EXCLUDED.github_repo_connected,
-         cms_connected = EXCLUDED.cms_connected,
-         uploaded_site_files = EXCLUDED.uploaded_site_files,
-         domain_ownership_verified = EXCLUDED.domain_ownership_verified,
-         verified_by_user_id = EXCLUDED.verified_by_user_id,
-         verified_at = EXCLUDED.verified_at,
-         updated_at = NOW()
-       RETURNING *`,
-      [profileId, githubRepoConnected, cmsConnected, uploadedSiteFiles, domainOwnershipVerified, verifiedByUserId]
-    );
-
-    const access = toCamel(result.rows[0]);
-    res.json({ ok: true, sourceAccess: access, canExecuteOptimizations: canExecuteWebsiteOptimizations(access) });
-  } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
-});
-
-app.post('/api/crm/website-intelligence/:id/optimizer/execute', async (req, res) => {
-  try {
-    await initCrmWebsiteSchema();
-    const profile = await crmWebsiteProfileWithAccess(req.params.id);
-    if (!profile) return res.status(404).json({ ok: false, error: 'Website profile not found' });
-    if (!profile.canExecuteOptimizations) {
-      return res.status(403).json({
-        ok: false,
-        error: 'Optimizer locked: verified source access is required before execution.',
-        allowedWithoutAccess: ['crawl public pages', 'score website', 'generate recommendations', 'generate outreach'],
-        requiredAccess: ['connected GitHub repo', 'connected CMS', 'uploaded site files', 'verified domain ownership'],
-      });
-    }
-
-    const { title = 'Optimizer execution task', description = 'Execution approved by verified source access.' } = req.body;
-    const task = await query(
-      'INSERT INTO crm_website_recommendations (website_profile_id, recommendation_type, title, description, requires_source_access, execution_status) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
-      [profile.id, 'Execution', title, description, true, 'Ready for approval']
-    );
-    res.status(201).json({ ok: true, task: toCamel(task.rows[0]) });
-  } catch (error) { res.status(500).json({ ok: false, error: error.message }); }
-});
-
-app.use(express.static(path.join(__dirname, 'dist')));
-app.get('*', (_req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
-});
-
-app.listen(port, () => {
-  console.log(`Steel Craft portal listening on ${port}`);
-});
+async function ensureTenantColumns(db) { await db.query(`alter table if exists monday_boards add column if not exists tenant_key text not null default 'steelcraft'; alter table if exists monday_columns add column if not exists tenant_key text not null default 'steelcraft'; alter table if exists monday_items add column if not exists tenant_key text not null default 'steelcraft'; alter table if exists steelcraft_workflow_sources add column if not exists tenant_key text not null default 'steelcraft'; alter table if exists quote_workbooks add column if not exists tenant_key text not null default 'steelcraft'; alter table if exists quote_templates add column if not exists tenant_key text not null default 'steelcraft';`); }
+async function ensureSchema() { const db = requireDatabase(); await db.query(`create table if not exists monday_boards (id text primary key, name text not null, workspace_name text, board_kind text, state text, raw jsonb not null, pulled_at timestamptz not null default now()); create table if not exists monday_columns (id text not null, board_id text not null references monday_boards(id) on delete cascade, title text not null, type text, settings jsonb, raw jsonb not null, pulled_at timestamptz not null default now(), primary key (board_id, id)); create table if not exists monday_items (id text primary key, board_id text not null references monday_boards(id) on delete cascade, name text not null, group_title text, raw jsonb not null, pulled_at timestamptz not null default now()); create table if not exists steelcraft_workflow_sources (id bigserial primary key, source text not null default 'monday_api', source_board_id text, internal_name text not null, classification text, destination jsonb not null default '{}'::jsonb, field_map jsonb not null default '[]'::jsonb, workflow_map jsonb not null default '{}'::jsonb, verification_checklist jsonb not null default '[]'::jsonb, raw jsonb not null default '{}'::jsonb, pulled_at timestamptz not null default now(), unique (source, source_board_id)); create table if not exists companies (id bigserial primary key, source text default 'manual', source_id text, name text not null, company_type text, email text, phone text, raw jsonb, created_at timestamptz not null default now(), updated_at timestamptz not null default now(), unique (source, source_id)); create table if not exists projects (id bigserial primary key, source text default 'manual', source_id text, name text not null, status text, company_id bigint references companies(id), raw jsonb, created_at timestamptz not null default now(), updated_at timestamptz not null default now(), unique (source, source_id)); create table if not exists portal_activity_logs (id bigserial primary key, actor text, action text not null, entity_type text, entity_id text, metadata jsonb, created_at timestamptz not null default now());`); await ensureProfileSchema(db); await ensureAuthSchema(db); await seedAuthUsers(db); await ensureEstimatingSchema(db); await ensureQuoteWorkbookSchema(db); await ensureQuoteTemplateSchema(db); await ensureTenantColumns(db); await ensureImportProfileSchema(db, steelcraftProfileKey); await ensureAccountingSchema(db); await ensureHrSchema(db); await ensureNeroaConnectSchema(db); }
+async function ensureAuthOnly() { const db = requireDatabase(); await ensureAuthSchema(db); await seedAuthUsers(db); }
+async function pullMondayBoards(profileKey) { return mondayQuery(profileKey, `query TenantBoards { boards(limit: 100) { id name board_kind state workspace { id name } columns { id title type settings_str } } }`); }
+async function syncMondayBoards(profileKey = steelcraftProfileKey) { await ensureSchema(); const data = await pullMondayBoards(profileKey); for (const board of data.boards) { const sourceId = `${normalizeKey(profileKey)}:${board.id}`; await pool.query(`insert into monday_boards (tenant_key, id, name, workspace_name, board_kind, state, raw, pulled_at) values ($1, $2, $3, $4, $5, $6, $7, now()) on conflict (id) do update set tenant_key = excluded.tenant_key, name = excluded.name, workspace_name = excluded.workspace_name, board_kind = excluded.board_kind, state = excluded.state, raw = excluded.raw, pulled_at = now()`, [profileKey, sourceId, board.name, board.workspace?.name || null, board.board_kind, board.state, board]); await upsertMondaySourceMapping(pool, profileKey, board); for (const column of board.columns || []) await pool.query(`insert into monday_columns (tenant_key, id, board_id, title, type, settings, raw, pulled_at) values ($1, $2, $3, $4, $5, $6, $7, now()) on conflict (board_id, id) do update set tenant_key = excluded.tenant_key, title = excluded.title, type = excluded.type, settings = excluded.settings, raw = excluded.raw, pulled_at = now()`, [profileKey, column.id, sourceId, column.title, column.type, safeJson(column.settings_str), column]); } await pool.query(`insert into portal_activity_logs (actor, action, entity_type, metadata) values ($1, $2, $3, $4)`, ['system', 'monday_boards_synced', 'monday', { tenantKey: profileKey, board_count: data.boards.length }]); return data.boards; }
+async function auditSteelCraftWorkflow({ save = false, profileKey = steelcraftProfileKey } = {}) { await ensureSchema(); const data = await pullMondayBoards(profileKey); const mapped = profileKey === steelcraftProfileKey ? mapMondayBoardsToSteelCraftWorkflow(data.boards) : { tenantKey: profileKey, mappedWorkflowCount: 0, workflows: [], note: 'Generic Monday profile captured. Map boards to rooms in tenant_monday_source_mappings.' }; if (save && profileKey === steelcraftProfileKey) { for (const flow of mapped.workflows) await pool.query(`insert into steelcraft_workflow_sources (tenant_key, source, source_board_id, internal_name, classification, destination, field_map, workflow_map, verification_checklist, raw, pulled_at) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now()) on conflict (source, source_board_id) do update set tenant_key = excluded.tenant_key, internal_name = excluded.internal_name, classification = excluded.classification, destination = excluded.destination, field_map = excluded.field_map, workflow_map = excluded.workflow_map, verification_checklist = excluded.verification_checklist, raw = excluded.raw, pulled_at = now()`, [profileKey, 'monday_api', flow.sourceBoardId, flow.internalName, flow.classification, flow.destination, flow.fieldMap, flow.workflow, flow.verificationChecklist, flow]); await pool.query(`insert into portal_activity_logs (actor, action, entity_type, metadata) values ($1,$2,$3,$4)`, ['system', 'steelcraft_workflow_audit_saved', 'workflow_source', { tenantKey: profileKey, mappedWorkflowCount: mapped.mappedWorkflowCount }]); } return { ...mapped, tenantKey: profileKey }; }
+async function importProfileWorkbook(req, res, next) { try { await ensureSchema(); const profileKey = tenantKey(req); const mappingKey = req.body?.mappingKey || req.body?.mapping_key || (profileKey === steelcraftProfileKey ? STEELCRAFT_WORKBOOK_MAPPING_KEY : GENERIC_WORKBOOK_MAPPING_KEY); const db = requireDatabase(); if (mappingKey === STEELCRAFT_WORKBOOK_MAPPING_KEY) { const result = await importQuoteWorkbook(db, req.file, req.body.actor || 'estimating'); if (result.workbook?.id) await db.query('update quote_workbooks set tenant_key = $1, updated_at = now() where id = $2', [profileKey, result.workbook.id]); return res.json({ ok: true, tenantKey: profileKey, mappingKey, ...result }); } const result = await profileWorkbookUpload(db, { tenantKey: profileKey, file: req.file, actor: req.body.actor || 'import', mappingKey }); res.json({ ok: true, tenantKey: profileKey, mappingKey, ...result }); } catch (error) { next(error); } }
+async function listTenantWorkbooks(req, res, next) { try { await ensureSchema(); const profileKey = tenantKey(req); const workbooks = await requireDatabase().query(`select qw.id, qw.tenant_key, qw.original_filename, qw.file_size, qw.sheet_count, qw.detected_total, qw.status, qw.estimate_id, qw.created_at, e.project_name, qv.id as quotation_id, qv.total as quote_total from quote_workbooks qw left join estimates e on e.id = qw.estimate_id left join quotation_versions qv on qv.estimate_id = e.id where qw.tenant_key = $1 order by qw.created_at desc limit 20`, [profileKey]); const profileUploads = await listProfileWorkbookUploads(requireDatabase(), profileKey); res.json({ ok: true, tenantKey: profileKey, workbooks: workbooks.rows, profileUploads }); } catch (error) { next(error); } }
+
+app.get('/api/build', (req, res) => { res.json({ ok: true, commit: 'auth-login-hotfix', authorityQuestion: 'Do you currently already have a BUSV number?', vaultBacked: true }); });
+app.get('/api/health', async (req, res) => { const checks = { app: 'ok', database: 'not_configured', monday: process.env.MONDAY_API_TOKEN ? 'steelcraft_configured' : 'tenant_specific', spaces: process.env.DO_SPACES_BUCKET ? 'configured' : 'not_configured', auth: 'not_checked', neroaConnect: 'not_checked' }; try { if (pool) { await pool.query('select 1 as ok'); checks.database = 'connected'; checks.auth = 'database_backed'; checks.neroaConnect = 'schema_ready'; } } catch (error) { checks.database = `error: ${error.message}`; checks.auth = 'error'; checks.neroaConnect = 'error'; } res.json({ ok: checks.database === 'connected', checks, steelcraftProfileKey }); });
+app.post('/api/setup/schema', async (req, res, next) => { try { await ensureSchema(); await pool.query(`insert into portal_activity_logs (actor, action, entity_type, metadata) values ($1, $2, $3, $4)`, ['system', 'schema_initialized', 'database', { tenantProfiles: true, importMappings: true, businessAuthority: true, vaultMemoryRefs: true, estimating: true, quoteWorkbooks: true, quoteTemplates: true, accounting: true, hr: true, auth: true, steelcraftWorkflow: true, neroaConnect: true }]); res.json({ ok: true, message: 'ERP schema initialized with BUSV business authority onboarding and Vault-backed activity refs.' }); } catch (error) { next(error); } });
+registerErpAuthorityOnboardingRoutes(app, requireDatabase, ensureSchema);
+
+app.post('/api/auth/login', async (req, res, next) => { try { await ensureAuthOnly(); const user = await authenticateUser(requireDatabase(), req.body?.email, req.body?.password); if (!user) return res.status(401).json({ ok: false, error: 'Invalid email or password.' }); res.json({ ok: true, user }); } catch (error) { next(error); } });
+app.post('/api/auth/forgot-password', async (req, res, next) => { try { await ensureAuthOnly(); const result = await requestPasswordReset(requireDatabase(), req.body?.email, req.ip); if (result.sent) await pool.query(`insert into portal_activity_logs (actor, action, entity_type, metadata) values ($1,$2,$3,$4)`, ['system', 'password_reset_requested', 'erp_user', { email: req.body?.email, emailProvider: 'neroa_mail_pending' }]); res.json({ ok: true, message: 'If that email exists, a password reset link has been prepared. Email delivery will run through Neroa Mail when that service is connected.' }); } catch (error) { next(error); } });
+app.post('/api/auth/reset-password', async (req, res, next) => { try { await ensureAuthOnly(); const user = await resetPasswordWithToken(requireDatabase(), req.body?.token, req.body?.password); if (!user) return res.status(400).json({ ok: false, error: 'Reset link is invalid, expired, or password is too short.' }); await pool.query(`insert into portal_activity_logs (actor, action, entity_type, entity_id, metadata) values ($1,$2,$3,$4,$5)`, [user.email, 'password_reset_completed', 'erp_user', String(user.id), { email: user.email }]); res.json({ ok: true, user }); } catch (error) { next(error); } });
+app.get('/api/auth/users', async (req, res, next) => { try { await ensureAuthOnly(); const users = await listAuthUsers(requireDatabase()); res.json({ ok: true, users }); } catch (error) { next(error); } });
+app.patch('/api/auth/users/:id/language', async (req, res, next) => { try { await ensureAuthOnly(); const user = await updateUserLanguage(requireDatabase(), req.params.id, req.body?.language || 'en'); if (!user) return res.status(404).json({ ok: false, error: 'User not found.' }); res.json({ ok: true, user }); } catch (error) { next(error); } });
+
+app.get('/api/profiles', async (req, res, next) => { try { await ensureSchema(); const profiles = await requireDatabase().query('select * from tenant_profiles order by lower(display_name)'); res.json({ ok: true, profiles: profiles.rows }); } catch (error) { next(error); } });
+app.post('/api/profiles', async (req, res, next) => { try { await ensureSchema(); const key = req.body.tenantKey || req.body.tenant_key; const name = req.body.displayName || req.body.display_name || key; if (!key) return res.status(400).json({ ok: false, error: 'tenantKey is required.' }); const result = await requireDatabase().query(`insert into tenant_profiles (tenant_key, display_name, industry_pack, uiux_profile, import_profile) values ($1,$2,$3,$4,$5) on conflict (tenant_key) do update set display_name = excluded.display_name, industry_pack = excluded.industry_pack, uiux_profile = excluded.uiux_profile, import_profile = excluded.import_profile, updated_at = now() returning *`, [key, name, req.body.industryPack || null, req.body.uiuxProfile || {}, req.body.importProfile || { defaultWorkbookMapping: GENERIC_WORKBOOK_MAPPING_KEY }]); await upsertTenantImportMapping(requireDatabase(), key, GENERIC_WORKBOOK_MAPPING_KEY, { mappingType: 'workbook', label: `${name} generic workbook intake`, parser: 'generic_workbook_profiler_v1', mapping: { key: GENERIC_WORKBOOK_MAPPING_KEY, label: `${name} generic workbook intake`, fields: [], ranges: [] } }); res.json({ ok: true, profile: result.rows[0] }); } catch (error) { next(error); } });
+app.get('/api/profiles/:tenantKey/import-profile', async (req, res, next) => { try { await ensureSchema(); const profile = await getTenantImportProfile(requireDatabase(), tenantKey(req)); res.json({ ok: true, ...profile }); } catch (error) { next(error); } });
+app.put('/api/profiles/:tenantKey/import-mappings/:mappingKey', async (req, res, next) => { try { await ensureSchema(); const mapping = await upsertTenantImportMapping(requireDatabase(), tenantKey(req), req.params.mappingKey, req.body || {}); res.json({ ok: true, mapping }); } catch (error) { next(error); } });
+
+app.get('/api/estimating/schema/status', async (req, res, next) => { try { await ensureSchema(); const tables = await requireDatabase().query(`select table_name from information_schema.tables where table_schema = 'public' and (table_name in ('tenant_profiles', 'tenant_import_mappings', 'tenant_workbook_uploads', 'tenant_workbook_sheets', 'tenant_monday_source_mappings', 'authority_accounts', 'authority_users', 'authority_action_events', 'vault_memory_refs', 'estimates', 'estimate_cost_lines', 'estimate_deposit_schedule', 'quotation_versions', 'quotation_lines', 'project_checklist_items', 'invoices', 'invoice_lines', 'schedule_of_values', 'change_orders', 'quote_workbooks', 'quote_workbook_sheets', 'quote_templates', 'quote_template_versions', 'quote_template_overrides', 'steelcraft_workflow_sources', 'erp_users', 'erp_password_reset_tokens', 'connect_threads', 'connect_messages', 'connect_route_packets', 'connect_action_packets') or table_name like 'accounting_%') order by table_name`); res.json({ ok: true, tables: tables.rows.map((row) => row.table_name) }); } catch (error) { next(error); } });
+app.post('/api/estimating/quote-workbooks', upload.single('workbook'), importProfileWorkbook);
+app.post('/api/profiles/:tenantKey/estimating/quote-workbooks', upload.single('workbook'), importProfileWorkbook);
+app.get('/api/estimating/quote-workbooks', listTenantWorkbooks);
+app.get('/api/profiles/:tenantKey/estimating/quote-workbooks', listTenantWorkbooks);
+app.get('/api/profiles/:tenantKey/workbook-uploads/:id', async (req, res, next) => { try { await ensureSchema(); const uploadRecord = await getProfileWorkbookUpload(requireDatabase(), tenantKey(req), req.params.id); if (!uploadRecord) return res.status(404).json({ ok: false, error: 'Workbook upload not found for this profile.' }); res.json({ ok: true, tenantKey: tenantKey(req), ...uploadRecord }); } catch (error) { next(error); } });
+app.get('/api/estimating/quote-workbooks/:id', async (req, res, next) => { try { await ensureSchema(); const db = requireDatabase(); const profileKey = tenantKey(req); const workbook = await db.query(`select * from quote_workbooks where id = $1 and tenant_key = $2`, [req.params.id, profileKey]); if (!workbook.rows[0]) return res.status(404).json({ ok: false, error: 'Quote workbook not found for this tenant profile.' }); const sheets = await db.query(`select sheet_name, row_count, column_count, detected_numbers, preview_rows from quote_workbook_sheets where workbook_id = $1 order by id`, [req.params.id]); const fields = await db.query(`select * from quote_workbook_metadata_fields where workbook_id = $1 order by id`, [req.params.id]); const ranges = await db.query(`select * from quote_workbook_metadata_ranges where workbook_id = $1 order by id`, [req.params.id]); const formulas = await db.query(`select * from quote_workbook_formulas where workbook_id = $1 order by sheet_name, cell_address`, [req.params.id]); const automations = await db.query(`select * from quote_workbook_automations where workbook_id = $1 order by id`, [req.params.id]); res.json({ ok: true, tenantKey: profileKey, workbook: workbook.rows[0], sheets: sheets.rows, fields: fields.rows, ranges: ranges.rows, formulas: formulas.rows, automations: automations.rows }); } catch (error) { next(error); } });
+app.post('/api/estimating/quote-workbooks/:id/create-template', async (req, res, next) => { try { await ensureSchema(); const db = requireDatabase(); const profileKey = tenantKey(req); const workbook = await db.query('select id from quote_workbooks where id = $1 and tenant_key = $2', [req.params.id, profileKey]); if (!workbook.rows[0]) return res.status(404).json({ ok: false, error: 'Quote workbook not found for this tenant profile.' }); const template = await createTemplateFromWorkbook(db, req.params.id, req.body.actor || 'estimating'); if (template.template?.id) await db.query('update quote_templates set tenant_key = $1, updated_at = now() where id = $2', [profileKey, template.template.id]); res.json({ ok: true, tenantKey: profileKey, ...template }); } catch (error) { next(error); } });
+app.get('/api/estimating/quote-templates', async (req, res, next) => { try { await ensureSchema(); const profileKey = tenantKey(req); const templates = await listTemplates(requireDatabase()); res.json({ ok: true, tenantKey: profileKey, templates: templates.filter((item) => (item.tenant_key || steelcraftProfileKey) === profileKey) }); } catch (error) { next(error); } });
+app.get('/api/estimating/quote-templates/:id', async (req, res, next) => { try { await ensureSchema(); const template = await getTemplate(requireDatabase(), req.params.id); if (!template) return res.status(404).json({ ok: false, error: 'Quote template not found.' }); res.json({ ok: true, ...template }); } catch (error) { next(error); } });
+app.patch('/api/estimating/quote-template-versions/:id', async (req, res, next) => { try { await ensureSchema(); const version = await updateTemplateVersion(requireDatabase(), req.params.id, req.body, req.body.actor || 'estimating'); res.json({ ok: true, version }); } catch (error) { next(error); } });
+app.put('/api/estimating/quote-template-versions/:id/overrides', async (req, res, next) => { try { await ensureSchema(); const override = await upsertTemplateOverride(requireDatabase(), req.params.id, req.body, req.body.actor || 'estimating'); res.json({ ok: true, override }); } catch (error) { next(error); } });
+
+registerAccountingRoutes(app, requireDatabase, ensureSchema);
+registerAccountingBankingDemoRoutes(app, requireDatabase, ensureSchema);
+registerComptrollerProductionDemoRoutes(app);
+registerNeroaConnectRoutes(app, requireDatabase, ensureSchema);
+
+app.get('/api/hr/schema/status', async (req, res, next) => { try { await ensureSchema(); const tables = await requireDatabase().query(`select table_name from information_schema.tables where table_schema = 'public' and table_name in ('employees', 'pto_policies', 'pto_balances', 'pto_requests', 'company_holidays', 'handbook_documents', 'handbook_acknowledgements', 'onboarding_checklists', 'onboarding_tasks', 'training_courses', 'training_lessons', 'employee_training_assignments') order by table_name`); res.json({ ok: true, tables: tables.rows.map((row) => row.table_name) }); } catch (error) { next(error); } });
+app.get('/api/monday/boards', async (req, res, next) => { try { const profileKey = tenantKey(req); const data = await pullMondayBoards(profileKey); res.json({ ok: true, tenantKey: profileKey, boards: data.boards }); } catch (error) { next(error); } });
+app.get('/api/profiles/:tenantKey/monday/boards', async (req, res, next) => { try { const profileKey = tenantKey(req); const data = await pullMondayBoards(profileKey); res.json({ ok: true, tenantKey: profileKey, boards: data.boards }); } catch (error) { next(error); } });
+app.post('/api/monday/sync-boards', async (req, res, next) => { try { const profileKey = tenantKey(req); const boards = await syncMondayBoards(profileKey); res.json({ ok: true, tenantKey: profileKey, syncedBoards: boards.length }); } catch (error) { next(error); } });
+app.post('/api/profiles/:tenantKey/monday/sync-boards', async (req, res, next) => { try { const profileKey = tenantKey(req); const boards = await syncMondayBoards(profileKey); res.json({ ok: true, tenantKey: profileKey, syncedBoards: boards.length }); } catch (error) { next(error); } });
+app.get('/api/monday/migration/start', async (req, res, next) => { try { const profileKey = tenantKey(req); const boards = await syncMondayBoards(profileKey); res.json({ ok: true, tenantKey: profileKey, message: `${profileKey} Monday source board and column structure synced into its tenant profile.`, syncedBoards: boards.length, next: profileKey === steelcraftProfileKey ? 'Review /api/steelcraft/workflow/audit?save=true.' : 'Map boards in tenant_monday_source_mappings before enabling room automations.' }); } catch (error) { next(error); } });
+app.get('/api/monday/migration/summary', async (req, res, next) => { try { await ensureSchema(); const profileKey = tenantKey(req); const boards = await pool.query(`select b.id, b.name, b.workspace_name, b.board_kind, b.state, b.pulled_at, count(c.id)::int as column_count from monday_boards b left join monday_columns c on c.board_id = b.id and c.tenant_key = b.tenant_key where b.tenant_key = $1 group by b.id order by lower(b.name)`, [profileKey]); const mappings = await pool.query('select * from tenant_monday_source_mappings where tenant_key = $1 order by lower(board_name)', [profileKey]); res.json({ ok: true, tenantKey: profileKey, boards: boards.rows, mappings: mappings.rows }); } catch (error) { next(error); } });
+app.put('/api/profiles/:tenantKey/monday/mappings/:boardId', async (req, res, next) => { try { await ensureSchema(); const result = await requireDatabase().query(`update tenant_monday_source_mappings set destination_portal = $3, mapping_status = coalesce($4, mapping_status), column_profile = coalesce($5, column_profile), updated_at = now() where tenant_key = $1 and board_id = $2 returning *`, [tenantKey(req), req.params.boardId, req.body.destinationPortal || req.body.destination_portal || null, req.body.mappingStatus || req.body.mapping_status || null, req.body.columnProfile || req.body.column_profile || null]); if (!result.rows[0]) return res.status(404).json({ ok: false, error: 'Monday board mapping not found for this profile.' }); res.json({ ok: true, mapping: result.rows[0] }); } catch (error) { next(error); } });
+app.get('/api/steelcraft/workflow/audit', async (req, res, next) => { try { const mapped = await auditSteelCraftWorkflow({ save: req.query.save === 'true', profileKey: tenantKey(req) }); res.json(mapped); } catch (error) { next(error); } });
+app.get('/api/steelcraft/workflow/sources', async (req, res, next) => { try { await ensureSchema(); const profileKey = tenantKey(req); const result = await requireDatabase().query(`select id, tenant_key, source, source_board_id, internal_name, classification, destination, workflow_map, verification_checklist, pulled_at from steelcraft_workflow_sources where tenant_key = $1 order by internal_name`, [profileKey]); res.json({ ok: true, tenantKey: profileKey, sources: result.rows }); } catch (error) { next(error); } });
+app.get('/api/spaces/status', async (req, res, next) => { try { if (!process.env.DO_SPACES_KEY || !process.env.DO_SPACES_SECRET || !process.env.DO_SPACES_ENDPOINT) return res.json({ ok: false, configured: false }); const client = new S3Client({ endpoint: process.env.DO_SPACES_ENDPOINT, region: process.env.DO_SPACES_REGION || 'us-east-1', credentials: { accessKeyId: process.env.DO_SPACES_KEY, secretAccessKey: process.env.DO_SPACES_SECRET } }); await client.send(new ListBucketsCommand({})); res.json({ ok: true, configured: true, bucket: process.env.DO_SPACES_BUCKET || null }); } catch (error) { next(error); } });
+
+app.use((req, res, next) => { if (req.path.startsWith('/api/')) return next(); res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate'); res.sendFile(path.join(__dirname, 'dist', 'index.html')); });
+app.use((error, req, res, next) => { const status = error.statusCode || 500; res.status(status).json({ ok: false, error: error.message }); });
+app.listen(port, () => { console.log(`Steel Craft portal server listening on ${port}`); });
